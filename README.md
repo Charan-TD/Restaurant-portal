@@ -50,8 +50,6 @@ Routes: `/` redirects to `/register`; `/register`, `/status`, `/login`, `/dashbo
 - `core/api/axios.ts`: central Axios instance.
 - `core/constants/onboarding.ts`: typed common field definitions and exact step order.
 
-See `MIGRATION.md` for the complete folder structure and conversion/removal lists.
-
 ## Explicit demo mode
 
 The original portal's demo is preserved so the whole flow can be inspected without a backend. The header labels it **Frontend demo**. `NEXT_PUBLIC_DEMO_MODE` defaults to `true`. There is no fake backend server, local database, or persistence.
