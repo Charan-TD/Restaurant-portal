@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env*
+!.env.example
+
+# generated
+next-env.d.ts
+public/maplibre-gl-worker.mjs
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
