@@ -639,7 +639,6 @@ export function MenuItemFormView({ id }: { id?: string }) {
                     <div>
                       <FieldLabel
                         text="Sub category"
-                        required
                         htmlFor="menu-sub"
                       />
                       <ComboField

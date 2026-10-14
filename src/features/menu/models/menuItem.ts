@@ -105,7 +105,6 @@ export const menuItemFormSchema: z.ZodType<MenuItemForm> = z
     subCategory: z
       .string()
       .trim()
-      .min(1, "Enter the sub category.")
       .max(255, "Keep the sub category under 255 characters."),
     price: wholeNumber("price").positive("Enter a price above ₹0."),
     discountedPrice: wholeNumber("offer price").nullable(),
