@@ -79,6 +79,7 @@ export interface FieldDefinition {
     | "email"
     | "tel"
     | "password"
+    | "date"
     | "select"
     | "radio"
     | "checkboxes"
@@ -217,6 +218,8 @@ export const documentFields: {
   label: string;
   file: FieldPath<RegistrationForm>;
   number: FieldDefinition;
+  /** Extra fields shown under the number, e.g. an expiry date. */
+  extra?: FieldDefinition[];
 }[] = [
   {
     label: "GST certificate",
@@ -248,15 +251,23 @@ export const documentFields: {
       maxLength: 14,
       inputMode: "numeric",
     },
+    extra: [
+      {
+        name: "documentNumbers.fssaiExpiry",
+        label: "FSSAI expiry date",
+        type: "date",
+      },
+    ],
   },
   {
-    label: "Identity proof",
+    label: "Aadhaar card",
     file: "documents.identity",
     number: {
       name: "documentNumbers.identity",
-      label: "ID number (Aadhaar / Passport / Voter ID)",
-      sanitize: alphanumericUpper,
-      maxLength: 20,
+      label: "Aadhaar number",
+      sanitize: digits,
+      maxLength: 12,
+      inputMode: "numeric",
     },
   },
   {
@@ -274,7 +285,11 @@ const names = (id: StepId) => (fieldGroups[id] ?? []).map((f) => f.name);
 export const stepFields: Record<StepId, FieldPath<RegistrationForm>[]> = {
   details: [...names("details"), ...restaurantPhotoFields.map((f) => f.name)],
   location: ["address", "latitude", "longitude", ...names("location")],
-  documents: documentFields.flatMap((f) => [f.number.name, f.file]),
+  documents: documentFields.flatMap((f) => [
+    f.number.name,
+    ...(f.extra ?? []).map((e) => e.name),
+    f.file,
+  ]),
   bank: [...names("bank"), "bankProof"],
   menu: ["menuItems"],
   hours: ["hours"],

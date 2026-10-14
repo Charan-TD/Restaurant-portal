@@ -37,7 +37,7 @@ export function UniversalSearch({
       popupIcon={null}
       noOptionsText="No matches"
       onChange={(_, option) => option && onSelect(option)}
-      sx={{ flex: 1, maxWidth: 440 }}
+      sx={{ flex: 1, minWidth: 0, maxWidth: 440 }}
       renderInput={(params) => (
         <CommonTextField
           {...params}

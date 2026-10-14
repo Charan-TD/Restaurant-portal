@@ -16,9 +16,18 @@ interface Props {
   longitude: number;
   /** Called after the pin is dragged or the map is tapped. */
   onMove: (latitude: number, longitude: number) => void;
+  /** Shows the pin without letting it be moved. */
+  readOnly?: boolean;
+  height?: number;
 }
 /** Map with a draggable pin for the restaurant's exact position. */
-export function LocationMap({ latitude, longitude, onMove }: Props) {
+export function LocationMap({
+  latitude,
+  longitude,
+  onMove,
+  readOnly = false,
+  height,
+}: Props) {
   const theme = useTheme(),
     container = useRef<HTMLDivElement>(null),
     map = useRef<MapLibreMap>(undefined),
@@ -29,6 +38,7 @@ export function LocationMap({ latitude, longitude, onMove }: Props) {
       latitude,
       longitude,
       color: theme.palette.primary.main,
+      readOnly,
     });
   useEffect(() => {
     onMoveRef.current = onMove;
@@ -44,7 +54,7 @@ export function LocationMap({ latitude, longitude, onMove }: Props) {
       maplibre.setWorkerUrl(
         `/maplibre-gl-worker.mjs?v=${maplibre.getVersion()}`,
       );
-      const { latitude, longitude, color } = initial.current,
+      const { latitude, longitude, color, readOnly } = initial.current,
         center: [number, number] = [longitude, latitude];
       const created = new Map({
         container: container.current,
@@ -53,22 +63,25 @@ export function LocationMap({ latitude, longitude, onMove }: Props) {
         zoom: ZOOM,
         attributionControl: { compact: true },
       });
-      created.addControl(
-        new NavigationControl({ showCompass: false }),
-        "top-right",
-      );
-      const pin = new Marker({ draggable: true, color })
+      if (!readOnly)
+        created.addControl(
+          new NavigationControl({ showCompass: false }),
+          "top-right",
+        );
+      const pin = new Marker({ draggable: !readOnly, color })
         .setLngLat(center)
         .addTo(created);
       const report = () => {
         const { lat, lng } = pin.getLngLat();
         onMoveRef.current(round(lat), round(lng));
       };
-      pin.on("dragend", report);
-      created.on("click", (e) => {
-        pin.setLngLat(e.lngLat);
-        report();
-      });
+      if (!readOnly) {
+        pin.on("dragend", report);
+        created.on("click", (e) => {
+          pin.setLngLat(e.lngLat);
+          report();
+        });
+      }
       map.current = created;
       marker.current = pin;
     });
@@ -98,7 +111,7 @@ export function LocationMap({ latitude, longitude, onMove }: Props) {
       role="region"
       aria-label="Map. Drag the pin, or tap the map, to set your restaurant's exact location."
       sx={{
-        height: { xs: 280, sm: 340 },
+        height: height ?? { xs: 280, sm: 340 },
         borderRadius: "12px",
         overflow: "hidden",
         border: 1,

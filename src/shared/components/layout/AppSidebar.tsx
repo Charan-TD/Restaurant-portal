@@ -93,8 +93,9 @@ export function AppSidebar({
           px: 1.5,
           py: 1.25,
           borderRadius: "12px",
+          bgcolor: "rgba(242,106,46,.07)",
           border: 1,
-          borderColor: "divider",
+          borderColor: "rgba(242,106,46,.18)",
           display: "flex",
           alignItems: "center",
           gap: 1.25,
@@ -102,7 +103,7 @@ export function AppSidebar({
       >
         <StorefrontOutlined
           fontSize="small"
-          sx={{ color: "text.secondary", flexShrink: 0 }}
+          sx={{ color: "primary.main", flexShrink: 0 }}
         />
         <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
           {restaurantName}
@@ -157,14 +158,21 @@ export function AppSidebar({
                 onClick={() => toggle(section.id)}
                 sx={{
                   ...itemSx,
-                  ...(containsActive && { color: "primary.main" }),
+                  // A clicked (open) section looks the same for every section.
+                  ...(expanded && {
+                    bgcolor: "action.hover",
+                    color: "text.primary",
+                  }),
+                  ...(containsActive && !expanded && { color: "primary.main" }),
                 }}
               >
                 <ListItemIcon>{navIcons[section.id]}</ListItemIcon>
                 <ListItemText
                   primary={section.label}
                   slotProps={{
-                    primary: { sx: { fontWeight: 600, fontSize: 14 } },
+                    primary: {
+                      sx: { fontWeight: expanded ? 700 : 600, fontSize: 14 },
+                    },
                   }}
                 />
                 <ExpandMore
@@ -200,8 +208,9 @@ export function AppSidebar({
                           ...itemSx,
                           minHeight: 38,
                           "&.Mui-selected, &.Mui-selected:hover": {
-                            bgcolor: "action.selected",
-                            color: "primary.main",
+                            bgcolor: "rgba(242,106,46,.1)",
+                            color: "primary.dark",
+                            boxShadow: "inset 3px 0 0 #f26a2e",
                           },
                         }}
                       >

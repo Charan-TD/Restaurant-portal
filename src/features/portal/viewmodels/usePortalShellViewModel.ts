@@ -1,53 +1,33 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWatch } from "react-hook-form";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { logout as logoutRequest } from "@/features/auth/services/authService";
-import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 import { useNotificationsViewModel } from "@/features/notifications/viewmodels/useNotificationsViewModel";
-const FALLBACK_NAME = "Restaurant Partner";
-/** Two letters for the avatar: "Ravi Kumar" → "RK", "Ravi" → "RA". */
-export function initialsOf(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const letters =
-    words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? "").slice(0, 2);
-  return letters.toUpperCase() || "RP";
-}
+import { useVendorProfile } from "@/features/profile/viewmodels/useVendorProfile";
 export function usePortalShellViewModel() {
   const portal = usePortal(),
     router = useRouter(),
+    vendor = useVendorProfile(),
     notifications = useNotificationsViewModel(),
     [mobileOpen, setMobileOpen] = useState(false);
-  const [ownerName, restaurantName, email, mobile, city] = useWatch({
-    control: portal.form.control,
-    name: ["ownerName", "restaurantName", "email", "mobile", "city"],
-  });
   const { authenticated } = portal;
   useEffect(() => {
     if (!authenticated) router.replace("/login");
   }, [authenticated, router]);
-  const vendorName = ownerName?.trim() || FALLBACK_NAME;
   const logout = () => {
     // Leave the portal even if the backend call fails.
     void logoutRequest().catch(() => undefined);
     portal.setAuthenticated(false);
+    portal.setProfile({});
     router.replace("/login");
   };
   return {
     authenticated,
-    vendorName,
-    restaurantName:
-      restaurantName?.trim() ||
-      portal.approval?.restaurantName ||
-      "Your restaurant",
-    initials: initialsOf(vendorName),
-    /** Shown in the avatar's profile card; empty values mean "not added". */
-    profile: {
-      email: email?.trim() ?? "",
-      mobile: mobile?.trim() ? `${COUNTRY_CODE} ${mobile.trim()}` : "",
-      city: city?.trim() ?? "",
-    },
+    vendor,
+    vendorName: vendor.vendorName,
+    restaurantName: vendor.restaurantName || "Restaurant name not added",
+    initials: vendor.initials,
     notifications,
     mobileOpen,
     toggleMobile: () => setMobileOpen((open) => !open),

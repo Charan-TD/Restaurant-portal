@@ -1,12 +1,15 @@
 import { z } from "zod";
 export const loginMethods = ["email", "phone"] as const;
 export type LoginMethod = (typeof loginMethods)[number];
-// Not enforced yet: login currently skips validation and opens the dashboard.
-export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email."),
-  password: z.string().min(1, "Enter your password."),
+// Mirrors the backend contract for POST /auth/restaurant/login.
+export const emailLoginSchema = z.object({
+  email: z.string().trim().email("Enter a valid email."),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters.")
+    .max(128, "Password must be at most 128 characters."),
 });
-export type LoginCredentials = z.infer<typeof loginSchema>;
+export type LoginCredentials = z.infer<typeof emailLoginSchema>;
 export interface LoginForm {
   method: LoginMethod;
   email: string;
@@ -21,8 +24,23 @@ export const initialLogin: LoginForm = {
   phone: "",
   otp: "",
 };
-export interface AuthSession {
-  authenticated: boolean;
+/** Who signed in, as far as the login response tells us. */
+export interface SessionProfile {
+  restaurantId?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
   restaurantName?: string;
-  approvalStatus: "Under review" | "Approved" | "Rejected";
+}
+export interface AuthSession {
+  accessToken: string;
+  refreshToken?: string;
+  profile: SessionProfile;
+}
+export interface OtpChallenge {
+  challengeId?: string;
+  /** Returned by non-production backends only, for testing. */
+  otp?: string;
+  expiresAt?: string;
 }

@@ -9,6 +9,7 @@ import { NavDropdown } from "@/shared/components/navigation/NavDropdown";
 import { UniversalSearch } from "@/shared/components/navigation/UniversalSearch";
 import { navIcons } from "@/shared/components/navigation/navIcons";
 import { NotificationsMenu } from "./NotificationsMenu";
+import { OnlineToggle } from "./OnlineToggle";
 import { ProfileMenu } from "./ProfileMenu";
 import type { PortalShellViewModel } from "../viewmodels/usePortalShellViewModel";
 export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
@@ -35,7 +36,13 @@ export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
         backdropFilter: "blur(10px)",
       }}
     >
-      <Toolbar sx={{ minHeight: { xs: 64, md: 72 }, gap: { xs: 1, md: 2 } }}>
+      <Toolbar
+        sx={{
+          minHeight: { xs: 64, md: 72 },
+          gap: { xs: 0.25, sm: 1, md: 2 },
+          px: { xs: 1, sm: 3 },
+        }}
+      >
         <IconButton
           aria-label="Open menu"
           onClick={vm.toggleMobile}
@@ -63,6 +70,13 @@ export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
               />
             );
           })}
+        </Box>
+        <Box sx={{ display: { xs: "none", sm: "flex" } }}>
+          <OnlineToggle
+            online={vm.vendor.online}
+            onChange={vm.vendor.setOnline}
+            size="small"
+          />
         </Box>
         <NotificationsMenu vm={alerts} />
         <ProfileMenu vm={vm} />

@@ -28,8 +28,8 @@ export function PageHeader({
         {eyebrow && (
           <Typography
             variant="overline"
-            color="text.secondary"
-            sx={{ letterSpacing: 1.2 }}
+            color="primary.dark"
+            sx={{ letterSpacing: 1.2, fontWeight: 700 }}
           >
             {eyebrow}
           </Typography>

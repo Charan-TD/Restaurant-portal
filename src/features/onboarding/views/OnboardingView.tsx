@@ -33,6 +33,18 @@ export function OnboardingView() {
         <Typography variant="h4">{title}</Typography>
         <Typography color="text.secondary">{description}</Typography>
       </div>
+      {vm.restoring && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Loading your saved registration…
+        </Alert>
+      )}
+      {vm.restored && (
+        <Alert severity="success" onClose={vm.dismissRestored} sx={{ mb: 3 }}>
+          Welcome back. We restored your saved registration, so you can carry on
+          from where you stopped. Documents you already uploaded are saved; you
+          only need to upload them again if you change that step.
+        </Alert>
+      )}
       <form
         noValidate
         onSubmit={(e) => {
@@ -87,6 +99,12 @@ export function OnboardingView() {
                 <div className="upload document" key={doc.file}>
                   <Typography variant="subtitle2">{doc.label} *</Typography>
                   <RegistrationField definition={doc.number} />
+                  {doc.extra?.map((definition) => (
+                    <RegistrationField
+                      key={definition.name}
+                      definition={definition}
+                    />
+                  ))}
                   <RegistrationUpload
                     name={doc.file}
                     label={`Upload ${doc.label.toLowerCase()}`}
@@ -114,7 +132,9 @@ export function OnboardingView() {
           </CommonButton>
           <CommonButton variant="contained" type="submit" disabled={vm.busy}>
             {vm.busy
-              ? "Submitting…"
+              ? step === LAST_STEP
+                ? "Submitting…"
+                : "Saving…"
               : step === LAST_STEP
                 ? "Submit for approval"
                 : "Save & continue"}

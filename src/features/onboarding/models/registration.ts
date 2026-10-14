@@ -6,51 +6,11 @@ export type FoodType = (typeof foodTypes)[number];
 export const itemTypes = foodTypes;
 export type ItemType = FoodType;
 export const COUNTRY_CODE = "+91";
-export const cuisineOptions = [
-  "American",
-  "Andhra",
-  "Arabian",
-  "Asian",
-  "Awadhi",
-  "Bakery",
-  "Bengali",
-  "Beverages",
-  "Biryani",
-  "Burgers",
-  "Chettinad",
-  "Chinese",
-  "Continental",
-  "Desserts",
-  "Fast food",
-  "Goan",
-  "Gujarati",
-  "Hyderabadi",
-  "Ice cream",
-  "Indian",
-  "Indo-Chinese",
-  "Italian",
-  "Japanese",
-  "Kashmiri",
-  "Kerala",
-  "Korean",
-  "Lebanese",
-  "Maharashtrian",
-  "Mediterranean",
-  "Mexican",
-  "Mughlai",
-  "North Indian",
-  "Pizza",
-  "Punjabi",
-  "Rajasthani",
-  "Rolls & wraps",
-  "Sandwiches",
-  "Seafood",
-  "South Indian",
-  "Street food",
-  "Tandoor",
-  "Thai",
-  "Thali",
-] as const;
+/** A cuisine from the backend; the form stores its id. */
+export interface Cuisine {
+  id: string;
+  name: string;
+}
 export interface RestaurantRegistration {
   restaurantName: string;
   ownerName: string;
@@ -60,6 +20,7 @@ export interface RestaurantRegistration {
   /** Any mix of veg, egg and non-veg; menu items must match it. */
   foodServed: FoodType[];
   email: string;
+  /** Cuisine ids from the backend. */
   cuisines: string[];
   customerContact: string;
 }
@@ -83,6 +44,8 @@ export interface DocumentNumbers {
   gst: string;
   pan: string;
   fssai: string;
+  /** YYYY-MM-DD, from the date input. */
+  fssaiExpiry: string;
   identity: string;
   businessProof: string;
 }
@@ -112,10 +75,6 @@ export interface RegistrationForm extends RestaurantRegistration {
   menuItems: MenuItem[];
   agreement: boolean;
 }
-export type RegistrationPayload = Omit<
-  RegistrationForm,
-  "confirmAccountNumber" | "confirmPassword"
->;
 export const initialRegistration: RegistrationForm = {
   restaurantName: "",
   ownerName: "",
@@ -144,6 +103,7 @@ export const initialRegistration: RegistrationForm = {
     gst: "",
     pan: "",
     fssai: "",
+    fssaiExpiry: "",
     identity: "",
     businessProof: "",
   },

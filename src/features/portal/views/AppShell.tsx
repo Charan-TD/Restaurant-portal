@@ -1,7 +1,8 @@
 "use client";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Box, Drawer } from "@mui/material";
+import { Box, Drawer, ThemeProvider } from "@mui/material";
+import { portalTheme } from "@/core/theme/theme";
 import { sidebarSections } from "@/core/constants/navigation";
 import {
   AppSidebar,
@@ -33,58 +34,66 @@ export function AppShell({ children }: { children: ReactNode }) {
     />
   );
   return (
-    <Box
-      sx={{
-        display: "flex",
-        minHeight: "100vh",
-        bgcolor: "background.default",
-      }}
-    >
+    <ThemeProvider theme={portalTheme}>
       <Box
-        component="aside"
-        sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: 0 }}
+        sx={{
+          display: "flex",
+          minHeight: "100vh",
+          bgcolor: "background.default",
+        }}
       >
-        <Drawer
-          variant="temporary"
-          open={vm.mobileOpen}
-          onClose={vm.closeMobile}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": paperSx,
-          }}
-        >
-          {sidebar}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          open
-          sx={{
-            display: { xs: "none", md: "block" },
-            "& .MuiDrawer-paper": paperSx,
-          }}
-        >
-          {sidebar}
-        </Drawer>
-      </Box>
-      <Box
-        sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}
-      >
-        <AppNavbar vm={vm} />
         <Box
-          component="main"
+          component="aside"
+          sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: 0 }}
+        >
+          <Drawer
+            variant="temporary"
+            open={vm.mobileOpen}
+            onClose={vm.closeMobile}
+            ModalProps={{ keepMounted: true }}
+            sx={{
+              display: { xs: "block", md: "none" },
+              "& .MuiDrawer-paper": paperSx,
+            }}
+          >
+            {sidebar}
+          </Drawer>
+          <Drawer
+            variant="permanent"
+            open
+            sx={{
+              display: { xs: "none", md: "block" },
+              "& .MuiDrawer-paper": paperSx,
+            }}
+          >
+            {sidebar}
+          </Drawer>
+        </Box>
+        <Box
           sx={{
             flex: 1,
-            width: "100%",
-            maxWidth: 1360,
-            mx: "auto",
-            px: { xs: 2, sm: 3, lg: 5 },
-            py: { xs: 3, md: 4 },
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {children}
+          <AppNavbar vm={vm} />
+          <Box
+            component="main"
+            className="portal-main"
+            sx={{
+              flex: 1,
+              width: "100%",
+              maxWidth: 1360,
+              mx: "auto",
+              px: { xs: 2, sm: 3, lg: 5 },
+              py: { xs: 3, md: 4 },
+            }}
+          >
+            {children}
+          </Box>
         </Box>
       </Box>
-    </Box>
+    </ThemeProvider>
   );
 }

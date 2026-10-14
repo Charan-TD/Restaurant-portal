@@ -56,11 +56,6 @@ export const sidebarSections: NavSection[] = [
         href: "/menu/add",
         description: "Add new dishes with price, picture and food type.",
       },
-      {
-        label: "Item availability",
-        href: "/menu/availability",
-        description: "Switch items in or out of stock for the day.",
-      },
     ],
   },
   {
@@ -144,14 +139,14 @@ export const navbarMenus: NavSection[] = [
     label: "Settings",
     pages: [
       {
-        label: "Profile settings",
-        href: "/settings/profile",
-        description: "Your name, contact details and login.",
+        label: "Working hours",
+        href: "/settings/working-hours",
+        description: "Choose the days and times you take orders.",
       },
       {
-        label: "Restaurant settings",
-        href: "/settings/restaurant",
-        description: "Restaurant details, hours, documents and bank account.",
+        label: "Change password",
+        href: "/settings/password",
+        description: "Update the password you use to sign in.",
       },
     ],
   },

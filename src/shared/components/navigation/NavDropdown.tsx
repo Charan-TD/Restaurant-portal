@@ -49,7 +49,7 @@ export function NavDropdown({
         endIcon={<ExpandMore fontSize="small" />}
         sx={{
           color: "text.secondary",
-          px: 1.5,
+          px: { xs: 1, lg: 1.5 },
           minWidth: 0,
           borderRadius: 999,
           "&:hover, &[aria-expanded='true']": {
@@ -71,7 +71,7 @@ export function NavDropdown({
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
-          paper: { sx: { mt: 1, width: 300, borderRadius: 3, p: 0.5 } },
+          paper: { sx: { mt: 1, width: 300, maxWidth: "calc(100vw - 24px)", borderRadius: 3, p: 0.5 } },
         }}
       >
         <Typography

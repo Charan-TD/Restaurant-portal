@@ -16,16 +16,26 @@ import {
 import { registrationSchema } from "@/features/onboarding/models/validation";
 import type { ApprovalResult } from "@/features/approval/models/approval";
 import type { Order } from "@/features/dashboard/models/order";
+import type { SessionProfile } from "@/features/auth/models/auth";
 interface PortalState {
   form: UseFormReturn<RegistrationForm>;
   currentStep: number;
   setCurrentStep: Dispatch<SetStateAction<number>>;
   completed: number[];
   setCompleted: Dispatch<SetStateAction<number[]>>;
+  /** Returned by the backend when the details step is saved. */
+  registrationId: string | null;
+  setRegistrationId: Dispatch<SetStateAction<string | null>>;
   approval: ApprovalResult | null;
   setApproval: Dispatch<SetStateAction<ApprovalResult | null>>;
   authenticated: boolean;
   setAuthenticated: Dispatch<SetStateAction<boolean>>;
+  /** The signed-in vendor, from the login response. */
+  profile: SessionProfile;
+  setProfile: Dispatch<SetStateAction<SessionProfile>>;
+  /** Whether the restaurant is taking orders right now. */
+  online: boolean;
+  setOnline: Dispatch<SetStateAction<boolean>>;
   orders: Order[];
   setOrders: Dispatch<SetStateAction<Order[]>>;
 }
@@ -38,8 +48,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   });
   const [currentStep, setCurrentStep] = useState(0),
     [completed, setCompleted] = useState<number[]>([]),
+    [registrationId, setRegistrationId] = useState<string | null>(null),
     [approval, setApproval] = useState<ApprovalResult | null>(null),
     [authenticated, setAuthenticated] = useState(false),
+    [profile, setProfile] = useState<SessionProfile>({}),
+    [online, setOnline] = useState(true),
     [orders, setOrders] = useState<Order[]>([]);
   return (
     <PortalContext.Provider
@@ -49,10 +62,16 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         setCurrentStep,
         completed,
         setCompleted,
+        registrationId,
+        setRegistrationId,
         approval,
         setApproval,
         authenticated,
         setAuthenticated,
+        profile,
+        setProfile,
+        online,
+        setOnline,
         orders,
         setOrders,
       }}

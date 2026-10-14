@@ -7,12 +7,19 @@ export interface CommonUploadProps {
   value: File | null;
   onChange: (file: File | null) => void;
   optional?: boolean;
-  /** "document" accepts PDF only; "image" accepts JPG/PNG only. */
-  accept?: "image" | "document";
+  /**
+   * "document" accepts PDF only; "image" accepts JPG/PNG only; "photo"
+   * accepts JPG/WEBP only (menu item pictures).
+   */
+  accept?: "image" | "photo" | "document";
   errorMessage?: string;
 }
 const acceptTypes = {
   image: { input: ".jpg,.jpeg,.png", hint: "JPG or PNG, up to 2 MB" },
+  photo: {
+    input: ".jpg,.jpeg,.webp,image/jpeg,image/webp",
+    hint: "JPG or WEBP, up to 2 MB",
+  },
   document: { input: ".pdf,application/pdf", hint: "PDF only, up to 2 MB" },
 };
 export function CommonUpload({

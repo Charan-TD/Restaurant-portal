@@ -1,16 +1,10 @@
 "use client";
 import { useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
-import {
-  Autocomplete,
-  Chip,
-  IconButton,
-  InputAdornment,
-  createFilterOptions,
-} from "@mui/material";
+import { IconButton, InputAdornment } from "@mui/material";
 import Visibility from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOff from "@mui/icons-material/VisibilityOffOutlined";
-import { cuisineOptions, type RegistrationForm } from "../models/registration";
+import type { RegistrationForm } from "../models/registration";
 import { passwordRules } from "../models/validation";
 import type { FieldDefinition } from "@/core/constants/onboarding";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
@@ -18,8 +12,8 @@ import { CommonSelect } from "@/shared/components/form/CommonSelect";
 import { CommonRadioGroup } from "@/shared/components/form/CommonRadioGroup";
 import { CommonCheckboxGroup } from "@/shared/components/form/CommonCheckboxGroup";
 import { PasswordChecklist } from "./PasswordChecklist";
-// Typing "i" suggests Indian, Italian, Indo-Chinese… (matches from the start).
-const filterCuisines = createFilterOptions<string>({ matchFrom: "start" });
+import { CuisineField } from "./CuisineField";
+import { todayIso } from "../models/validation";
 export function RegistrationField({
   definition,
 }: {
@@ -71,54 +65,15 @@ export function RegistrationField({
               }
             />
           );
-        if (definition.type === "cuisines") {
-          const selected = Array.isArray(field.value)
-            ? (field.value as string[])
-            : [];
+        if (definition.type === "cuisines")
           return (
-            <Autocomplete
+            <CuisineField
               className={className}
-              multiple
-              freeSolo
-              autoHighlight
-              options={cuisineOptions as readonly string[]}
-              filterOptions={filterCuisines}
-              value={selected}
-              onChange={(_, value) =>
-                field.onChange(value.map((v) => v.trim()).filter(Boolean))
-              }
-              onBlur={field.onBlur}
-              renderValue={(value, getItemProps) =>
-                value.map((option, index) => {
-                  const { key, ...itemProps } = getItemProps({ index });
-                  return (
-                    <Chip
-                      key={key}
-                      size="small"
-                      label={option}
-                      {...itemProps}
-                    />
-                  );
-                })
-              }
-              renderInput={(params) => (
-                <CommonTextField
-                  {...params}
-                  label={definition.label}
-                  required
-                  name={field.name}
-                  inputRef={field.ref}
-                  placeholder={selected.length ? "" : "Search cuisines…"}
-                  error={!!fieldState.error}
-                  helperText={
-                    fieldState.error?.message ||
-                    "Type to search, e.g. “i” for Indian, Italian…"
-                  }
-                />
-              )}
+              label={definition.label}
+              field={field}
+              error={fieldState.error?.message}
             />
           );
-        }
         const value = typeof field.value === "string" ? field.value : "";
         const mismatch =
           !!definition.matches && value !== "" && value !== other;
@@ -175,11 +130,18 @@ export function RegistrationField({
             multiline={definition.multiline}
             minRows={definition.multiline ? 3 : undefined}
             slotProps={{
+              // A date input shows its own dd-mm-yyyy hint, so keep the label up.
+              inputLabel:
+                definition.type === "date" ? { shrink: true } : undefined,
               formHelperText: matched
                 ? { sx: { color: "success.main" } }
                 : undefined,
               htmlInput: {
                 maxLength: definition.maxLength,
+                min:
+                  definition.name === "documentNumbers.fssaiExpiry"
+                    ? todayIso()
+                    : undefined,
                 inputMode: definition.inputMode,
                 autoComplete: isPassword ? "new-password" : undefined,
               },

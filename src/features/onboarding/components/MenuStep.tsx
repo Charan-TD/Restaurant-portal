@@ -11,18 +11,9 @@ import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonUpload } from "@/shared/components/form/CommonUpload";
+import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
 import { useMenuViewModel } from "../viewmodels/useMenuViewModel";
 import { itemTypes, type MenuItem } from "../models/registration";
-// Indian food mark: a dot inside a square — green veg, amber egg, red non-veg.
-function FoodTypeMark({ type }: { type: MenuItem["type"] }) {
-  return (
-    <span
-      className={`food-mark ${type.toLowerCase()}`}
-      aria-label={type}
-      title={type}
-    />
-  );
-}
 function MenuItemRow({
   item,
   onRemove,

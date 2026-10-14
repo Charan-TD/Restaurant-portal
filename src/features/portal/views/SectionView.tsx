@@ -3,11 +3,12 @@ import { useRouter } from "next/navigation";
 import { Box, Typography } from "@mui/material";
 import ConstructionOutlined from "@mui/icons-material/ConstructionOutlined";
 import type { NavPage, NavSection } from "@/core/constants/navigation";
+import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { LiveOrders } from "@/features/dashboard/components/LiveOrders";
-/** Shell for a navigation page until its own screen is built. */
+/** Shell for a page whose screen or API is not connected yet. */
 export function SectionView({
   section,
   page,
@@ -23,7 +24,7 @@ export function SectionView({
         title={page.label}
         subtitle={page.description}
       />
-      {page.href === "/orders/live" ? (
+      {page.href === "/orders/live" && (DEMO_MODE || API_PATHS.orders) ? (
         <LiveOrders />
       ) : (
         <CommonCard>
@@ -38,10 +39,9 @@ export function SectionView({
             }}
           >
             <ConstructionOutlined color="disabled" sx={{ fontSize: 48 }} />
-            <Typography variant="h6">{page.label} is on its way</Typography>
+            <Typography variant="h6">{page.label} is under development</Typography>
             <Typography color="text.secondary" sx={{ maxWidth: 420 }}>
-              This screen is being built. Everything you need today is on your
-              dashboard.
+              This page is under development and will be available soon.
             </Typography>
             <CommonButton
               variant="outlined"

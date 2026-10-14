@@ -26,6 +26,13 @@ const photo = z.custom<File | null>(
   (value) => isFile(value, ["image/png", "image/jpeg"]),
   "Upload a JPG or PNG image (up to 2 MB).",
 );
+/** Today as YYYY-MM-DD in the local timezone. */
+export const todayIso = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 10);
+};
 // Kept local (not imported) so this model stays dependency-free for tests.
 const FOOD_TYPES: readonly FoodType[] = ["Veg", "Egg", "Non-veg"];
 const phone = z
@@ -129,7 +136,16 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
       fssai: z
         .string()
         .regex(/^\d{14}$/, "Enter a valid 14-digit FSSAI licence number."),
-      identity: required,
+      fssaiExpiry: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the FSSAI licence expiry date.")
+        .refine(
+          (date) => date >= todayIso(),
+          "The FSSAI licence has expired. Enter a date that is not in the past.",
+        ),
+      identity: z
+        .string()
+        .regex(/^\d{12}$/, "Enter a valid 12-digit Aadhaar number."),
       businessProof: required,
     }),
     documents: z.object({

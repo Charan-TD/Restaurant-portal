@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
-import { DEMO_MODE } from "@/core/constants/config";
+import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
 import { stepIndex, LAST_STEP } from "@/core/constants/onboarding";
 import { getApproval } from "../services/approvalService";
 import type { ApprovalStatus } from "../models/approval";
@@ -12,11 +12,11 @@ export function useApprovalViewModel() {
     router = useRouter(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const { setApproval } = portal;
+  const { setApproval, registrationId } = portal;
   useEffect(() => {
-    if (DEMO_MODE) return;
+    if (DEMO_MODE || !API_PATHS.approval || !registrationId) return;
     let active = true;
-    getApproval()
+    getApproval(registrationId)
       .then((value) => {
         if (active) setApproval(value);
       })
@@ -26,12 +26,13 @@ export function useApprovalViewModel() {
     return () => {
       active = false;
     };
-  }, [setApproval]);
+  }, [setApproval, registrationId]);
   const refresh = async () => {
+    if (!registrationId) return;
     setBusy(true);
     setError("");
     try {
-      portal.setApproval(await getApproval());
+      portal.setApproval(await getApproval(registrationId));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
