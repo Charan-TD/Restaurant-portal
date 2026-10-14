@@ -11,7 +11,6 @@ import {
   type MenuItemForm,
 } from "../models/menuItem";
 import {
-  addMenuCategory,
   createMenuItem,
   getMenuItem,
   listMenuCategories,
@@ -67,8 +66,8 @@ export function useMenuItemFormViewModel(id?: string) {
     listMenuCategories()
       .then((lists) => {
         if (!active) return;
-        setCategories(lists.categories);
-        setSubCategories(lists.subCategories);
+        setCategories(lists.categories.map((c) => c.name));
+        setSubCategories(lists.subCategories.map((c) => c.name));
       })
       // Suggestions are optional; typing a category still works without them.
       .catch(() => undefined);
@@ -80,22 +79,18 @@ export function useMenuItemFormViewModel(id?: string) {
     setError("");
     setCreated(null);
     try {
-      const category = values.category.trim(),
-        subCategory = values.subCategory.trim();
       if (id) {
         await updateMenuItem(id, values);
         router.push("/menu/items");
       } else {
         setCreated(await createMenuItem(values));
-        // Remember a new category (and sub category) for the next dish.
-        if (category && (subCategory || !categories.includes(category)))
-          addMenuCategory(category, subCategory || undefined)
-            .then(() => {
-              setCategories((old) => [...new Set([...old, category])]);
-              if (subCategory)
-                setSubCategories((old) => [...new Set([...old, subCategory])]);
-            })
-            .catch(() => undefined);
+        // The category may be new; refresh the dropdown lists.
+        listMenuCategories()
+          .then((lists) => {
+            setCategories(lists.categories.map((c) => c.name));
+            setSubCategories(lists.subCategories.map((c) => c.name));
+          })
+          .catch(() => undefined);
         form.reset(emptyMenuItemForm());
         try {
           localStorage.removeItem(DRAFT_KEY);

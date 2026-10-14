@@ -3,9 +3,11 @@ import NextLink from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Controller,
+  useWatch,
   type Control,
   type ControllerFieldState,
   type ControllerRenderProps,
+  type UseFormSetValue,
 } from "react-hook-form";
 import {
   Alert,
@@ -14,6 +16,8 @@ import {
   Button,
   Chip,
   CircularProgress,
+  MenuItem,
+  Select,
   FormHelperText,
   IconButton,
   ToggleButton,
@@ -39,6 +43,7 @@ import {
   type MenuFoodType,
   type MenuItemForm,
 } from "../models/menuItem";
+import { formatRupees } from "@/shared/utils/format";
 import { menuImageUrl } from "../services/menuItemService";
 import { useMenuItemFormViewModel } from "../viewmodels/useMenuItemFormViewModel";
 type NumberName =
@@ -275,55 +280,198 @@ function ComboField({
     />
   );
 }
-/** "+ Add new …" link and the existing values as quick picks. */
-function Picks({
+/**
+ * Category-style field: pick an existing value from the dropdown or press
+ * "Add new …" to type a new one in its own text box.
+ */
+function ChoiceField({
+  id,
+  value,
+  options,
+  placeholder,
   addLabel,
+  newPlaceholder,
   existingLabel,
-  names,
-  onAdd,
-  onPick,
+  error,
+  helperText,
+  onChange,
+  onBlur,
 }: {
+  id: string;
+  value: string;
+  options: string[];
+  placeholder: string;
   addLabel: string;
+  newPlaceholder: string;
   existingLabel: string;
-  names: string[];
-  onAdd: () => void;
-  onPick: (name: string) => void;
+  error: boolean;
+  helperText?: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
 }) {
+  const [adding, setAdding] = useState(false);
+  if (adding)
+    return (
+      <>
+        <CommonTextField
+          id={id}
+          autoFocus
+          value={value}
+          placeholder={newPlaceholder}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          error={error}
+          helperText={helperText ?? "Saved when you add the item."}
+          slotProps={{ htmlInput: { maxLength: 255 } }}
+        />
+        <Button
+          size="small"
+          onClick={() => {
+            setAdding(false);
+            onChange("");
+          }}
+          sx={{ mt: 1, minHeight: 0, px: 0.5, fontWeight: 600 }}
+        >
+          Choose from existing
+        </Button>
+      </>
+    );
   return (
-    <Box sx={{ mt: 1 }}>
-      <Button
-        size="small"
-        startIcon={<AddOutlined />}
-        onClick={onAdd}
-        sx={{ minHeight: 0, px: 0.5, fontWeight: 600 }}
-      >
-        {addLabel}
-      </Button>
-      {names.length > 0 && (
-        <Box
+    <>
+      <ComboField
+        id={id}
+        value={value}
+        options={options}
+        placeholder={placeholder}
+        error={error}
+        helperText={helperText}
+        onChange={onChange}
+        onBlur={onBlur}
+      />
+      <Box sx={{ mt: 1 }}>
+        <Button
+          size="small"
+          startIcon={<AddOutlined />}
+          onClick={() => {
+            setAdding(true);
+            onChange("");
+          }}
+          sx={{ minHeight: 0, px: 0.5, fontWeight: 600 }}
+        >
+          {addLabel}
+        </Button>
+        {options.length > 0 && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              mt: 0.5,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              {existingLabel}
+            </Typography>
+            {options.slice(0, 8).map((name) => (
+              <Chip
+                key={name}
+                label={name}
+                variant="outlined"
+                onClick={() => onChange(name)}
+                sx={{ bgcolor: "#f8f8f6" }}
+              />
+            ))}
+          </Box>
+        )}
+      </Box>
+    </>
+  );
+}
+/** Optional discount (percent or flat ₹ off) that sets the offer price. */
+function DiscountField({
+  control,
+  setValue,
+}: {
+  control: Control<MenuItemForm>;
+  setValue: UseFormSetValue<MenuItemForm>;
+}) {
+  const price = useWatch({ control, name: "price" }),
+    offer = useWatch({ control, name: "discountedPrice" }),
+    [mode, setMode] = useState<"percent" | "flat">("percent"),
+    [amount, setAmount] = useState("");
+  const apply = (nextMode: typeof mode, raw: string, base: number | null) => {
+    const n = Number(raw);
+    if (!raw || !base || !Number.isFinite(n) || n <= 0)
+      return setValue("discountedPrice", null, { shouldValidate: true });
+    const off =
+      nextMode === "percent" ? Math.round((base * n) / 100) : Math.round(n);
+    setValue("discountedPrice", off > 0 && off < base ? base - off : null, {
+      shouldValidate: true,
+    });
+  };
+  return (
+    <div>
+      <FieldLabel text="Discount" htmlFor="menu-discount" />
+      <Box sx={{ display: "flex", gap: 1.5 }}>
+        <Select
+          size="small"
+          value={mode}
+          onChange={(e) => {
+            const next = e.target.value as typeof mode;
+            setMode(next);
+            apply(next, amount, price);
+          }}
+          inputProps={{ "aria-label": "Discount type" }}
+          sx={{ flex: 1.3, minWidth: 0 }}
+        >
+          <MenuItem value="percent">Percentage % off</MenuItem>
+          <MenuItem value="flat">Flat ₹ off</MenuItem>
+        </Select>
+        <CommonTextField
+          id="menu-discount"
+          value={amount}
+          placeholder="10"
+          onChange={(e) => {
+            const next = e.target.value.replace(/\D/g, "");
+            setAmount(next);
+            apply(mode, next, price);
+          }}
+          slotProps={{
+            htmlInput: { inputMode: "numeric", "aria-label": "Discount value" },
+            input: {
+              endAdornment: (
+                <Typography color="text.secondary">
+                  {mode === "percent" ? "%" : "₹"}
+                </Typography>
+              ),
+            },
+          }}
+          sx={{ flex: 1 }}
+        />
+      </Box>
+      {offer != null && price != null && amount ? (
+        <Typography
+          variant="caption"
           sx={{
-            display: "flex",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 1,
-            mt: 0.5,
+            display: "block",
+            mt: 0.75,
+            fontWeight: 600,
+            color: "success.main",
           }}
         >
-          <Typography variant="caption" color="text.secondary">
-            {existingLabel}
-          </Typography>
-          {names.slice(0, 8).map((name) => (
-            <Chip
-              key={name}
-              label={name}
-              variant="outlined"
-              onClick={() => onPick(name)}
-              sx={{ bgcolor: "#f8f8f6" }}
-            />
-          ))}
-        </Box>
+          Customers pay {formatRupees(offer)} · save {formatRupees(price - offer)}
+        </Typography>
+      ) : (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 0.75 }}
+        >
+          Optional. Sets the offer price from the price.
+        </Typography>
       )}
-    </Box>
+    </div>
   );
 }
 /** Drag-and-drop picture slot with a preview of what was picked. */
@@ -471,7 +619,7 @@ function PictureDrop({
 }
 export function MenuItemFormView({ id }: { id?: string }) {
   const vm = useMenuItemFormViewModel(id),
-    { control, setValue, setFocus } = vm.form,
+    { control, setValue } = vm.form,
     title = vm.editing ? "Edit item" : "Add items";
   return (
     <>
@@ -609,25 +757,18 @@ export function MenuItemFormView({ id }: { id?: string }) {
                         required
                         htmlFor="menu-category"
                       />
-                      <ComboField
+                      <ChoiceField
                         id="menu-category"
                         value={field.value}
                         options={vm.categories}
                         placeholder="e.g. Biryani"
+                        addLabel="Add new category"
+                        newPlaceholder="Type the new category"
+                        existingLabel="Existing categories:"
                         error={!!fieldState.error}
                         helperText={fieldState.error?.message}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
-                      />
-                      <Picks
-                        addLabel="Add new category"
-                        existingLabel="Existing categories:"
-                        names={vm.categories}
-                        onAdd={() => {
-                          setValue("category", "");
-                          setFocus("category");
-                        }}
-                        onPick={field.onChange}
                       />
                     </div>
                   )}
@@ -641,25 +782,18 @@ export function MenuItemFormView({ id }: { id?: string }) {
                         text="Sub category"
                         htmlFor="menu-sub"
                       />
-                      <ComboField
+                      <ChoiceField
                         id="menu-sub"
                         value={field.value}
                         options={vm.subCategories}
                         placeholder="e.g. Chicken Biryani"
+                        addLabel="Add new subcategory"
+                        newPlaceholder="Type the new subcategory"
+                        existingLabel="Existing subcategories:"
                         error={!!fieldState.error}
                         helperText={fieldState.error?.message}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
-                      />
-                      <Picks
-                        addLabel="Add new subcategory"
-                        existingLabel="Existing subcategories:"
-                        names={vm.subCategories}
-                        onAdd={() => {
-                          setValue("subCategory", "");
-                          setFocus("subCategory");
-                        }}
-                        onPick={field.onChange}
                       />
                     </div>
                   )}
@@ -695,7 +829,7 @@ export function MenuItemFormView({ id }: { id?: string }) {
             <Section
               icon={<CurrencyRupee />}
               title="Pricing & preparation"
-              subtitle="Set the price, tax and preparation details."
+              subtitle="Set the price, discount and preparation details."
             >
               <NumberField
                 control={control}
@@ -713,12 +847,7 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 placeholder="e.g. 99"
                 helperText="Optional. Shown instead of the price."
               />
-              <NumberField
-                control={control}
-                name="taxRate"
-                label="Tax rate (%)"
-                decimal
-              />
+              <DiscountField control={control} setValue={setValue} />
               <NumberField
                 control={control}
                 name="preparationMinutes"

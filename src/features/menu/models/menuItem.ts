@@ -155,11 +155,12 @@ export const toMenuItemForm = (item: MenuItem): MenuItemForm => ({
   images: [null],
 });
 /** Request body field names, as the backend expects them. */
-export function toMenuItemPayload(form: MenuItemForm) {
+/** `categoryId` is the saved category's id; without it the typed name is sent. */
+export function toMenuItemPayload(form: MenuItemForm, categoryId?: string | null) {
   return {
     name: form.name.trim(),
     description: form.description.trim() || null,
-    category_id: form.category.trim() || null,
+    category_id: categoryId ?? (form.category.trim() || null),
     price: form.price ?? 0,
     discounted_price: form.discountedPrice,
     tax_rate: form.taxRate ?? 0,
