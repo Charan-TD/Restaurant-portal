@@ -13,7 +13,7 @@ import {
 import {
   createMenuItem,
   getMenuItem,
-  listMenuCategories,
+  listCategoryNames,
   updateMenuItem,
 } from "../services/menuItemService";
 import { menuErrorMessage } from "./menuErrors";
@@ -63,11 +63,11 @@ export function useMenuItemFormViewModel(id?: string) {
   }, [id, form]);
   useEffect(() => {
     let active = true;
-    listMenuCategories()
+    listCategoryNames()
       .then((lists) => {
         if (!active) return;
-        setCategories(lists.categories.map((c) => c.name));
-        setSubCategories(lists.subCategories.map((c) => c.name));
+        setCategories(lists.categories);
+        setSubCategories(lists.subCategories);
       })
       // Suggestions are optional; typing a category still works without them.
       .catch(() => undefined);
@@ -85,10 +85,10 @@ export function useMenuItemFormViewModel(id?: string) {
       } else {
         setCreated(await createMenuItem(values));
         // The category may be new; refresh the dropdown lists.
-        listMenuCategories()
+        listCategoryNames()
           .then((lists) => {
-            setCategories(lists.categories.map((c) => c.name));
-            setSubCategories(lists.subCategories.map((c) => c.name));
+            setCategories(lists.categories);
+            setSubCategories(lists.subCategories);
           })
           .catch(() => undefined);
         form.reset(emptyMenuItemForm());

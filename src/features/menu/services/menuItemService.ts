@@ -11,6 +11,7 @@ import {
   type MenuItem,
   type MenuItemForm,
 } from "../models/menuItem";
+import { loadRemembered, rememberCategory } from "./categoryMemory";
 // Backend: GET /menu-items?restaurant_id=, GET /menu-items/categories,
 // POST /menu-items, GET | PATCH | DELETE /menu-items/{id}. All take a
 // restaurant login; responses are { success, message, data }.
@@ -171,7 +172,9 @@ export async function createMenuItem(form: MenuItemForm): Promise<MenuItem> {
     endpoint(API_PATHS.menuItems),
     files.length ? multipart(fields, files) : fields,
   );
-  return readItem(data);
+  const saved = readItem(data);
+  rememberCategory(saved.category, form.category.trim(), form.subCategory.trim());
+  return saved;
 }
 /**
  * Fields go as JSON so cleared values (e.g. no offer price) are sent as
@@ -186,6 +189,11 @@ export async function updateMenuItem(
   const { data } = await api.patch(
     itemPath(id),
     toMenuItemPayload(form),
+  );
+  rememberCategory(
+    readItem(data).category,
+    form.category.trim(),
+    form.subCategory.trim(),
   );
   const files = newImages(form);
   if (!files.length) return readItem(data);
@@ -253,23 +261,51 @@ export async function listMenuCategories(): Promise<MenuCategories> {
 const ID_LIKE = /^(CAT|SUB)\d+$/i;
 /**
  * Items carry a category id: a sub category's id when one was given, else the
- * category's. Turns it back into the name for the list and the edit form.
+ * category's. Turns it back into names for the list and the edit form, using
+ * the server's list and then the names this browser saved. An id that cannot
+ * be resolved is hidden instead of shown.
  */
 async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
   if (DEMO_MODE || !items.some((i) => i.category)) return items;
-  // If the names cannot be loaded, show none rather than a raw id like CAT003.
-  const hideIds = (list: MenuItem[]) =>
-    list.map((i) => (ID_LIKE.test(i.category) ? { ...i, category: "" } : i));
+  let lists: MenuCategories = { categories: [], subCategories: [] };
   try {
-    const { categories, subCategories } = await listMenuCategories();
-    const cats = new Map(categories.map((c) => [c.id, c.name])),
-      subs = new Map(subCategories.map((c) => [c.id, c.name]));
-    return items.map((i) =>
-      subs.has(i.category)
-        ? { ...i, subCategory: subs.get(i.category), category: "" }
-        : { ...i, category: cats.get(i.category) ?? "" },
-    );
+    lists = await listMenuCategories();
   } catch {
-    return hideIds(items);
+    // Fall back to the remembered names.
   }
+  const cats = new Map(lists.categories.map((c) => [c.id, c.name])),
+    subs = new Map(lists.subCategories.map((c) => [c.id, c.name])),
+    remembered = loadRemembered().names;
+  return items.map((i) => {
+    const id = i.category;
+    if (!id) return i;
+    if (subs.has(id))
+      return { ...i, subCategory: subs.get(id), category: remembered[id]?.parent ?? "" };
+    if (cats.has(id)) return { ...i, category: cats.get(id)! };
+    const known = remembered[id];
+    if (known?.parent !== undefined || (known && ID_LIKE.test(id) && /^SUB/i.test(id)))
+      return { ...i, subCategory: known.name, category: known.parent ?? "" };
+    if (known) return { ...i, category: known.name };
+    return { ...i, category: ID_LIKE.test(id) ? "" : id };
+  });
+}
+/** Category and sub category names for the dropdowns: the server's plus the ones this browser saved. */
+export async function listCategoryNames(): Promise<{
+  categories: string[];
+  subCategories: string[];
+}> {
+  const remembered = loadRemembered();
+  let lists: MenuCategories = { categories: [], subCategories: [] };
+  try {
+    lists = await listMenuCategories();
+  } catch {
+    // The remembered names still work offline.
+  }
+  const merge = (server: { name: string }[], local: string[]) => [
+    ...new Set([...server.map((c) => c.name), ...local]),
+  ];
+  return {
+    categories: merge(lists.categories, remembered.categories),
+    subCategories: merge(lists.subCategories, remembered.subCategories),
+  };
 }
