@@ -19,7 +19,6 @@ import {
   MenuItem,
   Select,
   FormHelperText,
-  IconButton,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -33,6 +32,7 @@ import SetMealOutlined from "@mui/icons-material/SetMealOutlined";
 import AddOutlined from "@mui/icons-material/AddOutlined";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import AddPhotoAlternateOutlined from "@mui/icons-material/AddPhotoAlternateOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -454,7 +454,15 @@ function DiscountField({
     </div>
   );
 }
-/** Drag-and-drop picture slot with a preview of what was picked. */
+const MAX_PICTURE_BYTES = 2 * 1024 * 1024;
+const fileSize = (bytes: number) =>
+  bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+/**
+ * Picture upload: tap or drop a photo, see it large straight away, and
+ * replace or remove it. Wrong types or big files are refused on the spot.
+ */
 function PictureDrop({
   value,
   currentUrl,
@@ -468,6 +476,7 @@ function PictureDrop({
 }) {
   const input = useRef<HTMLInputElement>(null),
     [over, setOver] = useState(false),
+    [problem, setProblem] = useState(""),
     preview = useMemo(
       () => (value ? URL.createObjectURL(value) : null),
       [value],
@@ -478,122 +487,172 @@ function PictureDrop({
     },
     [preview],
   );
-  const shown = preview ?? currentUrl ?? null;
+  const pick = (file?: File | null) => {
+    if (!file) return;
+    if (!ITEM_IMAGE_TYPES.includes(file.type))
+      return setProblem("Please choose a JPG or WEBP picture.");
+    if (file.size > MAX_PICTURE_BYTES)
+      return setProblem(
+        `That picture is ${fileSize(file.size)}. Please keep it under 2 MB.`,
+      );
+    setProblem("");
+    onChange(file);
+  };
+  const shown = preview ?? currentUrl ?? null,
+    message = problem || error;
+  const chooser = (
+    <input
+      ref={input}
+      hidden
+      aria-label="Dish picture"
+      type="file"
+      accept={`${ITEM_IMAGE_TYPES.join(",")},.jpg,.jpeg,.webp`}
+      onChange={(e) => {
+        pick(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  );
   return (
     <Box sx={fullRow}>
-      <Box
-        onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) onChange(file);
-        }}
-        sx={{
-          p: 2,
-          border: "1.5px dashed",
-          borderColor: over ? "primary.main" : "divider",
-          bgcolor: over ? "rgba(242,106,46,.05)" : "transparent",
-          borderRadius: "12px",
-        }}
-      >
-        <FieldLabel text="Main image" required />
+      {shown ? (
         <Box
           sx={{
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
             gap: 2.5,
+            p: 2,
+            border: 1,
+            borderColor: "divider",
+            borderRadius: "14px",
+            bgcolor: "#fcfcfb",
+          }}
+        >
+          <Box
+            component="img"
+            src={shown}
+            alt="Dish preview"
+            sx={{
+              width: { xs: "100%", sm: 240 },
+              height: { xs: 200, sm: 160 },
+              objectFit: "cover",
+              borderRadius: "12px",
+              display: "block",
+            }}
+          />
+          <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700 }}>
+              {value ? "Looks good!" : "Current picture"}
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ overflowWrap: "anywhere", mb: 2 }}
+            >
+              {value
+                ? `${value.name} · ${fileSize(value.size)}`
+                : "This is what customers see now."}
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+              <CommonButton
+                size="small"
+                variant="outlined"
+                startIcon={<FileUploadOutlined />}
+                onClick={() => input.current?.click()}
+              >
+                {value ? "Change picture" : "Replace picture"}
+              </CommonButton>
+              {value && (
+                <CommonButton
+                  size="small"
+                  color="inherit"
+                  startIcon={<CloseOutlined />}
+                  onClick={() => {
+                    setProblem("");
+                    onChange(null);
+                  }}
+                >
+                  Remove
+                </CommonButton>
+              )}
+            </Box>
+          </Box>
+          {chooser}
+        </Box>
+      ) : (
+        <Box
+          role="button"
+          tabIndex={0}
+          aria-label="Add a dish picture"
+          onClick={() => input.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              input.current?.click();
+            }
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOver(true);
+          }}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            pick(e.dataTransfer.files?.[0]);
+          }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+            px: 2,
+            py: { xs: 4, sm: 5 },
+            textAlign: "center",
+            cursor: "pointer",
+            border: "2px dashed",
+            borderColor: over || message ? (message ? "error.main" : "primary.main") : "#d9ded9",
+            bgcolor: over ? "rgba(242,106,46,.06)" : "#fcfcfb",
+            borderRadius: "14px",
+            transition: "border-color .15s, background-color .15s",
+            "&:hover, &:focus-visible": {
+              borderColor: "primary.main",
+              bgcolor: "rgba(242,106,46,.04)",
+              outline: "none",
+            },
           }}
         >
           <Box
             sx={{
-              flex: "1 1 280px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 2,
-              p: 2,
-              border: "1.5px dashed",
-              borderColor: "divider",
-              borderRadius: "10px",
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              bgcolor: "rgba(242,106,46,.12)",
+              color: "primary.main",
             }}
           >
-            <FileUploadOutlined color="primary" sx={{ fontSize: 32 }} />
-            <Box sx={{ textAlign: "center" }}>
-              <Typography variant="body2">
-                Drag &amp; drop an image here
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                or
-              </Typography>
-              <Box>
-                <CommonButton
-                  size="small"
-                  variant="outlined"
-                  onClick={() => input.current?.click()}
-                >
-                  {value ? "Change file" : "Choose file"}
-                </CommonButton>
-              </Box>
-            </Box>
-            <input
-              ref={input}
-              hidden
-              aria-label="Main image"
-              type="file"
-              accept={`${ITEM_IMAGE_TYPES.join(",")},.jpg,.jpeg,.webp`}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onChange(file);
-                e.target.value = "";
-              }}
-            />
+            <AddPhotoAlternateOutlined sx={{ fontSize: 28 }} />
           </Box>
-          {shown && (
-            <Box sx={{ position: "relative", flexShrink: 0 }}>
-              <Box
-                component="img"
-                src={shown}
-                alt="Item preview"
-                sx={{
-                  width: 130,
-                  height: 96,
-                  objectFit: "cover",
-                  borderRadius: "10px",
-                  display: "block",
-                }}
-              />
-              {value && (
-                <IconButton
-                  size="small"
-                  aria-label="Remove image"
-                  onClick={() => onChange(null)}
-                  sx={{
-                    position: "absolute",
-                    top: -10,
-                    right: -10,
-                    bgcolor: "background.paper",
-                    border: 1,
-                    borderColor: "divider",
-                    "&:hover": { bgcolor: "background.paper" },
-                  }}
-                >
-                  <CloseOutlined sx={{ fontSize: 16 }} />
-                </IconButton>
-              )}
+          <Typography sx={{ fontWeight: 700 }}>
+            {over ? "Drop it here" : "Add a photo of your dish"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Drag &amp; drop, or{" "}
+            <Box component="span" sx={{ color: "primary.main", fontWeight: 600 }}>
+              browse your files
             </Box>
-          )}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            JPG or WEBP, up to 2 MB. A bright, close-up photo sells best.
+          </Typography>
+          {chooser}
         </Box>
-        <Typography variant="caption" color="text.secondary">
-          JPG or WEBP, up to 2 MB
-        </Typography>
-      </Box>
-      {error && <FormHelperText error>{error}</FormHelperText>}
+      )}
+      {message && <FormHelperText error>{message}</FormHelperText>}
     </Box>
   );
 }
@@ -664,121 +723,117 @@ export function MenuItemFormView({ id }: { id?: string }) {
               title="Basic details"
               subtitle="Enter the basic information about your menu item."
             >
-              <Box sx={{ display: "grid", gap: 3 }}>
-                <Controller
-                  control={control}
-                  name="foodType"
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <FieldLabel text="Food type" required />
-                      <ToggleButtonGroup
-                        exclusive
-                        value={field.value}
-                        onChange={(_, value) => value && field.onChange(value)}
-                        sx={{ flexWrap: "wrap", gap: 1.5 }}
-                      >
-                        {menuFoodTypes.map((type) => (
-                          <ToggleButton
-                            key={type}
-                            value={type}
-                            sx={{
-                              px: 3,
-                              gap: 1,
-                              fontWeight: 600,
-                              color: "text.primary",
-                              border: "1px solid #d9ded9 !important",
-                              borderRadius: "10px !important",
-                              "& svg": { color: foodStyle[type].color },
-                              "&.Mui-selected, &.Mui-selected:hover": {
-                                bgcolor: `${foodStyle[type].color}14`,
-                                borderColor: `${foodStyle[type].color} !important`,
-                              },
-                            }}
-                          >
-                            {foodStyle[type].icon}
-                            {type}
-                          </ToggleButton>
-                        ))}
-                      </ToggleButtonGroup>
-                      {fieldState.error && (
-                        <FormHelperText error>
-                          {fieldState.error.message}
-                        </FormHelperText>
-                      )}
-                    </div>
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="name"
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <FieldLabel text="Item name" required htmlFor="menu-name" />
-                      <CommonTextField
-                        {...field}
-                        id="menu-name"
-                        placeholder="e.g. Paneer Butter Masala"
-                        error={!!fieldState.error}
-                        helperText={fieldState.error?.message}
-                        slotProps={{ htmlInput: { maxLength: 255 } }}
-                      />
-                    </div>
-                  )}
-                />
-              </Box>
-              <Box sx={{ display: "grid", gap: 3 }}>
-                <Controller
-                  control={control}
-                  name="category"
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <FieldLabel
-                        text="Category"
-                        required
-                        htmlFor="menu-category"
-                      />
-                      <ChoiceField
-                        id="menu-category"
-                        value={field.value}
-                        options={vm.categories}
-                        placeholder="e.g. Biryani"
-                        addLabel="Add new category"
-                        newPlaceholder="Type the new category"
-                        existingLabel="Existing categories:"
-                        error={!!fieldState.error}
-                        helperText={fieldState.error?.message}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                      />
-                    </div>
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="subCategory"
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <FieldLabel
-                        text="Sub category"
-                        htmlFor="menu-sub"
-                      />
-                      <ChoiceField
-                        id="menu-sub"
-                        value={field.value}
-                        options={vm.subCategories}
-                        placeholder="e.g. Chicken Biryani"
-                        addLabel="Add new subcategory"
-                        newPlaceholder="Type the new subcategory"
-                        existingLabel="Existing subcategories:"
-                        error={!!fieldState.error}
-                        helperText={fieldState.error?.message}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                      />
-                    </div>
-                  )}
-                />
-              </Box>
+              <Controller
+                control={control}
+                name="name"
+                render={({ field, fieldState }) => (
+                  <div>
+                    <FieldLabel text="Item name" required htmlFor="menu-name" />
+                    <CommonTextField
+                      {...field}
+                      id="menu-name"
+                      placeholder="e.g. Paneer Butter Masala"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                      slotProps={{ htmlInput: { maxLength: 255 } }}
+                    />
+                  </div>
+                )}
+              />
+              <Controller
+                control={control}
+                name="foodType"
+                render={({ field, fieldState }) => (
+                  <div>
+                    <FieldLabel text="Food type" required />
+                    <ToggleButtonGroup
+                      exclusive
+                      value={field.value}
+                      onChange={(_, value) => value && field.onChange(value)}
+                      sx={{ flexWrap: "wrap", gap: 1.5 }}
+                    >
+                      {menuFoodTypes.map((type) => (
+                        <ToggleButton
+                          key={type}
+                          value={type}
+                          sx={{
+                            px: 3,
+                            gap: 1,
+                            fontWeight: 600,
+                            color: "text.primary",
+                            border: "1px solid #d9ded9 !important",
+                            borderRadius: "10px !important",
+                            "& svg": { color: foodStyle[type].color },
+                            "&.Mui-selected, &.Mui-selected:hover": {
+                              bgcolor: `${foodStyle[type].color}14`,
+                              borderColor: `${foodStyle[type].color} !important`,
+                            },
+                          }}
+                        >
+                          {foodStyle[type].icon}
+                          {type}
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                    {fieldState.error && (
+                      <FormHelperText error>
+                        {fieldState.error.message}
+                      </FormHelperText>
+                    )}
+                  </div>
+                )}
+              />
+              <Controller
+                control={control}
+                name="category"
+                render={({ field, fieldState }) => (
+                  <div>
+                    <FieldLabel
+                      text="Category"
+                      required
+                      htmlFor="menu-category"
+                    />
+                    <ChoiceField
+                      id="menu-category"
+                      value={field.value}
+                      options={vm.categories}
+                      placeholder="e.g. Biryani"
+                      addLabel="Add new category"
+                      newPlaceholder="Type the new category"
+                      existingLabel="Existing categories:"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  </div>
+                )}
+              />
+              <Controller
+                control={control}
+                name="subCategory"
+                render={({ field, fieldState }) => (
+                  <div>
+                    <FieldLabel
+                      text="Sub category"
+                      htmlFor="menu-sub"
+                    />
+                    <ChoiceField
+                      id="menu-sub"
+                      value={field.value}
+                      options={vm.subCategories}
+                      placeholder="e.g. Chicken Biryani"
+                      addLabel="Add new subcategory"
+                      newPlaceholder="Type the new subcategory"
+                      existingLabel="Existing subcategories:"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  </div>
+                )}
+              />
               <Controller
                 control={control}
                 name="description"

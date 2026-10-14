@@ -4,7 +4,11 @@ import { Alert, Autocomplete, Box, Typography } from "@mui/material";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
-import { searchLocations } from "@/features/onboarding/services/locationService";
+import {
+  reverseGeocode,
+  searchLocations,
+} from "@/features/onboarding/services/locationService";
+import { LocationMap } from "@/features/onboarding/components/LocationMap";
 import type { LocationSuggestion } from "@/features/onboarding/models/location";
 import { errorMessage } from "@/shared/utils/errors";
 import { requestProfileChange } from "../services/restaurantService";
@@ -14,6 +18,9 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
   const [values, setValues] = useState(EMPTY),
     [picked, setPicked] = useState<LocationSuggestion | null>(null),
     [options, setOptions] = useState<LocationSuggestion[]>([]),
+    // The exact spot: starts at the search result and moves with the pin.
+    [pin, setPin] = useState<{ lat: number; lon: number } | null>(null),
+    [resolving, setResolving] = useState(false),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -35,8 +42,28 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
       }
     }, 300);
   }
+  /** The vendor moved the pin: keep its exact spot and refresh the address. */
+  async function movePin(lat: number, lon: number) {
+    setPin({ lat, lon });
+    setResolving(true);
+    try {
+      const found = await reverseGeocode(lat, lon);
+      if (found)
+        setValues((old) => ({
+          ...old,
+          city: found.city || old.city,
+          state: found.state || old.state,
+          pincode: found.pincode || old.pincode,
+        }));
+    } catch {
+      // The pin is still saved; the address can be typed by hand.
+    } finally {
+      setResolving(false);
+    }
+  }
   function choose(location: LocationSuggestion | null) {
     setPicked(location);
+    setPin(location ? { lat: location.latitude, lon: location.longitude } : null);
     if (location)
       setValues((old) => ({
         ...old,
@@ -62,11 +89,12 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
         city: values.city.trim(),
         state: values.state.trim(),
         pincode: values.pincode.trim(),
-        lat: picked.latitude,
-        lon: picked.longitude,
+        lat: pin?.lat ?? picked.latitude,
+        lon: pin?.lon ?? picked.longitude,
       });
       setValues(EMPTY);
       setPicked(null);
+      setPin(null);
       setSent(true);
       onSent();
     } catch (e) {
@@ -123,6 +151,38 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
             />
           )}
         />
+        {pin && (
+          <Box className="full">
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 1,
+                mb: 1.5,
+              }}
+            >
+              <Typography variant="subtitle2">
+                Drag the pin to your restaurant&apos;s entrance
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                aria-live="polite"
+              >
+                {resolving
+                  ? "Updating address…"
+                  : `${pin.lat.toFixed(6)}, ${pin.lon.toFixed(6)}`}
+              </Typography>
+            </Box>
+            <LocationMap
+              latitude={pin.lat}
+              longitude={pin.lon}
+              onMove={(lat, lon) => void movePin(lat, lon)}
+            />
+          </Box>
+        )}
         <CommonTextField
           label="Shop no. / Building / Floor"
           value={values.building}

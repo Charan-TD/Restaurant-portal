@@ -105,6 +105,7 @@ export function BankAccountForm({
             set("ifsc", e.target.value.toUpperCase().slice(0, 11))
           }
         />
+        <Box className="full">
         <DocumentUpload
           required
           title="Bank proof"
@@ -113,6 +114,7 @@ export function BankAccountForm({
           onChange={setProof}
           currentUrl={proofUrl}
         />
+        </Box>
       </div>
       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
         <CommonButton type="submit" variant="contained" disabled={busy}>
