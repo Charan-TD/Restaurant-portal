@@ -165,7 +165,7 @@ export async function listMenuItems(): Promise<MenuItem[]> {
 }
 export async function createMenuItem(form: MenuItemForm): Promise<MenuItem> {
   if (DEMO_MODE) return demoSave(`demo-${Date.now()}`, form);
-  const fields = toMenuItemPayload(form, await categoryIdFor(form)),
+  const fields = toMenuItemPayload(form),
     files = newImages(form);
   const { data } = await api.post(
     endpoint(API_PATHS.menuItems),
@@ -185,7 +185,7 @@ export async function updateMenuItem(
   if (DEMO_MODE) return demoSave(id, form);
   const { data } = await api.patch(
     itemPath(id),
-    toMenuItemPayload(form, await categoryIdFor(form)),
+    toMenuItemPayload(form),
   );
   const files = newImages(form);
   if (!files.length) return readItem(data);
@@ -251,60 +251,20 @@ export async function listMenuCategories(): Promise<MenuCategories> {
   return { categories: under("CAT001"), subCategories: under("SUB001") };
 }
 /**
- * POST /menu-items/categories: saves a new category and optional sub category.
- * Returns the saved category's id when the server sends it back.
+ * Items carry a category id: a sub category's id when one was given, else the
+ * category's. Turns it back into the name for the list and the edit form.
  */
-export async function addMenuCategory(
-  category: string,
-  subcategory?: string,
-): Promise<string | null> {
-  if (DEMO_MODE) return category;
-  const { data } = await api.post(`${endpoint(API_PATHS.menuItems)}/categories`, {
-    category,
-    ...(subcategory && { subcategory }),
-  });
-  const saved = ((data as { data?: { category?: { category_id?: unknown } } })?.data ?? {})
-    .category;
-  return typeof saved?.category_id === "string" ? saved.category_id : null;
-}
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-/**
- * The item's category must already exist on the server (an unknown one makes
- * it fail), so a new category is saved first. Returns the id to attach.
- */
-async function categoryIdFor(form: MenuItemForm): Promise<string | null> {
-  const name = form.category.trim();
-  if (!name) return null;
-  if (DEMO_MODE) return name;
-  const known = await listMenuCategories();
-  const existing = known.categories.find((c) => sameName(c.name, name));
-  const sub = form.subCategory.trim();
-  const subIsNew = !!sub && !known.subCategories.some((c) => sameName(c.name, sub));
-  if (existing && !subIsNew) return existing.id;
-  let id: string | null;
-  try {
-    id = await addMenuCategory(name, sub || undefined);
-  } catch {
-    if (existing) return existing.id;
-    throw new Error(
-      "The new category could not be saved on the server, so the item was not added. Please try again or pick an existing category.",
-    );
-  }
-  if (id && !existing) return id;
-  const after = await listMenuCategories();
-  return (
-    existing?.id ??
-    after.categories.find((c) => sameName(c.name, name))?.id ??
-    id
-  );
-}
-/** Shows category names instead of ids on items read from the server. */
 async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
   if (DEMO_MODE || !items.some((i) => i.category)) return items;
   try {
-    const { categories } = await listMenuCategories();
-    const names = new Map(categories.map((c) => [c.id, c.name]));
-    return items.map((i) => ({ ...i, category: names.get(i.category) ?? i.category }));
+    const { categories, subCategories } = await listMenuCategories();
+    const cats = new Map(categories.map((c) => [c.id, c.name])),
+      subs = new Map(subCategories.map((c) => [c.id, c.name]));
+    return items.map((i) =>
+      subs.has(i.category)
+        ? { ...i, subCategory: subs.get(i.category), category: "" }
+        : { ...i, category: cats.get(i.category) ?? i.category },
+    );
   } catch {
     return items;
   }

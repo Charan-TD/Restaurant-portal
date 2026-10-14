@@ -155,12 +155,16 @@ export const toMenuItemForm = (item: MenuItem): MenuItemForm => ({
   images: [null],
 });
 /** Request body field names, as the backend expects them. */
-/** `categoryId` is the saved category's id; without it the typed name is sent. */
-export function toMenuItemPayload(form: MenuItemForm, categoryId?: string | null) {
+/**
+ * The API takes the category and sub category as names and saves them
+ * itself; `category_id` is no longer accepted. `food_served` is one value.
+ */
+export function toMenuItemPayload(form: MenuItemForm) {
   return {
     name: form.name.trim(),
     description: form.description.trim() || null,
-    category_id: categoryId ?? (form.category.trim() || null),
+    category: form.category.trim() || undefined,
+    sub_category: form.subCategory.trim() || undefined,
     price: form.price ?? 0,
     discounted_price: form.discountedPrice,
     tax_rate: form.taxRate ?? 0,
@@ -168,7 +172,7 @@ export function toMenuItemPayload(form: MenuItemForm, categoryId?: string | null
     quantity: form.quantity ?? 0,
     low_stock_threshold: form.lowStockThreshold ?? 0,
     owner_is_available: form.available,
-    food_served: form.foodType ? [foodTypeKeys[form.foodType]] : null,
+    food_served: form.foodType ? foodTypeKeys[form.foodType] : undefined,
   };
 }
 type Row = Record<string, unknown>;
@@ -179,12 +183,16 @@ const number = (value: unknown, fallback = 0) => {
   return value !== null && value !== "" && Number.isFinite(n) ? n : fallback;
 };
 export function fromMenuItemRow(row: Row): MenuItem {
-  const served = Array.isArray(row.food_served) ? row.food_served : [],
+  const served = Array.isArray(row.food_served)
+      ? row.food_served
+      : row.food_served
+        ? [row.food_served]
+        : [],
     foodType =
       menuFoodTypes.find((type) =>
         served.some((s) => String(s).toLowerCase() === foodTypeKeys[type]),
       ) ?? null,
-    reason = row.admin_item_inactive_reason as Row | null;
+    reason = row.admin_item_inactive_reason as Row | string | null;
   return {
     id: text(row.id),
     name: text(row.name),
@@ -204,10 +212,13 @@ export function fromMenuItemRow(row: Row): MenuItem {
       typeof row.admin_is_available === "boolean"
         ? row.admin_is_available
         : null,
+    // A plain text reason now; older rows held an object.
     adminInactiveReason:
-      reason && typeof reason === "object"
-        ? text(reason.reason) || text(reason.message)
-        : "",
+      typeof reason === "string"
+        ? reason
+        : reason && typeof reason === "object"
+          ? text(reason.reason) || text(reason.message)
+          : "",
     images:
       [row.img_urls, row.img_id]
         .find(Array.isArray)
