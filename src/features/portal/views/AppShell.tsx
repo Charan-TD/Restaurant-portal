@@ -84,9 +84,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             sx={{
               flex: 1,
               width: "100%",
-              maxWidth: 1360,
+              maxWidth: 1280,
               mx: "auto",
-              px: { xs: 2, sm: 3, lg: 5 },
+              px: { xs: 2, sm: 3, md: 4 },
               py: { xs: 3, md: 4 },
             }}
           >

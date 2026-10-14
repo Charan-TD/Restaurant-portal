@@ -45,3 +45,10 @@
 body{background:#f5f6f4;-webkit-font-smoothing:antialiased}
 .portal-main .card{border-color:#e6eae6;border-radius:16px;box-shadow:0 1px 2px rgba(32,38,33,.04),0 8px 24px -16px rgba(32,38,33,.12)}
 .card.profile-card,.card.compact-card{padding:28px 32px}@media(max-width:900px){.card.profile-card,.card.compact-card{padding:24px}}@media(max-width:640px){.card.profile-card,.card.compact-card{padding:20px 16px}}
+
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* 16px inputs stop iOS and Android from zooming the page when a field is focused. */
+@media(max-width:900px){input,select,textarea,.MuiInputBase-input{font-size:16px!important}}
+/* Same gutters and card sizes on the sign-in and setup screens. */
+.shell{max-width:1280px}
+img,svg,video{max-width:100%}
