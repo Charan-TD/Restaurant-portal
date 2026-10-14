@@ -63,6 +63,7 @@ function toOrder(row: Row): Order {
   return {
     id: String(row.id),
     food: food || "Order",
+    pnr: first(row.pnr, row.pnr_number, row.pnr_no),
     station: [station, ...seat].filter(Boolean).join(" · ") || "Train delivery",
     amount: Number(row.total) || 0,
     state: fromServer[String(row.status).toUpperCase()] ?? "New",

@@ -86,7 +86,7 @@ export function OrderCard({ order, busy, onChange }: Props) {
       <Cell value={order.customer || "Customer"} caption="Customer" />
       <Cell
         value={order.food}
-        caption={order.station || "Order items"}
+        caption={order.pnr ? `PNR ${order.pnr}` : "Order items"}
         sx={{ gridColumn: { xs: "1 / -1", lg: "auto" } }}
       />
       <Cell strong value={formatRupees(order.amount)} caption="Amount" />

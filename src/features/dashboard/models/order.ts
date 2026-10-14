@@ -15,9 +15,11 @@ export interface Order {
   /** Items summary, e.g. "2 × Chicken Biryani, 1 × Raita". */
   food: string;
   /** Where the order goes, e.g. "Coach B2 · Seat 42". */
-  station: string;
+  station?: string;
   amount: number;
   state: OrderStatus;
   customer?: string;
+  /** The passenger's train ticket number. */
+  pnr?: string;
   placedAt?: string;
 }
