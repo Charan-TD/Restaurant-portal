@@ -179,8 +179,10 @@ function ItemRow({
               {item.foodType}
             </Box>
           )}
-          {item.category && (
-            <Typography variant="body2">{item.category}</Typography>
+          {(item.subCategory || item.category) && (
+            <Typography variant="body2">
+              {[item.category, item.subCategory].filter(Boolean).join(" · ")}
+            </Typography>
           )}
           <MenuItemStatus item={item} />
         </Box>

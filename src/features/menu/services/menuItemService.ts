@@ -250,12 +250,16 @@ export async function listMenuCategories(): Promise<MenuCategories> {
   };
   return { categories: under("CAT001"), subCategories: under("SUB001") };
 }
+const ID_LIKE = /^(CAT|SUB)\d+$/i;
 /**
  * Items carry a category id: a sub category's id when one was given, else the
  * category's. Turns it back into the name for the list and the edit form.
  */
 async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
   if (DEMO_MODE || !items.some((i) => i.category)) return items;
+  // If the names cannot be loaded, show none rather than a raw id like CAT003.
+  const hideIds = (list: MenuItem[]) =>
+    list.map((i) => (ID_LIKE.test(i.category) ? { ...i, category: "" } : i));
   try {
     const { categories, subCategories } = await listMenuCategories();
     const cats = new Map(categories.map((c) => [c.id, c.name])),
@@ -263,9 +267,9 @@ async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
     return items.map((i) =>
       subs.has(i.category)
         ? { ...i, subCategory: subs.get(i.category), category: "" }
-        : { ...i, category: cats.get(i.category) ?? i.category },
+        : { ...i, category: cats.get(i.category) ?? "" },
     );
   } catch {
-    return items;
+    return hideIds(items);
   }
 }

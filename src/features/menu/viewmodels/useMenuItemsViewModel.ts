@@ -36,7 +36,8 @@ export function useMenuItemsViewModel() {
         (foodFilter === "All" || item.foodType === foodFilter) &&
         (!query ||
           item.name.toLowerCase().includes(query) ||
-          item.category.toLowerCase().includes(query)),
+          item.category.toLowerCase().includes(query) ||
+          (item.subCategory ?? "").toLowerCase().includes(query)),
     );
   }, [items, search, foodFilter]);
   const replace = (item: MenuItem) =>

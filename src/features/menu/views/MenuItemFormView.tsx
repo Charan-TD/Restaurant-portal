@@ -12,6 +12,7 @@ import {
 import {
   Alert,
   Autocomplete,
+  createFilterOptions,
   Box,
   Button,
   Chip,
@@ -215,6 +216,7 @@ function Section({
   );
 }
 const fullRow = { gridColumn: { md: "1 / -1" } } as const;
+const filterByText = createFilterOptions<string>();
 /** Dropdown of existing values that also accepts a new one typed in. */
 function ComboField({
   id,
@@ -239,9 +241,17 @@ function ComboField({
     <Autocomplete
       id={id}
       freeSolo
+      openOnFocus
       forcePopupIcon
       fullWidth
       options={options}
+      // Opening the list always shows every saved value; typing narrows it.
+      filterOptions={(all, state) =>
+        all.some((o) => o.toLowerCase() === state.inputValue.trim().toLowerCase())
+          ? all
+          : filterByText(all, state)
+      }
+      noOptionsText="No saved values yet"
       inputValue={value}
       onInputChange={(_, next) => onChange(next)}
       onBlur={onBlur}
