@@ -39,6 +39,15 @@ export function MenuFilters({
         value={foodFilter}
         onChange={(_, value) => value && onFoodFilter(value)}
         aria-label="Food type"
+        sx={{
+          "& .MuiToggleButton-root": {
+            height: 40,
+            px: 2,
+            gap: 0.75,
+            lineHeight: 1,
+            "& .food-mark": { m: 0 },
+          },
+        }}
       >
         <ToggleButton value="All">All</ToggleButton>
         {menuFoodTypes.map((type) => (

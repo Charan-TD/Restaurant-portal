@@ -36,9 +36,13 @@ import { MenuFilters } from "../components/MenuFilters";
 import { useMenuItemsViewModel } from "../viewmodels/useMenuItemsViewModel";
 function Price({ item }: { item: MenuItem }) {
   if (item.discountedPrice === null)
-    return <strong>{formatRupees(item.price)}</strong>;
+    return (
+      <Box sx={{ minWidth: 72, textAlign: "right" }}>
+        <strong>{formatRupees(item.price)}</strong>
+      </Box>
+    );
   return (
-    <Box sx={{ textAlign: "right" }}>
+    <Box sx={{ minWidth: 72, textAlign: "right" }}>
       <strong>{formatRupees(item.discountedPrice)}</strong>
       <Typography
         variant="caption"
@@ -154,13 +158,26 @@ function ItemRow({
             </Typography>
           </Box>
           {item.foodType && (
-            <Chip
-              size="small"
-              variant="outlined"
-              icon={<FoodTypeMark type={item.foodType} />}
-              label={item.foodType}
-              sx={{ "& .MuiChip-icon": { ml: 1, mr: -0.5 } }}
-            />
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.75,
+                height: 26,
+                px: 1.25,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 600,
+                lineHeight: 1,
+                color: "text.primary",
+                "& .food-mark": { m: 0 },
+              }}
+            >
+              <FoodTypeMark type={item.foodType} />
+              {item.foodType}
+            </Box>
           )}
           {item.category && (
             <Typography variant="body2">{item.category}</Typography>
