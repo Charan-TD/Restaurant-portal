@@ -12,7 +12,6 @@ import RestaurantOutlined from "@mui/icons-material/RestaurantOutlined";
 import RoomServiceOutlined from "@mui/icons-material/RoomServiceOutlined";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import CreditCardOutlined from "@mui/icons-material/CreditCardOutlined";
-import OpenInNewOutlined from "@mui/icons-material/OpenInNewOutlined";
 import NextLink from "next/link";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -198,19 +197,6 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
                 </>
               ) : (
                 <Typography color="text.disabled">Not added</Typography>
-              )}
-              {hasPin && (
-                <Button
-                  component="a"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  href={`https://www.google.com/maps?q=${place!.latitude},${place!.longitude}`}
-                  variant="outlined"
-                  startIcon={<OpenInNewOutlined />}
-                  sx={{ mt: 2 }}
-                >
-                  Open in Google Maps
-                </Button>
               )}
             </Box>
           </Box>
