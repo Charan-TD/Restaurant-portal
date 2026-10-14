@@ -37,6 +37,7 @@ import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
+import { FieldLabel } from "@/shared/components/form/FormField";
 import {
   ITEM_IMAGE_TYPES,
   menuFoodTypes,
@@ -51,27 +52,6 @@ type NumberName =
   | "discountedPrice"
   | "taxRate"
   | "preparationMinutes";
-/** Bold label above a field, with a red star when required. */
-function FieldLabel({
-  text,
-  required,
-  htmlFor,
-}: {
-  text: string;
-  required?: boolean;
-  htmlFor?: string;
-}) {
-  return (
-    <Typography
-      component="label"
-      htmlFor={htmlFor}
-      sx={{ display: "block", fontWeight: 600, fontSize: 14, mb: 0.75 }}
-    >
-      {text}
-      {required && <span style={{ color: "#d32f2f" }}> *</span>}
-    </Typography>
-  );
-}
 const foodStyle: Record<MenuFoodType, { icon: ReactNode; color: string }> = {
   Veg: { icon: <EnergySavingsLeafOutlined fontSize="small" />, color: "#2e7d32" },
   Egg: { icon: <EggOutlined fontSize="small" />, color: "#e09b00" },

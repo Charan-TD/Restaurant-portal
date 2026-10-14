@@ -1,23 +1,21 @@
 "use client";
-import type { ReactNode } from "react";
 import { Controller } from "react-hook-form";
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Box,
-  Typography,
-} from "@mui/material";
-import ExpandMore from "@mui/icons-material/ExpandMore";
+import { Box, Typography } from "@mui/material";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
+import LockOutlined from "@mui/icons-material/LockOutlined";
 import NextLink from "next/link";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
-import { UploadLink } from "@/shared/components/form/UploadLink";
+import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
+import {
+  FormField,
+  FormGrid,
+  prefixAdornment,
+} from "@/shared/components/form/FormField";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 import { DEMO_MODE } from "@/core/constants/config";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
@@ -28,158 +26,126 @@ import { BankAccountForm } from "./BankAccountForm";
 import { ChangeRequestForm, ChangeRequestHistory } from "./ChangeRequestCard";
 import { LocationRequestForm } from "./LocationRequestForm";
 import { ProfileSection } from "./ProfileSection";
-const fields: { name: keyof ProfileForm; label: string; type?: string }[] = [
-  { name: "restaurantName", label: "Restaurant name" },
-  { name: "name", label: "Owner name" },
-  { name: "phone", label: "Mobile number", type: "tel" },
-  { name: "email", label: "Email", type: "email" },
-  { name: "city", label: "City" },
+const fields: {
+  name: keyof ProfileForm;
+  label: string;
+  type?: string;
+  placeholder: string;
+}[] = [
+  { name: "restaurantName", label: "Restaurant name", placeholder: "Restaurant name" },
+  { name: "name", label: "Owner name", placeholder: "Owner name" },
+  { name: "phone", label: "Mobile number", type: "tel", placeholder: "10-digit mobile number" },
+  { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
+  { name: "city", label: "City", placeholder: "City" },
 ];
-/** A collapsible section of the edit page, closed until the vendor needs it. */
-function EditAccordion({
-  icon,
-  title,
-  hint,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  hint: string;
-  children: ReactNode;
-}) {
-  return (
-    <Accordion
-      disableGutters
-      elevation={0}
-      sx={{
-        border: 1,
-        borderColor: "divider",
-        borderRadius: "16px !important",
-        overflow: "hidden",
-        "&::before": { display: "none" },
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMore />}
-        sx={{ px: 3, minHeight: 68, "& .MuiAccordionSummary-content": { my: 1.5 } }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: "10px",
-              display: "grid",
-              placeItems: "center",
-              bgcolor: "rgba(242,106,46,.1)",
-              color: "primary.main",
-            }}
-          >
-            {icon}
-          </Box>
-          <div>
-            <Typography sx={{ fontWeight: 700 }}>{title}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {hint}
-            </Typography>
-          </div>
-        </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ px: 3, pb: 3, pt: 1 }}>{children}</AccordionDetails>
-    </Accordion>
-  );
-}
 /** The edit page: direct changes first, then the sections that need approval. */
 export function EditProfileView({ vm }: { vm: ProfileViewModel }) {
-  const changes = useChangeRequests();
+  const changes = useChangeRequests(),
+    details = vm.details;
   return (
     <Box sx={{ display: "grid", gap: 3 }}>
       <ProfileSection
-        icon={<StorefrontOutlined fontSize="small" />}
+        icon={<StorefrontOutlined />}
         title="Restaurant details"
+        subtitle={
+          DEMO_MODE
+            ? "Update your restaurant details."
+            : "You can change the mobile number, logo and cover here."
+        }
       >
         <form noValidate onSubmit={vm.save}>
-          <div className="form-grid compact-grid">
-            {fields.map((item) => (
-              <Controller
-                key={item.name}
-                name={item.name}
-                control={vm.form.control}
-                render={({ field, fieldState }) => (
-                  <CommonTextField
-                    {...field}
-                    type={item.type}
-                    label={item.label}
-                    error={!!fieldState.error}
-                    helperText={fieldState.error?.message}
-                    disabled={!DEMO_MODE && item.name !== "phone"}
-                    {...(item.name === "phone" && {
-                      inputPrefix: COUNTRY_CODE,
-                      onChange: (e) =>
-                        field.onChange(
-                          e.target.value.replace(/\D/g, "").slice(0, 10),
-                        ),
-                      slotProps: {
-                        htmlInput: { inputMode: "numeric", maxLength: 10 },
-                      },
-                    })}
-                  />
-                )}
-              />
-            ))}
-          </div>
+          <FormGrid>
+            {fields.map((item) => {
+              const locked = !DEMO_MODE && item.name !== "phone",
+                id = `profile-${item.name}`;
+              return (
+                <Controller
+                  key={item.name}
+                  name={item.name}
+                  control={vm.form.control}
+                  render={({ field, fieldState }) => (
+                    <FormField label={item.label} htmlFor={id}>
+                      <CommonTextField
+                        {...field}
+                        id={id}
+                        type={item.type}
+                        placeholder={item.placeholder}
+                        error={!!fieldState.error}
+                        helperText={
+                          fieldState.error?.message ??
+                          (locked ? "Needs admin approval to change." : undefined)
+                        }
+                        disabled={locked}
+                        {...(item.name === "phone" && {
+                          onChange: (e) =>
+                            field.onChange(
+                              e.target.value.replace(/\D/g, "").slice(0, 10),
+                            ),
+                          slotProps: {
+                            htmlInput: { inputMode: "numeric", maxLength: 10 },
+                            input: { startAdornment: prefixAdornment(COUNTRY_CODE) },
+                          },
+                        })}
+                        {...(locked && {
+                          slotProps: {
+                            input: {
+                              endAdornment: (
+                                <LockOutlined
+                                  fontSize="small"
+                                  sx={{ color: "text.disabled" }}
+                                />
+                              ),
+                            },
+                          },
+                        })}
+                      />
+                    </FormField>
+                  )}
+                />
+              );
+            })}
+          </FormGrid>
           {!DEMO_MODE && (
-            <>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mt: 1.5 }}
-              >
-                You can change the mobile number, logo and cover here. Other
-                details need approval, see the sections below.
+            <Box sx={{ mt: 3 }}>
+              <Typography sx={{ fontWeight: 700, mb: 1.5 }}>
+                Logo and cover
               </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gap: 2,
-                  mt: 2.5,
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, minmax(0, 1fr))",
-                  },
-                }}
-              >
-                <div>
-                  <Typography variant="subtitle2">Restaurant logo</Typography>
-                  <UploadLink
-                    label="logo"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    value={vm.logo}
-                    onChange={vm.setLogo}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    JPG, PNG or WEBP, up to 2 MB
-                  </Typography>
-                </div>
-                <div>
-                  <Typography variant="subtitle2">Cover image</Typography>
-                  <UploadLink
-                    label="cover image"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    value={vm.cover}
-                    onChange={vm.setCover}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    JPG, PNG or WEBP, up to 2 MB
-                  </Typography>
-                </div>
-              </Box>
-            </>
+              <FormGrid>
+                <DocumentUpload
+                  image
+                  title="Restaurant logo"
+                  hint="JPG, PNG or WEBP, up to 2 MB"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  value={vm.logo}
+                  onChange={vm.setLogo}
+                  currentUrl={details?.logoUrl}
+                />
+                <DocumentUpload
+                  image
+                  title="Cover image"
+                  hint="JPG, PNG or WEBP, up to 2 MB"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  value={vm.cover}
+                  onChange={vm.setCover}
+                  currentUrl={details?.coverUrl}
+                />
+              </FormGrid>
+            </Box>
           )}
           <Box
-            sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1.5,
+              mt: 3,
+              pt: 3,
+              borderTop: 1,
+              borderColor: "divider",
+            }}
           >
-            <CommonButton onClick={vm.cancel}>Cancel</CommonButton>
+            <CommonButton variant="outlined" color="inherit" onClick={vm.cancel}>
+              Cancel
+            </CommonButton>
             <CommonButton type="submit" variant="contained" disabled={vm.busy}>
               {vm.busy ? "Saving…" : "Save changes"}
             </CommonButton>
@@ -187,50 +153,55 @@ export function EditProfileView({ vm }: { vm: ProfileViewModel }) {
         </form>
       </ProfileSection>
       {!DEMO_MODE && (
-        <Box sx={{ display: "grid", gap: 2 }}>
-          <EditAccordion
-            icon={<PlaceOutlined fontSize="small" />}
+        <>
+          <ProfileSection
+            icon={<PlaceOutlined />}
             title="Location"
-            hint="Move your restaurant. Needs admin approval."
+            subtitle="Move your restaurant. Needs admin approval."
           >
             <LocationRequestForm onSent={changes.reload} />
-          </EditAccordion>
-          <EditAccordion
-            icon={<ScheduleOutlined fontSize="small" />}
+          </ProfileSection>
+          <ProfileSection
+            icon={<ScheduleOutlined />}
             title="Operating hours"
-            hint="Choose the days and times you take orders."
+            subtitle="Choose the days and times you take orders."
+            action={
+              <CommonButton
+                variant="outlined"
+                component={NextLink}
+                href="/settings/working-hours"
+              >
+                Open working hours
+              </CommonButton>
+            }
           >
-            <Typography color="text.secondary" sx={{ mb: 2 }}>
+            <Typography color="text.secondary">
               Working hours are managed in Settings.
             </Typography>
-            <CommonButton
-              variant="outlined"
-              component={NextLink}
-              href="/settings/working-hours"
-            >
-              Open working hours
-            </CommonButton>
-          </EditAccordion>
-          <EditAccordion
-            icon={<AccountBalanceOutlined fontSize="small" />}
+          </ProfileSection>
+          <ProfileSection
+            icon={<AccountBalanceOutlined />}
             title="Bank account details"
-            hint="Where your payouts are sent."
+            subtitle="Where your payouts are sent."
           >
-            <BankAccountForm onSaved={vm.reloadDetails} />
-          </EditAccordion>
-          <EditAccordion
-            icon={<DescriptionOutlined fontSize="small" />}
+            <BankAccountForm
+              onSaved={vm.reloadDetails}
+              proofUrl={details?.documents.bankProof}
+            />
+          </ProfileSection>
+          <ProfileSection
+            icon={<DescriptionOutlined />}
             title="Names & documents"
-            hint="Restaurant name, GST, PAN and Aadhaar. Needs admin approval."
+            subtitle="Restaurant name, GST, PAN and Aadhaar. Needs admin approval."
           >
-            <ChangeRequestForm onSent={changes.reload} />
-          </EditAccordion>
+            <ChangeRequestForm onSent={changes.reload} details={details} />
+          </ProfileSection>
           {changes.requests.length > 0 && (
-            <CommonCard className="compact-card">
+            <CommonCard className="profile-card">
               <ChangeRequestHistory requests={changes.requests} />
             </CommonCard>
           )}
-        </Box>
+        </>
       )}
     </Box>
   );

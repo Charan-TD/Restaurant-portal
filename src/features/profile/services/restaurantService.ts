@@ -233,6 +233,14 @@ export interface RestaurantDetails {
   status?: string;
   logoUrl?: string;
   coverUrl?: string;
+  gstin?: string;
+  /** Signed links to the documents already on record. */
+  documents: {
+    gst?: string;
+    pan?: string;
+    aadhaar?: string;
+    bankProof?: string;
+  };
   location: {
     building?: string;
     landmark?: string;
@@ -289,8 +297,15 @@ export async function getRestaurantDetails(): Promise<RestaurantDetails> {
     contact: first(row.restaurant_contact),
     fssai: first(row.fssai_number, row.fssai),
     status: label(first(row.review_status, row.status)),
-    logoUrl: first(row.logo, row.logo_url),
-    coverUrl: first(row.cover, row.cover_url, row.cover_image),
+    logoUrl: first(row.logo_url, row.logo),
+    coverUrl: first(row.cover_url, row.cover, row.cover_image),
+    gstin: first(row.gstin, row.gst),
+    documents: {
+      gst: first(row.gst_document_url),
+      pan: first(row.pan_document_url),
+      aadhaar: first(row.aadhaar_document_url),
+      bankProof: first(row.bank_proof_url),
+    },
     location: {
       building: pick("house_no", "building"),
       landmark: pick("landmark"),

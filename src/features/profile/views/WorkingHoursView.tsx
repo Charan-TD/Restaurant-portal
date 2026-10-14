@@ -5,6 +5,7 @@ import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
+import { FormField } from "@/shared/components/form/FormField";
 import { useWorkingHoursViewModel } from "../viewmodels/useWorkingHoursViewModel";
 import { SettingsTabs } from "./SettingsTabs";
 export function WorkingHoursView() {
@@ -33,7 +34,7 @@ export function WorkingHoursView() {
             sx={{
               display: "flex",
               flexWrap: "wrap",
-              alignItems: "center",
+              alignItems: "flex-end",
               gap: 1.5,
               p: 2,
               mb: 1,
@@ -51,25 +52,25 @@ export function WorkingHoursView() {
                 Set the times once and apply them to all 7 days.
               </Typography>
             </Box>
-            <CommonTextField
-              label="Opens at"
-              type="time"
-              value={vm.bulk.start}
-              onChange={(e) =>
-                vm.setBulk({ ...vm.bulk, start: e.target.value })
-              }
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ width: 140 }}
-            />
-            <CommonTextField
-              label="Closes at"
-              type="time"
-              value={vm.bulk.end}
-              error={vm.bulkInvalid}
-              onChange={(e) => vm.setBulk({ ...vm.bulk, end: e.target.value })}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ width: 140 }}
-            />
+            <FormField label="Opens at">
+              <CommonTextField
+                type="time"
+                value={vm.bulk.start}
+                onChange={(e) =>
+                  vm.setBulk({ ...vm.bulk, start: e.target.value })
+                }
+                sx={{ width: 140 }}
+              />
+            </FormField>
+            <FormField label="Closes at">
+              <CommonTextField
+                type="time"
+                value={vm.bulk.end}
+                error={vm.bulkInvalid}
+                onChange={(e) => vm.setBulk({ ...vm.bulk, end: e.target.value })}
+                sx={{ width: 140 }}
+              />
+            </FormField>
             <CommonButton
               variant="contained"
               startIcon={<DoneAllOutlined />}
@@ -129,28 +130,28 @@ export function WorkingHoursView() {
                         maxWidth: 440,
                       }}
                     >
-                      <CommonTextField
-                        label="Opens at"
-                        type="time"
-                        size="small"
-                        value={day.start}
-                        onChange={(e) => vm.edit(i, { start: e.target.value })}
-                        slotProps={{ inputLabel: { shrink: true } }}
-                      />
-                      <CommonTextField
-                        label="Closes at"
-                        type="time"
-                        size="small"
-                        value={day.end}
-                        error={day.end <= day.start}
-                        helperText={
-                          day.end <= day.start
-                            ? "Must be after opening"
-                            : undefined
-                        }
-                        onChange={(e) => vm.edit(i, { end: e.target.value })}
-                        slotProps={{ inputLabel: { shrink: true } }}
-                      />
+                      <FormField label="Opens at">
+                        <CommonTextField
+                          type="time"
+                          size="small"
+                          value={day.start}
+                          onChange={(e) => vm.edit(i, { start: e.target.value })}
+                        />
+                      </FormField>
+                      <FormField label="Closes at">
+                        <CommonTextField
+                          type="time"
+                          size="small"
+                          value={day.end}
+                          error={day.end <= day.start}
+                          helperText={
+                            day.end <= day.start
+                              ? "Must be after opening"
+                              : undefined
+                          }
+                          onChange={(e) => vm.edit(i, { end: e.target.value })}
+                        />
+                      </FormField>
                     </Box>
                   </>
                 ) : (
