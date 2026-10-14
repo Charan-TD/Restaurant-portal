@@ -263,7 +263,7 @@ const ID_LIKE = /^(CAT|SUB)\d+$/i;
  * Items carry a category id: a sub category's id when one was given, else the
  * category's. Turns it back into names for the list and the edit form, using
  * the server's list and then the names this browser saved. An id that cannot
- * be resolved is hidden instead of shown.
+ * be resolved is shown as it is.
  */
 async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
   if (DEMO_MODE || !items.some((i) => i.category)) return items;
@@ -286,7 +286,8 @@ async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
     if (known?.parent !== undefined || (known && ID_LIKE.test(id) && /^SUB/i.test(id)))
       return { ...i, subCategory: known.name, category: known.parent ?? "" };
     if (known) return { ...i, category: known.name };
-    return { ...i, category: ID_LIKE.test(id) ? "" : id };
+    // No name known: show the id rather than nothing.
+    return { ...i, category: id };
   });
 }
 /** Category and sub category names for the dropdowns: the server's plus the ones this browser saved. */
