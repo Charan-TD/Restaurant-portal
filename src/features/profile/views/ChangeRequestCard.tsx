@@ -1,10 +1,9 @@
 "use client";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { Alert, Box, Chip, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
-import { FormField, FormGrid } from "@/shared/components/form/FormField";
 import { errorMessage } from "@/shared/utils/errors";
 import {
   requestProfileChange,
@@ -47,29 +46,6 @@ const EMPTY = {
   aadhaarNumber: "",
   aadhaar: null as File | null,
 };
-/** A bordered block for one identity document: its number and its file. */
-function DocumentGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Box
-      sx={{
-        p: { xs: 2, sm: 2.5 },
-        border: 1,
-        borderColor: "divider",
-        borderRadius: "14px",
-        bgcolor: "#fcfcfb",
-      }}
-    >
-      <Typography sx={{ fontWeight: 700, mb: 2 }}>{title}</Typography>
-      <FormGrid>{children}</FormGrid>
-    </Box>
-  );
-}
 /** Names and documents; they wait for admin approval before they change. */
 export function ChangeRequestForm({
   onSent,
@@ -137,90 +113,56 @@ export function ChangeRequestForm({
           {error}
         </Alert>
       )}
-      <Box sx={{ display: "grid", gap: 2.5 }}>
-        <FormGrid>
-          <FormField label="Restaurant name" htmlFor="cr-restaurant">
-            <CommonTextField
-              id="cr-restaurant"
-              placeholder={details?.name || "New restaurant name"}
-              value={values.restaurantName}
-              onChange={(e) => set("restaurantName", e.target.value)}
-            />
-          </FormField>
-          <FormField label="Owner name" htmlFor="cr-owner">
-            <CommonTextField
-              id="cr-owner"
-              placeholder={details?.ownerName || "New owner name"}
-              value={values.ownerName}
-              onChange={(e) => set("ownerName", e.target.value)}
-            />
-          </FormField>
-        </FormGrid>
-        <DocumentGroup title="GST">
-          <FormField label="GSTIN" htmlFor="cr-gst">
-            <CommonTextField
-              id="cr-gst"
-              placeholder={details?.gstin || "15-character GSTIN"}
-              value={values.gst}
-              onChange={(e) =>
-                set("gst", e.target.value.toUpperCase().slice(0, 15))
-              }
-            />
-          </FormField>
-          <Box sx={{ alignSelf: "end" }}>
-            <DocumentUpload
-              title="GST certificate"
-              value={values.gstDocument}
-              onChange={(file) => set("gstDocument", file)}
-              currentUrl={details?.documents.gst}
-            />
-          </Box>
-        </DocumentGroup>
-        <DocumentGroup title="PAN">
-          <FormField label="PAN number" htmlFor="cr-pan">
-            <CommonTextField
-              id="cr-pan"
-              placeholder="e.g. ABCDE1234F"
-              value={values.panNumber}
-              onChange={(e) =>
-                set("panNumber", e.target.value.toUpperCase().slice(0, 10))
-              }
-            />
-          </FormField>
-          <Box sx={{ alignSelf: "end" }}>
-            <DocumentUpload
-              title="PAN card"
-              value={values.pan}
-              onChange={(file) => set("pan", file)}
-              currentUrl={details?.documents.pan}
-            />
-          </Box>
-        </DocumentGroup>
-        <DocumentGroup title="Aadhaar">
-          <FormField label="Aadhaar number" htmlFor="cr-aadhaar">
-            <CommonTextField
-              id="cr-aadhaar"
-              placeholder="12 digits"
-              value={values.aadhaarNumber}
-              onChange={(e) =>
-                set(
-                  "aadhaarNumber",
-                  e.target.value.replace(/\D/g, "").slice(0, 12),
-                )
-              }
-              slotProps={{ htmlInput: { inputMode: "numeric" } }}
-            />
-          </FormField>
-          <Box sx={{ alignSelf: "end" }}>
-            <DocumentUpload
-              title="Aadhaar card"
-              value={values.aadhaar}
-              onChange={(file) => set("aadhaar", file)}
-              currentUrl={details?.documents.aadhaar}
-            />
-          </Box>
-        </DocumentGroup>
-      </Box>
+      <div className="form-grid compact-grid">
+        <CommonTextField
+          label="Restaurant name"
+          value={values.restaurantName}
+          onChange={(e) => set("restaurantName", e.target.value)}
+        />
+        <CommonTextField
+          label="Owner name"
+          value={values.ownerName}
+          onChange={(e) => set("ownerName", e.target.value)}
+        />
+        <CommonTextField
+          label="GSTIN"
+          value={values.gst}
+          onChange={(e) => set("gst", e.target.value.toUpperCase().slice(0, 15))}
+        />
+        <DocumentUpload
+          title="GST certificate"
+          value={values.gstDocument}
+          onChange={(file) => set("gstDocument", file)}
+          currentUrl={details?.documents.gst}
+        />
+        <CommonTextField
+          label="PAN number"
+          value={values.panNumber}
+          onChange={(e) =>
+            set("panNumber", e.target.value.toUpperCase().slice(0, 10))
+          }
+        />
+        <DocumentUpload
+          title="PAN card"
+          value={values.pan}
+          onChange={(file) => set("pan", file)}
+          currentUrl={details?.documents.pan}
+        />
+        <CommonTextField
+          label="Aadhaar number"
+          value={values.aadhaarNumber}
+          onChange={(e) =>
+            set("aadhaarNumber", e.target.value.replace(/\D/g, "").slice(0, 12))
+          }
+          slotProps={{ htmlInput: { inputMode: "numeric" } }}
+        />
+        <DocumentUpload
+          title="Aadhaar card"
+          value={values.aadhaar}
+          onChange={(file) => set("aadhaar", file)}
+          currentUrl={details?.documents.aadhaar}
+        />
+      </div>
       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
         <CommonButton type="submit" variant="contained" disabled={busy}>
           {busy ? "Sending…" : "Request approval"}

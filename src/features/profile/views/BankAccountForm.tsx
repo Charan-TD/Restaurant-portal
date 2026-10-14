@@ -1,11 +1,9 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { Alert, Box, Typography } from "@mui/material";
-import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
-import { FormField, FormGrid } from "@/shared/components/form/FormField";
 import { errorMessage } from "@/shared/utils/errors";
 import { replaceBankAccount } from "../services/restaurantService";
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -73,73 +71,49 @@ export function BankAccountForm({
           {error}
         </Alert>
       )}
-      <FormGrid>
-        <FormField label="Account holder name" required htmlFor="bank-holder">
-          <CommonTextField
-            id="bank-holder"
-            placeholder="Name as on the bank account"
-            value={values.holder}
-            onChange={(e) => set("holder", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Bank name" required htmlFor="bank-name">
-          <CommonTextField
-            id="bank-name"
-            placeholder="e.g. ICICI Bank"
-            value={values.bank}
-            onChange={(e) => set("bank", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Account number" required htmlFor="bank-account">
-          <CommonTextField
-            id="bank-account"
-            placeholder="9 to 18 digits"
-            value={values.account}
-            onChange={(e) =>
-              set("account", e.target.value.replace(/\D/g, "").slice(0, 18))
-            }
-            slotProps={{ htmlInput: { inputMode: "numeric" } }}
-          />
-        </FormField>
-        <FormField label="Confirm account number" required htmlFor="bank-confirm">
-          <CommonTextField
-            id="bank-confirm"
-            placeholder="Re-enter the account number"
-            value={values.confirm}
-            error={!!values.confirm && values.confirm !== values.account}
-            helperText={
-              values.confirm && values.confirm !== values.account
-                ? "Account numbers do not match."
-                : ""
-            }
-            onChange={(e) =>
-              set("confirm", e.target.value.replace(/\D/g, "").slice(0, 18))
-            }
-            slotProps={{ htmlInput: { inputMode: "numeric" } }}
-          />
-        </FormField>
-        <FormField label="IFSC code" required htmlFor="bank-ifsc">
-          <CommonTextField
-            id="bank-ifsc"
-            placeholder="e.g. HDFC0001234"
-            value={values.ifsc}
-            onChange={(e) =>
-              set("ifsc", e.target.value.toUpperCase().slice(0, 11))
-            }
-          />
-        </FormField>
-        <Box sx={{ alignSelf: "end" }}>
-          <DocumentUpload
-            required
-            title="Bank proof"
-            hint="Cancelled cheque or passbook page"
-            icon={<AccountBalanceOutlined />}
-            value={proof}
-            onChange={setProof}
-            currentUrl={proofUrl}
-          />
-        </Box>
-      </FormGrid>
+      <div className="form-grid compact-grid">
+        <CommonTextField
+          label="Account holder name"
+          value={values.holder}
+          onChange={(e) => set("holder", e.target.value)}
+        />
+        <CommonTextField
+          label="Bank name"
+          value={values.bank}
+          onChange={(e) => set("bank", e.target.value)}
+        />
+        <CommonTextField
+          label="Account number"
+          value={values.account}
+          onChange={(e) =>
+            set("account", e.target.value.replace(/\D/g, "").slice(0, 18))
+          }
+          slotProps={{ htmlInput: { inputMode: "numeric" } }}
+        />
+        <CommonTextField
+          label="Confirm account number"
+          value={values.confirm}
+          onChange={(e) =>
+            set("confirm", e.target.value.replace(/\D/g, "").slice(0, 18))
+          }
+          slotProps={{ htmlInput: { inputMode: "numeric" } }}
+        />
+        <CommonTextField
+          label="IFSC code"
+          value={values.ifsc}
+          onChange={(e) =>
+            set("ifsc", e.target.value.toUpperCase().slice(0, 11))
+          }
+        />
+        <DocumentUpload
+          required
+          title="Bank proof"
+          hint="Cancelled cheque or passbook page"
+          value={proof}
+          onChange={setProof}
+          currentUrl={proofUrl}
+        />
+      </div>
       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
         <CommonButton type="submit" variant="contained" disabled={busy}>
           {busy ? "Saving…" : "Save bank details"}
