@@ -23,6 +23,7 @@ const stateLabel: Record<OrderStatus, string> = {
   Accepted: "Accepted",
   Preparing: "Preparing",
   Ready: "Packed",
+  HandedOver: "Handed to rider",
   Delivered: "Delivered",
   Rejected: "Rejected",
 };
@@ -130,6 +131,14 @@ export function OrderCard({ order, busy, onChange }: Props) {
             onClick={() => act("Ready")}
           >
             Mark as packed
+          </CommonButton>
+        ) : order.state === "Ready" ? (
+          <CommonButton
+            disabled={busy}
+            variant="contained"
+            onClick={() => act("HandedOver")}
+          >
+            Handed to the rider
           </CommonButton>
         ) : (
           <Chip size="small" label={stateLabel[order.state]} variant="outlined" />

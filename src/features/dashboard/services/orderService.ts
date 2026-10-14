@@ -9,7 +9,7 @@ const fromServer: Record<string, OrderStatus> = {
   CONFIRMED: "Accepted",
   PREPARING: "Preparing",
   READY: "Ready",
-  OUT_FOR_DELIVERY: "Delivered",
+  OUT_FOR_DELIVERY: "HandedOver",
   DELIVERED: "Delivered",
   CANCELLED: "Rejected",
 };
@@ -18,6 +18,7 @@ const toServer: Record<OrderStatus, string> = {
   Accepted: "CONFIRMED",
   Preparing: "PREPARING",
   Ready: "READY",
+  HandedOver: "OUT_FOR_DELIVERY",
   Delivered: "DELIVERED",
   Rejected: "CANCELLED",
 };

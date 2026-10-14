@@ -1,9 +1,13 @@
-/** New → Accepted → Preparing → Ready (packed); Rejected is a cancelled order. */
+/**
+ * New → Accepted → Preparing → Ready (packed) → HandedOver (given to the
+ * rider); Rejected is a cancelled order.
+ */
 export type OrderStatus =
   | "New"
   | "Accepted"
   | "Preparing"
   | "Ready"
+  | "HandedOver"
   | "Delivered"
   | "Rejected";
 export interface Order {
