@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { Box, Chip, IconButton, Typography } from "@mui/material";
 import MoreVert from "@mui/icons-material/MoreVert";
 import ChatBubbleOutlineOutlined from "@mui/icons-material/ChatBubbleOutlineOutlined";
@@ -15,19 +14,15 @@ import { CustomerAvatar } from "../components/CustomerAvatar";
 import { CustomerStatCard } from "../components/CustomerStatCard";
 import {
   CustomerToolbar,
-  type DateRange,
   type FilterOption,
 } from "../components/CustomerToolbar";
-import { ListFooter, PAGE_SIZE } from "../components/ListFooter";
+import { ListFooter } from "../components/ListFooter";
 import { RatingStars } from "../components/RatingValue";
+import { sentimentOf, type Sentiment } from "../models/review";
 import {
-  sampleReviews,
-  sentimentOf,
-  type ReviewRow,
-  type Sentiment,
-} from "../models/sampleCustomers";
-
-type ReviewFilter = "rating" | "latest" | "low" | "item";
+  useCustomerFeedbackViewModel,
+  type ReviewFilter,
+} from "../viewmodels/useCustomerFeedbackViewModel";
 
 const filters: FilterOption<ReviewFilter>[] = [
   { value: "rating", label: "Rating", icon: <StarRounded fontSize="small" /> },
@@ -43,13 +38,6 @@ const filters: FilterOption<ReviewFilter>[] = [
     icon: <RestaurantOutlined fontSize="small" />,
   },
 ];
-
-const sorters: Record<ReviewFilter, (a: ReviewRow, b: ReviewRow) => number> = {
-  rating: (a, b) => b.rating - a.rating,
-  latest: (a, b) => b.at.localeCompare(a.at),
-  low: (a, b) => a.rating - b.rating,
-  item: (a, b) => a.item.localeCompare(b.item),
-};
 
 const chipColors: Record<Sentiment, { bg: string; fg: string }> = {
   Positive: { bg: "#e6f6ec", fg: "#1f8a4c" },
@@ -74,30 +62,9 @@ function Labelled({
   );
 }
 
-/** Ratings and reviews left by customers (static sample data for now). */
+/** Ratings and reviews left by customers. */
 export function CustomerFeedbackView() {
-  const [search, setSearch] = useState(""),
-    [range, setRange] = useState<DateRange>("Last 30 days"),
-    [filter, setFilter] = useState<ReviewFilter | null>(null),
-    [page, setPage] = useState(1);
-
-  const reviews = useMemo(() => {
-    const term = search.trim().toLowerCase(),
-      list = sampleReviews.filter(
-        (r) =>
-          !term ||
-          r.name.toLowerCase().includes(term) ||
-          r.orderId.toLowerCase().includes(term),
-      );
-    return filter ? [...list].sort(sorters[filter]) : list;
-  }, [search, filter]);
-
-  const lastPage = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE)),
-    current = Math.min(page, lastPage),
-    rows = reviews.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
-    average =
-      sampleReviews.reduce((sum, r) => sum + r.rating, 0) /
-      sampleReviews.length;
+  const vm = useCustomerFeedbackViewModel();
 
   return (
     <>
@@ -117,48 +84,36 @@ export function CustomerFeedbackView() {
         <CustomerStatCard
           icon={<ChatBubbleOutlineOutlined />}
           label="Total reviews"
-          value={sampleReviews.length}
-          change="12%"
+          value={vm.total}
         />
         <CustomerStatCard
           icon={<StarRounded />}
           label="Average rating"
-          value={average.toFixed(1)}
-          change="0.3"
+          value={vm.average === null ? "–" : vm.average.toFixed(1)}
           tint="#fdf3dc"
           iconColor="#e09b00"
         />
         <CustomerStatCard
           icon={<ThumbUp />}
           label="Positive reviews"
-          value={
-            sampleReviews.filter((r) => sentimentOf(r.rating) === "Positive")
-              .length
-          }
-          change="15%"
+          value={vm.positive}
           tint="#e6f6ec"
           iconColor="#1f8a4c"
         />
       </Box>
       <CommonCard>
         <CustomerToolbar
-          search={search}
-          onSearch={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
+          search={vm.search}
+          onSearch={vm.setSearch}
           placeholder="Search by customer name or order ID..."
-          range={range}
-          onRange={setRange}
-          filter={filter}
-          onFilter={(value) => {
-            setFilter(value);
-            setPage(1);
-          }}
+          range={vm.range}
+          onRange={vm.setRange}
+          filter={vm.filter}
+          onFilter={vm.setFilter}
           filters={filters}
         />
         <Box sx={{ display: "grid", gap: 1.5, mt: 2.5 }}>
-          {rows.map((r) => {
+          {vm.rows.map((r) => {
             const sentiment = sentimentOf(r.rating);
             return (
               <Box
@@ -226,17 +181,22 @@ export function CustomerFeedbackView() {
               </Box>
             );
           })}
-          {rows.length === 0 && (
+          {vm.rows.length === 0 && (
             <Typography color="text.secondary" align="center" sx={{ py: 6 }}>
-              No reviews match your search.
+              {vm.loading
+                ? "Loading reviews…"
+                : vm.error ||
+                  (vm.total
+                    ? "No reviews match your search."
+                    : "No reviews yet.")}
             </Typography>
           )}
         </Box>
         <ListFooter
-          page={current}
-          total={reviews.length}
+          page={vm.page}
+          total={vm.shown.length}
           noun="reviews"
-          onPage={setPage}
+          onPage={vm.setPage}
         />
       </CommonCard>
     </>

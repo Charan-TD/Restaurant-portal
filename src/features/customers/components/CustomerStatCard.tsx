@@ -15,8 +15,8 @@ export function CustomerStatCard({
   icon: ReactNode;
   label: string;
   value: ReactNode;
-  /** e.g. "12%". */
-  change: string;
+  /** e.g. "12%"; left out when there is nothing to compare with. */
+  change?: string;
   tint?: string;
   iconColor?: string;
 }) {
@@ -52,27 +52,29 @@ export function CustomerStatCard({
           <Typography sx={{ fontSize: 32, fontWeight: 800, lineHeight: 1.25 }}>
             {value}
           </Typography>
-          <Typography
-            variant="body2"
-            component="span"
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              color: "success.main",
-              fontWeight: 600,
-            }}
-          >
-            <ArrowUpward sx={{ fontSize: 15 }} />
-            {change}
+          {change && (
             <Typography
               variant="body2"
               component="span"
-              color="text.secondary"
-              sx={{ ml: 1, fontWeight: 400 }}
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                color: "success.main",
+                fontWeight: 600,
+              }}
             >
-              vs last month
+              <ArrowUpward sx={{ fontSize: 15 }} />
+              {change}
+              <Typography
+                variant="body2"
+                component="span"
+                color="text.secondary"
+                sx={{ ml: 1, fontWeight: 400 }}
+              >
+                vs last month
+              </Typography>
             </Typography>
-          </Typography>
+          )}
         </Box>
       </Box>
     </CommonCard>

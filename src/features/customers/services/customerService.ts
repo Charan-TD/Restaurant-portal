@@ -8,6 +8,10 @@ export interface Customer {
   orders: number;
   spent: number;
   lastOrderAt?: string;
+  /** Short id of the latest order. */
+  lastOrderId?: string;
+  /** Names of the items ordered. */
+  items: string[];
 }
 const text = (value: unknown) =>
   typeof value === "string" && value.trim()
@@ -16,6 +20,9 @@ const text = (value: unknown) =>
       ? String(value)
       : undefined;
 const first = (...values: unknown[]) => values.map(text).find(Boolean);
+const linesOf = (row: Record<string, unknown>) =>
+  ([row.order_items, row.items, row.line_items].find(Array.isArray) ??
+    []) as Record<string, unknown>[];
 /**
  * The server has no customer list for restaurants, so customers are built
  * from the restaurant's orders (GET /orders), grouped by customer. Name and
@@ -45,6 +52,7 @@ export async function getCustomers(): Promise<Customer[]> {
       pnrs: [],
       orders: 0,
       spent: 0,
+      items: [],
     };
     customer.name ??= first(user.name, user.full_name, row.customer_name);
     customer.phone ??= first(
@@ -58,8 +66,21 @@ export async function getCustomers(): Promise<Customer[]> {
     customer.orders += 1;
     customer.spent += Number(row.total) || 0;
     const when = first(row.created_at, row.createdAt);
-    if (when && (!customer.lastOrderAt || when > customer.lastOrderAt))
+    if (when && (!customer.lastOrderAt || when > customer.lastOrderAt)) {
       customer.lastOrderAt = when;
+      customer.lastOrderId =
+        first(row.order_number, row.display_id) ??
+        (row.id ? `#${String(row.id).slice(0, 8).toUpperCase()}` : undefined);
+    }
+    for (const line of linesOf(row)) {
+      const name = first(
+        line.name,
+        line.item_name,
+        line.menu_item_name,
+        (line.menu_item as Record<string, unknown> | undefined)?.name,
+      );
+      if (name && !customer.items.includes(name)) customer.items.push(name);
+    }
     byCustomer.set(id, customer);
   }
   return [...byCustomer.values()].sort((a, b) =>

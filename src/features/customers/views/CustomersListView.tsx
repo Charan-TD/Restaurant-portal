@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import {
   Box,
   IconButton,
@@ -27,14 +26,14 @@ import { CustomerAvatar } from "../components/CustomerAvatar";
 import { CustomerStatCard } from "../components/CustomerStatCard";
 import {
   CustomerToolbar,
-  type DateRange,
   type FilterOption,
 } from "../components/CustomerToolbar";
-import { ListFooter, PAGE_SIZE } from "../components/ListFooter";
-import { RatingValue } from "../components/RatingValue";
-import { sampleCustomers, type CustomerRow } from "../models/sampleCustomers";
-
-type CustomerFilter = "items" | "orders" | "paid";
+import { ListFooter } from "../components/ListFooter";
+import {
+  maskPhone,
+  useCustomersViewModel,
+  type CustomerFilter,
+} from "../viewmodels/useCustomersViewModel";
 
 const filters: FilterOption<CustomerFilter>[] = [
   {
@@ -54,15 +53,6 @@ const filters: FilterOption<CustomerFilter>[] = [
   },
 ];
 
-const sorters: Record<
-  CustomerFilter,
-  (a: CustomerRow, b: CustomerRow) => number
-> = {
-  items: (a, b) => b.items.length - a.items.length,
-  orders: (a, b) => b.orders - a.orders,
-  paid: (a, b) => b.spent - a.spent,
-};
-
 const headCell = {
   fontWeight: 600,
   color: "text.primary",
@@ -70,30 +60,9 @@ const headCell = {
   whiteSpace: "nowrap",
 };
 
-/** Customers who ordered from the restaurant (static sample data for now). */
+/** Customers who ordered from the restaurant, built from its orders. */
 export function CustomersListView() {
-  const [search, setSearch] = useState(""),
-    [range, setRange] = useState<DateRange>("Last 30 days"),
-    [filter, setFilter] = useState<CustomerFilter | null>(null),
-    [page, setPage] = useState(1);
-
-  const customers = useMemo(() => {
-    const term = search.trim().toLowerCase(),
-      list = sampleCustomers.filter(
-        (c) =>
-          !term ||
-          c.name.toLowerCase().includes(term) ||
-          c.phone.includes(term),
-      );
-    return filter ? [...list].sort(sorters[filter]) : list;
-  }, [search, filter]);
-
-  const lastPage = Math.max(1, Math.ceil(customers.length / PAGE_SIZE)),
-    current = Math.min(page, lastPage),
-    rows = customers.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
-    average =
-      sampleCustomers.reduce((sum, c) => sum + c.rating, 0) /
-      sampleCustomers.length;
+  const vm = useCustomersViewModel();
 
   return (
     <>
@@ -113,39 +82,30 @@ export function CustomersListView() {
         <CustomerStatCard
           icon={<PeopleAltOutlined />}
           label="Total customers"
-          value={sampleCustomers.length}
-          change="12%"
+          value={vm.total}
         />
         <CustomerStatCard
           icon={<EmojiEventsOutlined />}
           label="Active customers"
-          value={sampleCustomers.filter((c) => c.orders >= 5).length}
-          change="8%"
+          value={vm.active}
           tint="#fdf3dc"
           iconColor="#e09b00"
         />
         <CustomerStatCard
           icon={<StarRounded />}
           label="Average rating"
-          value={average.toFixed(1)}
-          change="0.2"
+          value="–"
         />
       </Box>
       <CommonCard>
         <CustomerToolbar
-          search={search}
-          onSearch={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
+          search={vm.search}
+          onSearch={vm.setSearch}
           placeholder="Search customers by name or phone number..."
-          range={range}
-          onRange={setRange}
-          filter={filter}
-          onFilter={(value) => {
-            setFilter(value);
-            setPage(1);
-          }}
+          range={vm.range}
+          onRange={vm.setRange}
+          filter={vm.filter}
+          onFilter={vm.setFilter}
           filters={filters}
         />
         <TableContainer sx={{ mt: 2.5 }}>
@@ -165,44 +125,51 @@ export function CustomersListView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((c) => (
+              {vm.rows.map((c) => (
                 <TableRow key={c.id} hover>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <CustomerAvatar name={c.name} />
+                      <CustomerAvatar name={c.name ?? "Customer"} />
                       <div>
                         <Typography sx={{ fontWeight: 600 }}>
-                          {c.name}
+                          {c.name ?? "Customer"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {c.phone}
+                          {maskPhone(c.phone)}
                         </Typography>
                       </div>
                     </Box>
                   </TableCell>
-                  <TableCell>{c.orderId}</TableCell>
+                  <TableCell>{c.lastOrderId ?? "–"}</TableCell>
                   <TableCell>{formatRupees(c.spent)}</TableCell>
                   <TableCell>
                     <ItemsSummary items={c.items} />
                   </TableCell>
                   <TableCell>
-                    <RatingValue rating={c.rating} />
+                    <Typography color="text.secondary">–</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton aria-label={`More options for ${c.name}`}>
+                    <IconButton
+                      aria-label={`More options for ${c.name ?? "customer"}`}
+                    >
                       <MoreVert />
                     </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
-              {rows.length === 0 && (
+              {vm.rows.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={6}
                     align="center"
                     sx={{ py: 6, color: "text.secondary" }}
                   >
-                    No customers match your search.
+                    {vm.loading
+                      ? "Loading customers…"
+                      : vm.error ||
+                        (vm.total
+                          ? "No customers match your search."
+                          : "No customers yet.")}
                   </TableCell>
                 </TableRow>
               )}
@@ -210,10 +177,10 @@ export function CustomersListView() {
           </Table>
         </TableContainer>
         <ListFooter
-          page={current}
-          total={customers.length}
+          page={vm.page}
+          total={vm.shown.length}
           noun="customers"
-          onPage={setPage}
+          onPage={vm.setPage}
         />
       </CommonCard>
     </>
