@@ -6,8 +6,11 @@ import {
   MENU_IMAGE_BASE_URL,
 } from "@/core/constants/config";
 import {
+  changedMenuItemPayload,
   fromMenuItemRow,
-  toMenuItemPayload,
+  pricingPayload,
+  toCreatePayload,
+  toMenuItemForm,
   type MenuItem,
   type MenuItemForm,
 } from "../models/menuItem";
@@ -43,11 +46,11 @@ function multipart(fields: Record<string, unknown>, files: File[]) {
 }
 /** The API sends signed picture URLs; older storage paths need the base URL. */
 export const menuImageUrl = (path: string | undefined) =>
-  path && /^https?:///.test(path)
+  path && /^https?:/ //.test(path)
     ? path
     : path && MENU_IMAGE_BASE_URL
-    ? `${MENU_IMAGE_BASE_URL}/${path.split("/").map(encodeURIComponent).join("/")}`
-    : null;
+      ? `${MENU_IMAGE_BASE_URL}/${path.split("/").map(encodeURIComponent).join("/")}`
+      : null;
 /**
  * The list endpoint only answers for the token's own restaurant, so the id
  * is read from the same `restaurant_id` claim the backend compares against.
@@ -73,6 +76,8 @@ let demoItems: MenuItem[] = [
     category: "Main course",
     quantity: 20,
     lowStockThreshold: 5,
+    addOnIds: [],
+    qtyType: "",
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -91,6 +96,8 @@ let demoItems: MenuItem[] = [
     category: "Main course",
     quantity: 3,
     lowStockThreshold: 5,
+    addOnIds: [],
+    qtyType: "",
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -109,6 +116,8 @@ let demoItems: MenuItem[] = [
     category: "Rice",
     quantity: 0,
     lowStockThreshold: 0,
+    addOnIds: [],
+    qtyType: "",
     available: false,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -130,6 +139,8 @@ function demoSave(id: string, form: MenuItemForm): MenuItem {
     category: form.category.trim(),
     quantity: form.quantity ?? 0,
     lowStockThreshold: form.lowStockThreshold ?? 0,
+    addOnIds: [...form.addOnIds],
+    qtyType: form.qtyType,
     available: form.available,
     adminAvailable: current?.adminAvailable ?? null,
     adminInactiveReason: current?.adminInactiveReason ?? "",
@@ -166,14 +177,18 @@ export async function listMenuItems(): Promise<MenuItem[]> {
 }
 export async function createMenuItem(form: MenuItemForm): Promise<MenuItem> {
   if (DEMO_MODE) return demoSave(`demo-${Date.now()}`, form);
-  const fields = toMenuItemPayload(form),
+  const fields = toCreatePayload(form),
     files = newImages(form);
   const { data } = await api.post(
     endpoint(API_PATHS.menuItems),
     files.length ? multipart(fields, files) : fields,
   );
   const saved = readItem(data);
-  rememberCategory(saved.category, form.category.trim(), form.subCategory.trim());
+  rememberCategory(
+    saved.category,
+    form.category.trim(),
+    form.subCategory.trim(),
+  );
   return saved;
 }
 /**
@@ -184,19 +199,21 @@ export async function createMenuItem(form: MenuItemForm): Promise<MenuItem> {
 export async function updateMenuItem(
   id: string,
   form: MenuItemForm,
+  original: MenuItem,
 ): Promise<MenuItem> {
   if (DEMO_MODE) return demoSave(id, form);
-  const { data } = await api.patch(
-    itemPath(id),
-    toMenuItemPayload(form),
-  );
-  rememberCategory(
-    readItem(data).category,
-    form.category.trim(),
-    form.subCategory.trim(),
-  );
-  const files = newImages(form);
-  if (!files.length) return readItem(data);
+  const changes = changedMenuItemPayload(original, form),
+    files = newImages(form);
+  let data: unknown = null;
+  if (Object.keys(changes).length) {
+    ({ data } = await api.patch(itemPath(id), changes));
+    rememberCategory(
+      readItem(data).category,
+      form.category.trim(),
+      form.subCategory.trim(),
+    );
+  }
+  if (!files.length) return data ? readItem(data) : original;
   const { data: withImages } = await api.patch(
     itemPath(id),
     multipart({}, files),
@@ -206,6 +223,7 @@ export async function updateMenuItem(
 export async function setMenuItemAvailable(
   id: string,
   available: boolean,
+  current: MenuItem,
 ): Promise<MenuItem> {
   if (DEMO_MODE) {
     const item = { ...demoFind(id), available };
@@ -213,6 +231,7 @@ export async function setMenuItemAvailable(
     return item;
   }
   const { data } = await api.patch(itemPath(id), {
+    ...pricingPayload(toMenuItemForm(current)),
     owner_is_available: available,
   });
   return readItem(data);
@@ -227,14 +246,18 @@ export async function deleteMenuItem(id: string): Promise<void> {
 export interface CategoryOption {
   id: string;
   name: string;
+  /** For a sub category: the id of the category it belongs to. */
+  parentId?: string;
 }
 export interface MenuCategories {
   categories: CategoryOption[];
   subCategories: CategoryOption[];
 }
 /**
- * GET /menu-items/categories: rows of { category_id, category_name, parent_id }.
- * Rows under parent CAT001 are categories and rows under SUB001 are sub categories.
+ * GET /menu-items/categories: this restaurant's rows of
+ * { category_id, category_name, parent_id, level, is_active }. Level 1 rows
+ * are categories (parent CAT001); level 2 rows are sub categories whose
+ * parent_id is their category.
  */
 export async function listMenuCategories(): Promise<MenuCategories> {
   if (DEMO_MODE)
@@ -246,24 +269,44 @@ export async function listMenuCategories(): Promise<MenuCategories> {
     };
   const { data } = await api.get(`${endpoint(API_PATHS.menuItems)}/categories`);
   const rows = (data as { data?: unknown })?.data ?? data;
-  const under = (parent: string): CategoryOption[] => {
-    const seen = new Set<string>();
-    return (Array.isArray(rows) ? rows : [])
-      .filter((r) => (r as { parent_id?: unknown })?.parent_id === parent)
-      .map((r) => ({
-        id: String((r as { category_id?: unknown }).category_id ?? ""),
-        name: String((r as { category_name?: unknown }).category_name ?? "").trim(),
-      }))
-      .filter((c) => c.id && c.name && !seen.has(c.id) && seen.add(c.id));
-  };
-  return { categories: under("CAT001"), subCategories: under("SUB001") };
+  const seen = new Set<string>(),
+    categories: CategoryOption[] = [],
+    subCategories: CategoryOption[] = [];
+  for (const r of Array.isArray(rows)
+    ? (rows as Record<string, unknown>[])
+    : []) {
+    const id = String(r.category_id ?? ""),
+      name = String(r.category_name ?? "").trim(),
+      parent = String(r.parent_id ?? "");
+    if (!id || !name || r.is_active === false || seen.has(id)) continue;
+    seen.add(id);
+    const sub = Number(r.level) === 2 || /^SUB/i.test(id);
+    (sub ? subCategories : categories).push(
+      sub ? { id, name, parentId: parent } : { id, name },
+    );
+  }
+  return { categories, subCategories };
+}
+/** POST /menu-items/categories: saves categories, each with optional sub categories. */
+export async function addMenuCategories(
+  entries: { category: string; subcategories?: string[] }[],
+): Promise<void> {
+  if (DEMO_MODE) return;
+  await api.post(`${endpoint(API_PATHS.menuItems)}/categories`, {
+    categories: entries.map((e) => ({
+      category: e.category.trim(),
+      ...(e.subcategories?.length
+        ? { subcategories: e.subcategories.map((n) => n.trim()) }
+        : {}),
+    })),
+  });
 }
 const ID_LIKE = /^(CAT|SUB)\d+$/i;
 /**
  * Items carry a category id: a sub category's id when one was given, else the
- * category's. Turns it back into names for the list and the edit form, using
- * the server's list and then the names this browser saved. An id that cannot
- * be resolved is shown as it is.
+ * category's. Turns it back into names for the list and the edit form, from
+ * the server's category list (falling back to the names this browser saved).
+ * An id that cannot be resolved is shown as it is.
  */
 async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
   if (DEMO_MODE || !items.some((i) => i.category)) return items;
@@ -274,39 +317,56 @@ async function withCategoryNames(items: MenuItem[]): Promise<MenuItem[]> {
     // Fall back to the remembered names.
   }
   const cats = new Map(lists.categories.map((c) => [c.id, c.name])),
-    subs = new Map(lists.subCategories.map((c) => [c.id, c.name])),
+    subs = new Map(lists.subCategories.map((c) => [c.id, c])),
     remembered = loadRemembered().names;
   return items.map((i) => {
     const id = i.category;
     if (!id) return i;
-    if (subs.has(id))
-      return { ...i, subCategory: subs.get(id), category: remembered[id]?.parent ?? "" };
+    const sub = subs.get(id);
+    if (sub)
+      return {
+        ...i,
+        subCategory: sub.name,
+        category:
+          (sub.parentId && cats.get(sub.parentId)) ||
+          remembered[id]?.parent ||
+          "",
+      };
     if (cats.has(id)) return { ...i, category: cats.get(id)! };
     const known = remembered[id];
-    if (known?.parent !== undefined || (known && ID_LIKE.test(id) && /^SUB/i.test(id)))
+    if (known?.parent !== undefined || (known && /^SUB/i.test(id)))
       return { ...i, subCategory: known.name, category: known.parent ?? "" };
     if (known) return { ...i, category: known.name };
     // No name known: show the id rather than nothing.
     return { ...i, category: id };
   });
 }
-/** Category and sub category names for the dropdowns: the server's plus the ones this browser saved. */
+/** Category and sub category names for the form dropdowns. */
 export async function listCategoryNames(): Promise<{
   categories: string[];
   subCategories: string[];
 }> {
   const remembered = loadRemembered();
   let lists: MenuCategories = { categories: [], subCategories: [] };
+  let own: MenuItem[] = [];
   try {
-    lists = await listMenuCategories();
+    [lists, own] = await Promise.all([listMenuCategories(), listMenuItems()]);
   } catch {
     // The remembered names still work offline.
   }
-  const merge = (server: { name: string }[], local: string[]) => [
-    ...new Set([...server.map((c) => c.name), ...local]),
+  const names = (...groups: (string | undefined)[][]) => [
+    ...new Set(groups.flat().filter((n): n is string => !!n)),
   ];
   return {
-    categories: merge(lists.categories, remembered.categories),
-    subCategories: merge(lists.subCategories, remembered.subCategories),
+    categories: names(
+      lists.categories.map((c) => c.name),
+      remembered.categories,
+      own.map((i) => (ID_LIKE.test(i.category) ? undefined : i.category)),
+    ),
+    subCategories: names(
+      lists.subCategories.map((c) => c.name),
+      remembered.subCategories,
+      own.map((i) => i.subCategory),
+    ),
   };
 }

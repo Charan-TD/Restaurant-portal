@@ -1,6 +1,7 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Alert, Box, Chip, Typography } from "@mui/material";
+import { Box, Chip, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
@@ -10,12 +11,20 @@ import {
   type ProfileChangeRequest,
   type RestaurantDetails,
 } from "../services/restaurantService";
+/** How many of the newest requests are listed before "See more requests". */
+const LATEST_REQUESTS = 3;
 const GST = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const PAN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const AADHAAR = /^\d{12}$/;
 const FIELD_LABELS: Record<string, string> = {
   rest_name: "Restaurant name",
   owner_name: "Owner name",
+  restaurant_type: "Restaurant type",
+  fssai_number: "FSSAI number",
+  fssai_expiry_date: "FSSAI expiry",
+  fssai: "FSSAI certificate",
+  business_proof_number: "Business proof number",
+  business_proof: "Business proof",
   gst: "GSTIN",
   gst_document: "GST certificate",
   pan_number: "PAN number",
@@ -91,8 +100,10 @@ export function ChangeRequestForm({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sent, setSent] = useState(false);
-  const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) =>
-    setValues((old) => ({ ...old, [key]: value }));
+  const set = <K extends keyof typeof EMPTY>(
+    key: K,
+    value: (typeof EMPTY)[K],
+  ) => setValues((old) => ({ ...old, [key]: value }));
   const gst = values.gst.trim().toUpperCase(),
     pan = values.panNumber.trim().toUpperCase(),
     aadhaar = values.aadhaarNumber.trim();
@@ -137,14 +148,14 @@ export function ChangeRequestForm({
         Leave a field empty to keep it as is.
       </Typography>
       {sent && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <ToastAlert severity="success" sx={{ mb: 2 }}>
           Request sent. An admin will review it.
-        </Alert>
+        </ToastAlert>
       )}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <ToastAlert severity="error" sx={{ mb: 2 }}>
           {error}
-        </Alert>
+        </ToastAlert>
       )}
       <div className="form-grid compact-grid">
         <CommonTextField
@@ -161,7 +172,9 @@ export function ChangeRequestForm({
           <CommonTextField
             label="GSTIN"
             value={values.gst}
-            onChange={(e) => set("gst", e.target.value.toUpperCase().slice(0, 15))}
+            onChange={(e) =>
+              set("gst", e.target.value.toUpperCase().slice(0, 15))
+            }
           />
           <DocumentUpload
             title="GST certificate"
@@ -190,7 +203,10 @@ export function ChangeRequestForm({
             label="Aadhaar number"
             value={values.aadhaarNumber}
             onChange={(e) =>
-              set("aadhaarNumber", e.target.value.replace(/\D/g, "").slice(0, 12))
+              set(
+                "aadhaarNumber",
+                e.target.value.replace(/\D/g, "").slice(0, 12),
+              )
             }
             slotProps={{ htmlInput: { inputMode: "numeric" } }}
           />
@@ -216,13 +232,22 @@ export function ChangeRequestHistory({
 }: {
   requests: ProfileChangeRequest[];
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (!requests.length) return null;
+  // Newest first; only the latest few until the vendor asks for the rest.
+  const sorted = [...requests].sort(
+      (a, b) =>
+        (Date.parse(b.createdAt ?? "") || 0) -
+        (Date.parse(a.createdAt ?? "") || 0),
+    ),
+    shown = showAll ? sorted : sorted.slice(0, LATEST_REQUESTS),
+    older = sorted.length - LATEST_REQUESTS;
   return (
     <Box>
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
         Your requests
       </Typography>
-      {requests.map((request) => (
+      {shown.map((request) => (
         <Box
           key={request.id}
           sx={{
@@ -237,9 +262,9 @@ export function ChangeRequestHistory({
         >
           <Box sx={{ minWidth: 0 }}>
             <Typography noWrap sx={{ fontWeight: 600 }}>
-              {[...new Set(request.fields.map((key) => FIELD_LABELS[key]))].join(
-                ", ",
-              ) || "Profile change"}
+              {[
+                ...new Set(request.fields.map((key) => FIELD_LABELS[key])),
+              ].join(", ") || "Profile change"}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {request.createdAt
@@ -260,6 +285,15 @@ export function ChangeRequestHistory({
           />
         </Box>
       ))}
+      {older > 0 && (
+        <CommonButton
+          variant="text"
+          onClick={() => setShowAll((all) => !all)}
+          sx={{ mt: 1, ml: -1, fontWeight: 700 }}
+        >
+          {showAll ? "Show fewer requests" : `See more requests (${older})`}
+        </CommonButton>
+      )}
     </Box>
   );
 }

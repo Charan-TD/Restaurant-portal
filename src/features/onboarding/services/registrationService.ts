@@ -100,19 +100,27 @@ const savers: Partial<
     api.put(
       stepPath(id, "operating-hours"),
       Object.fromEntries(
-        form.hours.map((day) => [
-          dayKeys[day.day],
-          {
-            is_open: day.open,
-            is_24_hours: false,
-            slots: day.open
-              ? day.shifts.map((shift) => ({
-                  opening_time: shift.start,
-                  closing_time: shift.end,
-                }))
-              : [],
-          },
-        ]),
+        form.hours.map((day) => {
+          const around =
+            day.open &&
+            day.shifts.length === 1 &&
+            day.shifts[0].start === "00:00" &&
+            day.shifts[0].end === "23:59";
+          return [
+            dayKeys[day.day],
+            {
+              is_open: day.open,
+              is_24_hours: around,
+              slots:
+                day.open && !around
+                  ? day.shifts.map((shift) => ({
+                      opening_time: shift.start,
+                      closing_time: shift.end,
+                    }))
+                  : [],
+            },
+          ];
+        }),
       ),
     ),
 };

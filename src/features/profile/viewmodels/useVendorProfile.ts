@@ -1,6 +1,10 @@
 "use client";
 import { useWatch } from "react-hook-form";
 import { usePortal } from "@/core/providers/PortalProvider";
+import { useToast } from "@/core/providers/ToastProvider";
+import { DEMO_MODE } from "@/core/constants/config";
+import { errorMessage } from "@/shared/utils/errors";
+import { setRestaurantActive } from "../services/restaurantService";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 const FALLBACK_NAME = "Restaurant Partner";
 /** One letter for the avatar: the first letter of the name, "Ravi Kumar" → "R". */
@@ -25,7 +29,8 @@ export function localDigits(phone: string | undefined) {
  */
 export function useVendorProfile() {
   const portal = usePortal(),
-    { profile, approval, online, setOnline } = portal;
+    { profile, approval, online } = portal,
+    toast = useToast();
   const [ownerName, restaurantName, email, mobile, city] = useWatch({
     control: portal.form.control,
     name: ["ownerName", "restaurantName", "email", "mobile", "city"],
@@ -52,7 +57,15 @@ export function useVendorProfile() {
     mobile: phone ? `${COUNTRY_CODE} ${phone}` : "",
     city: profile.city?.trim() || city?.trim() || "",
     online,
-    setOnline,
+    /** Saves the new status; the switch flips back if the server refuses. */
+    setOnline: (next: boolean) => {
+      portal.setOnline(next);
+      if (DEMO_MODE) return;
+      setRestaurantActive(next).catch((error) => {
+        portal.setOnline(!next);
+        toast.error(errorMessage(error));
+      });
+    },
   };
 }
 export type VendorProfile = ReturnType<typeof useVendorProfile>;

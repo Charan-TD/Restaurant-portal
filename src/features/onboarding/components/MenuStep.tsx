@@ -103,6 +103,7 @@ export function MenuStep() {
               label="Price (₹)"
               required
               type="number"
+              placeholder="e.g. 120"
               value={field.value || ""}
               onChange={(e) => field.onChange(Number(e.target.value))}
               onBlur={field.onBlur}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { usePortal } from "@/core/providers/PortalProvider";
+import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
 import { clearTokens } from "@/core/api/axios";
 import {
@@ -13,6 +14,7 @@ import { sampleOrders } from "../models/sampleOrders";
 import { errorMessage } from "@/shared/utils/errors";
 export function useOrdersViewModel() {
   const { orders, setOrders, setAuthenticated } = usePortal(),
+    toast = useToast(),
     [error, setError] = useState(""),
     [busyId, setBusyId] = useState<string | null>(null),
     [sample, setSample] = useState(false);
@@ -58,6 +60,13 @@ export function useOrdersViewModel() {
         await updateOrder(id, state);
         setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
       }
+      toast.success(
+        state === "Rejected"
+          ? "Order rejected."
+          : state === "Accepted"
+            ? "Order accepted."
+            : "Order updated.",
+      );
     } catch (e) {
       setError(errorMessage(e));
     } finally {

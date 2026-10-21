@@ -1,4 +1,5 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { Fragment } from "react";
 import { Typography, Alert, Divider } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
@@ -39,11 +40,15 @@ export function OnboardingView() {
         </Alert>
       )}
       {vm.restored && (
-        <Alert severity="success" onClose={vm.dismissRestored} sx={{ mb: 3 }}>
+        <ToastAlert
+          severity="success"
+          onClose={vm.dismissRestored}
+          sx={{ mb: 3 }}
+        >
           Welcome back. We restored your saved registration, so you can carry on
           from where you stopped. Documents you already uploaded are saved; you
           only need to upload them again if you change that step.
-        </Alert>
+        </ToastAlert>
       )}
       <form
         noValidate
@@ -118,9 +123,9 @@ export function OnboardingView() {
           {id === "review" && <ReviewStep onEdit={vm.go} />}
         </CommonCard>
         {vm.error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <ToastAlert severity="error" sx={{ mt: 2 }}>
             {vm.error}
-          </Alert>
+          </ToastAlert>
         )}
         <div className="actions">
           <CommonButton

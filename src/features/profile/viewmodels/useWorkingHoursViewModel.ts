@@ -62,6 +62,13 @@ export function useWorkingHoursViewModel() {
     setDone(false);
     setDays((old) => old.map((d) => ({ ...d, open: true, ...bulk })));
   };
+  // 00:00 to 23:59 is saved as a 24-hour day; edit single days afterwards.
+  const openAllDay = () => {
+    setDone(false);
+    setDays((old) =>
+      old.map((d) => ({ ...d, open: true, start: "00:00", end: "23:59" })),
+    );
+  };
   const problem = hoursProblem(days),
     dirty = JSON.stringify(days) !== JSON.stringify(saved);
   const save = async () => {
@@ -91,6 +98,7 @@ export function useWorkingHoursViewModel() {
     setBulk,
     bulkInvalid: bulk.end <= bulk.start,
     applyToAll,
+    openAllDay,
     save,
     reset: () => {
       setDays(saved);

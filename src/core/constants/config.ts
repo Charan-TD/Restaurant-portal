@@ -4,6 +4,7 @@ export const API_PATHS = {
   register: process.env.NEXT_PUBLIC_REGISTER_PATH,
   cuisines: process.env.NEXT_PUBLIC_CUISINES_PATH,
   menuItems: process.env.NEXT_PUBLIC_MENU_ITEMS_PATH,
+  addons: process.env.NEXT_PUBLIC_ADDONS_PATH,
   login: process.env.NEXT_PUBLIC_LOGIN_PATH,
   sendOtp: process.env.NEXT_PUBLIC_SEND_OTP_PATH,
   verifyOtp: process.env.NEXT_PUBLIC_VERIFY_OTP_PATH,

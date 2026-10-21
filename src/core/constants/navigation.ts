@@ -63,12 +63,12 @@ export const sidebarSections: NavSection[] = [
     label: "Customers",
     pages: [
       {
-        label: "Customers list",
+        label: "All customers",
         href: "/customers/list",
         description: "Customers who have ordered from your restaurant.",
       },
       {
-        label: "Feedback & ratings",
+        label: "Customer feedback",
         href: "/customers/feedback",
         description: "Reviews and ratings left by your customers.",
       },

@@ -1,5 +1,4 @@
 "use client";
-import NextLink from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Controller,
@@ -15,10 +14,13 @@ import {
   createFilterOptions,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Select,
+  Switch,
   FormHelperText,
   ToggleButton,
   ToggleButtonGroup,
@@ -31,6 +33,7 @@ import EnergySavingsLeafOutlined from "@mui/icons-material/EnergySavingsLeafOutl
 import EggOutlined from "@mui/icons-material/EggOutlined";
 import SetMealOutlined from "@mui/icons-material/SetMealOutlined";
 import AddOutlined from "@mui/icons-material/AddOutlined";
+import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
 import AddPhotoAlternateOutlined from "@mui/icons-material/AddPhotoAlternateOutlined";
@@ -42,19 +45,21 @@ import { FieldLabel } from "@/shared/components/form/FormField";
 import {
   ITEM_IMAGE_TYPES,
   menuFoodTypes,
+  qtyTypes,
   type MenuFoodType,
   type MenuItemForm,
 } from "../models/menuItem";
 import { formatRupees } from "@/shared/utils/format";
 import { menuImageUrl } from "../services/menuItemService";
+import type { RestaurantAddOn } from "../services/addOnService";
 import { useMenuItemFormViewModel } from "../viewmodels/useMenuItemFormViewModel";
 type NumberName =
-  | "price"
-  | "discountedPrice"
-  | "taxRate"
-  | "preparationMinutes";
+  "price" | "discountedPrice" | "taxRate" | "preparationMinutes";
 const foodStyle: Record<MenuFoodType, { icon: ReactNode; color: string }> = {
-  Veg: { icon: <EnergySavingsLeafOutlined fontSize="small" />, color: "#2e7d32" },
+  Veg: {
+    icon: <EnergySavingsLeafOutlined fontSize="small" />,
+    color: "#2e7d32",
+  },
   Egg: { icon: <EggOutlined fontSize="small" />, color: "#e09b00" },
   "Non-veg": { icon: <SetMealOutlined fontSize="small" />, color: "#c62828" },
 };
@@ -83,9 +88,16 @@ function NumberInput({
   decimal?: boolean;
 }) {
   // Keeps what was typed, so "2." survives while the form stores 2.
-  const [typed, setTyped] = useState(field.value == null ? "" : String(field.value));
+  const [typed, setTyped] = useState(
+    field.value == null ? "" : String(field.value),
+  );
   const stored = typed === "" ? null : Number(typed);
-  const text = stored === field.value ? typed : field.value == null ? "" : String(field.value);
+  const text =
+    stored === field.value
+      ? typed
+      : field.value == null
+        ? ""
+        : String(field.value);
   const inputId = `menu-${field.name}`;
   return (
     <div>
@@ -216,6 +228,272 @@ function Section({
   );
 }
 const fullRow = { gridColumn: { md: "1 / -1" } } as const;
+
+/** Inline box to create an add-on while filling in the item. */
+function NewAddOn({
+  onCreate,
+}: {
+  /** Resolves to an error message, or "" once the add-on is saved and ticked. */
+  onCreate: (name: string, price: number) => Promise<string>;
+}) {
+  const [open, setOpen] = useState(false),
+    [name, setName] = useState(""),
+    [price, setPrice] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setName("");
+    setPrice("");
+    setError("");
+  };
+  const save = async () => {
+    if (!name.trim()) return setError("Enter the add-on name.");
+    if (price === "") return setError("Enter the price (0 if free).");
+    setBusy(true);
+    const problem = await onCreate(name.trim(), Number(price));
+    setBusy(false);
+    if (problem) setError(problem);
+    else close();
+  };
+  if (!open)
+    return (
+      <Button
+        startIcon={<AddOutlined />}
+        onClick={() => setOpen(true)}
+        sx={{ mt: 1, ml: -1, fontWeight: 700, color: "primary.dark" }}
+      >
+        Add new add-on
+      </Button>
+    );
+  const enter = (e: { key: string; preventDefault: () => void }) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void save();
+    }
+  };
+  return (
+    <Box
+      sx={{
+        mt: 1.5,
+        p: 2,
+        display: "grid",
+        gap: 2,
+        alignItems: "start",
+        border: 1,
+        borderColor: "divider",
+        borderRadius: "14px",
+        gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr auto" },
+      }}
+    >
+      <CommonTextField
+        autoFocus
+        value={name}
+        placeholder="Add-on name, e.g. Extra raita"
+        onChange={(e) => {
+          setName(e.target.value);
+          setError("");
+        }}
+        onKeyDown={enter}
+        error={!!error && !name.trim()}
+        helperText={!name.trim() ? error : undefined}
+        slotProps={{
+          htmlInput: { maxLength: 100, "aria-label": "Add-on name" },
+        }}
+      />
+      <CommonTextField
+        value={price}
+        placeholder="Price, e.g. 30"
+        onChange={(e) => {
+          setPrice(clean(e.target.value));
+          setError("");
+        }}
+        onKeyDown={enter}
+        error={!!error && !!name.trim()}
+        helperText={name.trim() ? error : undefined}
+        slotProps={{
+          htmlInput: { inputMode: "numeric", "aria-label": "Add-on price" },
+          input: {
+            startAdornment: (
+              <Box sx={{ mr: 1, color: "text.secondary" }}>₹</Box>
+            ),
+          },
+        }}
+      />
+      <Box sx={{ display: "flex", gap: 1 }}>
+        <CommonButton
+          variant="contained"
+          disabled={busy}
+          onClick={() => void save()}
+        >
+          {busy ? "Adding…" : "Add"}
+        </CommonButton>
+        <CommonButton
+          variant="outlined"
+          color="inherit"
+          disabled={busy}
+          onClick={close}
+        >
+          Cancel
+        </CommonButton>
+      </Box>
+    </Box>
+  );
+}
+
+/** The restaurant's add-ons as a checklist; the ticked ones go with the item. */
+function AddOnsField({
+  control,
+  addOns,
+  onCreate,
+}: {
+  control: Control<MenuItemForm>;
+  addOns: RestaurantAddOn[];
+  onCreate: (name: string, price: number) => Promise<string>;
+}) {
+  return (
+    <div>
+      <FieldLabel text="Add-ons" htmlFor="menu-addons" />
+      {addOns.length === 0 ? (
+        <Typography color="text.secondary">
+          No add-ons yet. Add one below.
+        </Typography>
+      ) : (
+        <Controller
+          control={control}
+          name="addOnIds"
+          render={({ field }) => (
+            <Autocomplete
+              id="menu-addons"
+              multiple
+              disableCloseOnSelect
+              openOnFocus
+              options={addOns}
+              value={addOns.filter((a) => field.value.includes(a.id))}
+              onChange={(_, picked) => field.onChange(picked.map((a) => a.id))}
+              getOptionLabel={(a) => a.name}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              noOptionsText="No add-ons match"
+              renderOption={({ key, ...props }, addOn, { selected }) => (
+                <li key={key} {...props}>
+                  <Checkbox checked={selected} sx={{ mr: 1, p: 0.5 }} />
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    <span>{addOn.name}</span>
+                    <strong>
+                      {addOn.price ? `+${formatRupees(addOn.price)}` : "Free"}
+                    </strong>
+                  </Box>
+                </li>
+              )}
+              renderValue={(picked, getItemProps) =>
+                picked.map((addOn, index) => {
+                  const { key, ...props } = getItemProps({ index });
+                  return (
+                    <Chip
+                      key={key}
+                      {...props}
+                      label={`${addOn.name} · ${addOn.price ? formatRupees(addOn.price) : "Free"}`}
+                    />
+                  );
+                })
+              }
+              renderInput={(params) => (
+                <CommonTextField
+                  {...params}
+                  placeholder={field.value.length ? "" : "Select add-ons"}
+                />
+              )}
+            />
+          )}
+        />
+      )}
+      <NewAddOn onCreate={onCreate} />
+    </div>
+  );
+}
+
+/** The in / out of stock switch and optional add-ons. */
+function AvailabilityFields({
+  control,
+  addOns,
+  onCreateAddOn,
+}: {
+  control: Control<MenuItemForm>;
+  addOns: RestaurantAddOn[];
+  onCreateAddOn: (name: string, price: number) => Promise<string>;
+}) {
+  return (
+    <>
+      <Controller
+        control={control}
+        name="available"
+        render={({ field }) => (
+          <Box
+            sx={{
+              ...fullRow,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: "12px",
+              px: 2,
+              py: 1,
+            }}
+          >
+            <FormControlLabel
+              sx={{ m: 0, width: "100%", justifyContent: "space-between" }}
+              labelPlacement="start"
+              control={
+                <Switch
+                  checked={field.value ?? true}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                />
+              }
+              label={
+                <div>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    Available for orders
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Turn off to show this item as out of stock.
+                  </Typography>
+                </div>
+              }
+            />
+          </Box>
+        )}
+      />
+      <Controller
+        control={control}
+        name="qtyType"
+        render={({ field, fieldState }) => (
+          <div>
+            <FieldLabel text="Sold as" htmlFor="menu-qty-type" />
+            <ChoiceField
+              id="menu-qty-type"
+              value={field.value ?? ""}
+              options={[...qtyTypes]}
+              placeholder="e.g. Plate, Half Plate"
+              addLabel="Add new quantity type"
+              newPlaceholder="Type how it is sold, e.g. Family pack"
+              error={!!fieldState.error}
+              helperText={fieldState.error?.message}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          </div>
+        )}
+      />
+
+      <AddOnsField control={control} addOns={addOns} onCreate={onCreateAddOn} />
+    </>
+  );
+}
 const filterByText = createFilterOptions<string>();
 /** Dropdown of existing values that also accepts a new one typed in. */
 function ComboField({
@@ -247,7 +525,9 @@ function ComboField({
       options={options}
       // Opening the list always shows every saved value; typing narrows it.
       filterOptions={(all, state) =>
-        all.some((o) => o.toLowerCase() === state.inputValue.trim().toLowerCase())
+        all.some(
+          (o) => o.toLowerCase() === state.inputValue.trim().toLowerCase(),
+        )
           ? all
           : filterByText(all, state)
       }
@@ -281,7 +561,6 @@ function ChoiceField({
   placeholder,
   addLabel,
   newPlaceholder,
-  existingLabel,
   error,
   helperText,
   onChange,
@@ -293,7 +572,6 @@ function ChoiceField({
   placeholder: string;
   addLabel: string;
   newPlaceholder: string;
-  existingLabel: string;
   error: boolean;
   helperText?: string;
   onChange: (value: string) => void;
@@ -350,30 +628,6 @@ function ChoiceField({
         >
           {addLabel}
         </Button>
-        {options.length > 0 && (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 1,
-              mt: 0.5,
-            }}
-          >
-            <Typography variant="caption" color="text.secondary">
-              {existingLabel}
-            </Typography>
-            {options.slice(0, 8).map((name) => (
-              <Chip
-                key={name}
-                label={name}
-                variant="outlined"
-                onClick={() => onChange(name)}
-                sx={{ bgcolor: "#f8f8f6" }}
-              />
-            ))}
-          </Box>
-        )}
       </Box>
     </>
   );
@@ -450,7 +704,8 @@ function DiscountField({
             color: "success.main",
           }}
         >
-          Customers pay {formatRupees(offer)} · save {formatRupees(price - offer)}
+          Customers pay {formatRupees(offer)} · save{" "}
+          {formatRupees(price - offer)}
         </Typography>
       ) : (
         <Typography
@@ -623,7 +878,12 @@ function PictureDrop({
             textAlign: "center",
             cursor: "pointer",
             border: "2px dashed",
-            borderColor: over || message ? (message ? "error.main" : "primary.main") : "#d9ded9",
+            borderColor:
+              over || message
+                ? message
+                  ? "error.main"
+                  : "primary.main"
+                : "#d9ded9",
             bgcolor: over ? "rgba(242,106,46,.06)" : "#fcfcfb",
             borderRadius: "14px",
             transition: "border-color .15s, background-color .15s",
@@ -652,7 +912,10 @@ function PictureDrop({
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Drag &amp; drop, or{" "}
-            <Box component="span" sx={{ color: "primary.main", fontWeight: 600 }}>
+            <Box
+              component="span"
+              sx={{ color: "primary.main", fontWeight: 600 }}
+            >
               browse your files
             </Box>
           </Typography>
@@ -681,33 +944,11 @@ export function MenuItemFormView({ id }: { id?: string }) {
             : "Add a new dish with details, pricing, image and availability."
         }
       />
-      {vm.created && (
-        <Alert
-          severity="success"
-          onClose={vm.dismissCreated}
-          sx={{ mb: 3 }}
-          action={
-            <CommonButton
-              color="inherit"
-              size="small"
-              href="/menu/items"
-              LinkComponent={NextLink}
-            >
-              View menu
-            </CommonButton>
-          }
-        >
-          {vm.created.name} was added to your menu. Add another below.
-        </Alert>
-      )}
-      {vm.draftSaved && (
-        <Alert severity="info" onClose={vm.clearDraftSaved} sx={{ mb: 3 }}>
-          Draft saved in this browser. The picture is not part of the draft.
-        </Alert>
-      )}
-      {vm.error && (
-        <Alert severity="error" onClose={vm.dismissError} sx={{ mb: 3 }}>
-          {vm.error}
+      {vm.editing && vm.item?.adminAvailable === false && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <strong>This item was disabled by TrainDhaba.</strong> Reason:{" "}
+          {vm.item.adminInactiveReason || "No reason was given."} Customers
+          cannot order it until it is enabled again.
         </Alert>
       )}
       {vm.loading ? (
@@ -810,7 +1051,6 @@ export function MenuItemFormView({ id }: { id?: string }) {
                       placeholder="e.g. Biryani"
                       addLabel="Add new category"
                       newPlaceholder="Type the new category"
-                      existingLabel="Existing categories:"
                       error={!!fieldState.error}
                       helperText={fieldState.error?.message}
                       onChange={field.onChange}
@@ -824,10 +1064,7 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 name="subCategory"
                 render={({ field, fieldState }) => (
                   <div>
-                    <FieldLabel
-                      text="Sub category"
-                      htmlFor="menu-sub"
-                    />
+                    <FieldLabel text="Sub category" htmlFor="menu-sub" />
                     <ChoiceField
                       id="menu-sub"
                       value={field.value}
@@ -835,7 +1072,6 @@ export function MenuItemFormView({ id }: { id?: string }) {
                       placeholder="e.g. Chicken Biryani"
                       addLabel="Add new subcategory"
                       newPlaceholder="Type the new subcategory"
-                      existingLabel="Existing subcategories:"
                       error={!!fieldState.error}
                       helperText={fieldState.error?.message}
                       onChange={field.onChange}
@@ -869,6 +1105,17 @@ export function MenuItemFormView({ id }: { id?: string }) {
                     </Typography>
                   </Box>
                 )}
+              />
+            </Section>
+            <Section
+              icon={<Inventory2Outlined />}
+              title="Availability"
+              subtitle="Choose if the item is available, how it is sold and its add-ons."
+            >
+              <AvailabilityFields
+                control={control}
+                addOns={vm.addOns}
+                onCreateAddOn={vm.createAddOn}
               />
             </Section>
             <Section

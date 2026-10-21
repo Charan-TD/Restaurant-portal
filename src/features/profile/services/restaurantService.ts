@@ -7,6 +7,8 @@ export interface RestaurantSummary {
   ownerName?: string;
   phone?: string;
   email?: string;
+  /** True when the owner has the restaurant ACTIVE (taking orders). */
+  active?: boolean;
 }
 const text = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -23,7 +25,11 @@ export async function getMyRestaurant(): Promise<RestaurantSummary> {
     unknown
   >;
   return {
-    name: first(restaurant?.rest_name, restaurant?.restaurant_name, restaurant?.name),
+    name: first(
+      restaurant?.rest_name,
+      restaurant?.restaurant_name,
+      restaurant?.name,
+    ),
     city: first(restaurant?.city),
     ownerName: first(
       restaurant?.owner_name,
@@ -36,9 +42,29 @@ export async function getMyRestaurant(): Promise<RestaurantSummary> {
       restaurant?.mobile,
     ),
     email: first(restaurant?.email, restaurant?.owner_email),
+    active: ownerActive(restaurant?.owner_restaurant_status),
   };
 }
-/** PATCH /restaurant/profile: details the restaurant can change directly. */
+const ownerActive = (value: unknown) => {
+  const status = text(value)?.toUpperCase();
+  return status ? status === "ACTIVE" : undefined;
+};
+/**
+ * PATCH /restaurant/profile/status: the owner switches the restaurant ACTIVE
+ * (online) or INACTIVE (offline). Takes effect at once, no approval needed.
+ */
+export async function setRestaurantActive(active: boolean) {
+  await api.patch(`${endpoint(API_PATHS.restaurantMe)}/status`, {
+    owner_restaurant_status: active ? "ACTIVE" : "INACTIVE",
+  });
+}
+const profilePath = (page: string) =>
+  `${endpoint(API_PATHS.restaurantMe)}/${page}`;
+/**
+ * PATCH /restaurant/profile/restaurant-details: the contact number, logo and
+ * cover are saved straight away. (Name, owner and type need approval; see
+ * requestProfileChange.)
+ */
 export async function updateRestaurantProfile(changes: {
   contact?: string;
   logo?: File | null;
@@ -48,17 +74,24 @@ export async function updateRestaurantProfile(changes: {
   if (changes.contact) body.append("restaurant_contact", changes.contact);
   if (changes.logo) body.append("logo", changes.logo);
   if (changes.cover) body.append("cover", changes.cover);
-  await api.patch(endpoint(API_PATHS.restaurantMe), body);
+  await api.patch(profilePath("restaurant-details"), body);
 }
-export interface ProfileChangeRequestInput {
+export type ProfileChangeRequestInput = ProfileChangeInput;
+export interface ProfileChangeInput {
   rest_name?: string;
   owner_name?: string;
+  restaurant_type?: string;
   gst?: string;
   gst_document?: File | null;
   pan_number?: string;
   pan_card?: File | null;
   aadhaar_number?: string;
   adhaar_card?: File | null;
+  fssai_number?: string;
+  fssai_expiry_date?: string;
+  fssai?: File | null;
+  business_proof_number?: string;
+  business_proof?: File | null;
   // A new location; the server must accept these to approve a move.
   house_no?: string;
   landmark?: string;
@@ -75,20 +108,58 @@ export interface ProfileChangeRequest {
   fields: string[];
   reason?: string;
 }
+const DETAIL_FIELDS = ["rest_name", "owner_name", "restaurant_type"],
+  LOCATION_FIELDS = [
+    "house_no",
+    "landmark",
+    "city",
+    "state",
+    "pincode",
+    "lat",
+    "lon",
+  ];
+const hasValue = (value: unknown) =>
+  value !== undefined && value !== null && value !== "";
 /**
- * POST /restaurant/profile/change-requests: these changes wait for admin
- * approval and are not applied until approved.
+ * Changes that wait for admin approval. Each field goes to the page that
+ * owns it: name, owner and type to restaurant-details, address and map
+ * position to location (JSON), and GST, PAN, Aadhaar, FSSAI and business
+ * proof to business-documents. A change already under review is refused by
+ * the server (409).
  */
-export async function requestProfileChange(changes: ProfileChangeRequestInput) {
-  const body = new FormData();
-  Object.entries(changes).forEach(([key, value]) => {
-    if (value) body.append(key, typeof value === "number" ? String(value) : value);
-  });
-  await api.post(endpoint(API_PATHS.profileChangeRequests), body);
+export async function requestProfileChange(changes: ProfileChangeInput) {
+  const entries = Object.entries(changes).filter(([, v]) => hasValue(v));
+  const pick = (keys: string[]) =>
+    entries.filter(([key]) => keys.includes(key));
+  const details = pick(DETAIL_FIELDS),
+    place = pick(LOCATION_FIELDS),
+    documents = entries.filter(
+      ([key]) => ![...DETAIL_FIELDS, ...LOCATION_FIELDS].includes(key),
+    );
+  const form = (rows: [string, unknown][]) => {
+    const body = new FormData();
+    rows.forEach(([key, value]) =>
+      body.append(key, value instanceof File ? value : String(value)),
+    );
+    return body;
+  };
+  // One at a time: the server allows a single request under review.
+  if (details.length)
+    await api.patch(profilePath("restaurant-details"), form(details));
+  if (place.length)
+    await api.patch(profilePath("location"), Object.fromEntries(place));
+  if (documents.length)
+    await api.patch(profilePath("business-documents"), form(documents));
 }
 const FIELD_KEYS = [
   "rest_name",
   "owner_name",
+  "restaurant_type",
+  "fssai_number",
+  "fssai_expiry_date",
+  "fssai",
+  "business_proof_number",
+  "business_proof",
   "gst",
   "gst_document",
   "pan_number",
@@ -170,9 +241,14 @@ function readDay(day: string, raw: unknown): WorkingDay {
     end = hhmm(row.close) ?? hhmm(slots[slots.length - 1]?.closing_time);
   return start && end ? { day, open: true, start, end } : closed;
 }
-/** GET /restaurant/profile: the weekly hours the restaurant is open. */
+/** GET /restaurant/profile/operating-hours: the weekly hours the restaurant is open. */
 export async function getWorkingHours(): Promise<WorkingDay[]> {
-  return hoursOf(await fetchRestaurantRow());
+  const { data } = await api.get(profilePath("operating-hours"));
+  const body = (data?.data ?? data) as Row;
+  return hoursOf(
+    (body?.operating_hours ?? body?.opening_hours ?? body) as Row,
+    true,
+  );
 }
 type Row = Record<string, unknown>;
 async function fetchRestaurantRow(): Promise<Row> {
@@ -180,8 +256,10 @@ async function fetchRestaurantRow(): Promise<Row> {
   const body = (data?.data ?? data) as Row;
   return (body?.restaurant ?? body?.profile ?? body) as Row;
 }
-function hoursOf(restaurant: Row): WorkingDay[] {
-  let hours = restaurant?.opening_hours ?? restaurant?.operating_hours;
+function hoursOf(restaurant: Row, isSchedule = false): WorkingDay[] {
+  let hours = isSchedule
+    ? restaurant
+    : (restaurant?.opening_hours ?? restaurant?.operating_hours);
   if (typeof hours === "string") {
     try {
       hours = JSON.parse(hours);
@@ -198,18 +276,25 @@ function hoursOf(restaurant: Row): WorkingDay[] {
     return readDay(day, byDay[full] ?? byDay[full.slice(0, 3)]);
   });
 }
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 /**
- * PATCH /restaurant/profile with `opening_hours`: one open/close window per
- * day, keyed by lowercase day name. Closed days are left out.
+ * PATCH /restaurant/profile/operating-hours: the weekly schedule keyed mon to
+ * sun, in the registration format. Saved immediately.
  */
 export async function updateWorkingHours(days: WorkingDay[]) {
-  const hours: Record<string, { open: string; close: string }> = {};
-  days.forEach((d) => {
-    if (d.open) hours[d.day.toLowerCase()] = { open: d.start, close: d.end };
+  const schedule: Record<string, unknown> = {};
+  days.forEach((d, index) => {
+    const around = d.open && d.start === "00:00" && d.end === "23:59";
+    schedule[DAY_KEYS[index]] = {
+      is_open: d.open,
+      is_24_hours: around,
+      slots:
+        d.open && !around
+          ? [{ opening_time: d.start, closing_time: d.end }]
+          : [],
+    };
   });
-  const body = new FormData();
-  body.append("opening_hours", JSON.stringify(hours));
-  await api.patch(endpoint(API_PATHS.restaurantMe), body);
+  await api.patch(profilePath("operating-hours"), schedule);
 }
 /** POST /auth/restaurant/change-password for the signed-in restaurant. */
 export async function changePassword(
@@ -288,7 +373,8 @@ export async function getRestaurantDetails(): Promise<RestaurantDetails> {
     type: label(first(row.restaurant_type, row.type)),
     cuisines: (Array.isArray(cuisines) ? cuisines : [])
       .map((c) => {
-        const value = typeof c === "string" ? c : first(asRow(c).name, asRow(c).cuisine_id);
+        const value =
+          typeof c === "string" ? c : first(asRow(c).name, asRow(c).cuisine_id);
         return value && (cuisineNames.get(value) ?? value);
       })
       .filter((c): c is string => !!c),
@@ -313,7 +399,13 @@ export async function getRestaurantDetails(): Promise<RestaurantDetails> {
       state: pick("state"),
       pincode: pick("pincode"),
       latitude: numberOf(place.lat, place.latitude, row.lat, row.latitude),
-      longitude: numberOf(place.lon, place.lng, place.longitude, row.lon, row.longitude),
+      longitude: numberOf(
+        place.lon,
+        place.lng,
+        place.longitude,
+        row.lon,
+        row.longitude,
+      ),
     },
     hours: hoursOf(row),
     bank: {

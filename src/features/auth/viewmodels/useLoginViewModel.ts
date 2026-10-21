@@ -111,7 +111,9 @@ export function useLoginViewModel() {
       // name in the background so the dashboard opens without waiting.
       if (API_PATHS.restaurantMe)
         void getMyRestaurant()
-          .then((restaurant) =>
+          .then((restaurant) => {
+            if (restaurant.active !== undefined)
+              portal.setOnline(restaurant.active);
             portal.setProfile((current) => ({
               ...current,
               restaurantName: current.restaurantName ?? restaurant.name,
@@ -119,8 +121,8 @@ export function useLoginViewModel() {
               name: current.name ?? restaurant.ownerName,
               phone: current.phone ?? restaurant.phone,
               email: current.email ?? restaurant.email,
-            })),
-          )
+            }));
+          })
           .catch(() => undefined);
       portal.setAuthenticated(true);
       form.reset({ ...form.getValues(), password: "", otp: "" });

@@ -16,6 +16,13 @@ export function getAccessToken(): string | null {
     return null;
   }
 }
+export function getRefreshToken(): string | null {
+  try {
+    return localStorage.getItem(REFRESH_KEY);
+  } catch {
+    return null;
+  }
+}
 /** Reads the JWT's claims, which often carry the user's name and email. */
 export function claimsOf(
   token: string,

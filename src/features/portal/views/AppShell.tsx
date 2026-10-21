@@ -8,6 +8,7 @@ import {
   AppSidebar,
   SIDEBAR_WIDTH,
 } from "@/shared/components/layout/AppSidebar";
+import { BackButton } from "@/shared/components/actions/BackButton";
 import { AppNavbar } from "../components/AppNavbar";
 import { usePortalShellViewModel } from "../viewmodels/usePortalShellViewModel";
 const paperSx = {
@@ -90,6 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               py: { xs: 3, md: 4 },
             }}
           >
+            <BackButton />
             {children}
           </Box>
         </Box>

@@ -1,6 +1,7 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useRef, useState, type FormEvent } from "react";
-import { Alert, Autocomplete, Box, Typography } from "@mui/material";
+import { Autocomplete, Box, Typography } from "@mui/material";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
@@ -63,7 +64,9 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
   }
   function choose(location: LocationSuggestion | null) {
     setPicked(location);
-    setPin(location ? { lat: location.latitude, lon: location.longitude } : null);
+    setPin(
+      location ? { lat: location.latitude, lon: location.longitude } : null,
+    );
     if (location)
       setValues((old) => ({
         ...old,
@@ -110,14 +113,14 @@ export function LocationRequestForm({ onSent }: { onSent: () => void }) {
         it is approved.
       </Typography>
       {sent && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <ToastAlert severity="success" sx={{ mb: 2 }}>
           Request sent. An admin will review the new location.
-        </Alert>
+        </ToastAlert>
       )}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <ToastAlert severity="error" sx={{ mb: 2 }}>
           {error}
-        </Alert>
+        </ToastAlert>
       )}
       <div className="form-grid compact-grid">
         <Autocomplete

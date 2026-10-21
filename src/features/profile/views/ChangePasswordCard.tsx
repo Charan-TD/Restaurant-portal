@@ -1,7 +1,8 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Box, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import LockOutlined from "@mui/icons-material/LockOutlined";
 import ShieldOutlined from "@mui/icons-material/ShieldOutlined";
 import VpnKeyOutlined from "@mui/icons-material/VpnKeyOutlined";
@@ -23,10 +24,22 @@ const STRENGTH = [
   { label: "Strong password", color: "success.main" },
 ] as const;
 const TIPS = [
-  { icon: <VpnKeyOutlined />, text: "Use a unique password and avoid reusing old passwords." },
-  { icon: <GroupsOutlined />, text: "Include a mix of letters and special characters." },
-  { icon: <VisibilityOffOutlined />, text: "Don't share your password with anyone." },
-  { icon: <AutorenewOutlined />, text: "Update your password regularly for better security." },
+  {
+    icon: <VpnKeyOutlined />,
+    text: "Use a unique password and avoid reusing old passwords.",
+  },
+  {
+    icon: <GroupsOutlined />,
+    text: "Include a mix of letters and special characters.",
+  },
+  {
+    icon: <VisibilityOffOutlined />,
+    text: "Don't share your password with anyone.",
+  },
+  {
+    icon: <AutorenewOutlined />,
+    text: "Update your password regularly for better security.",
+  },
 ];
 /** Four bars that fill as more of the password rules are met. */
 function StrengthMeter({ password }: { password: string }) {
@@ -52,7 +65,11 @@ function StrengthMeter({ password }: { password: string }) {
         </Box>
         <Typography
           variant="caption"
-          sx={{ minWidth: 100, fontWeight: 600, color: shown?.color ?? "text.secondary" }}
+          sx={{
+            minWidth: 100,
+            fontWeight: 600,
+            color: shown?.color ?? "text.secondary",
+          }}
         >
           {shown?.label ?? "Enter a password"}
         </Typography>
@@ -108,7 +125,10 @@ export function ChangePasswordCard() {
         display: "grid",
         gap: 3,
         alignItems: "start",
-        gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.9fr) minmax(0, 1fr)" },
+        gridTemplateColumns: {
+          xs: "1fr",
+          lg: "minmax(0, 1.9fr) minmax(0, 1fr)",
+        },
       }}
     >
       <CommonCard className="profile-card">
@@ -137,14 +157,14 @@ export function ChangePasswordCard() {
           </div>
         </Box>
         {done && (
-          <Alert severity="success" sx={{ mb: 2 }}>
+          <ToastAlert severity="success" sx={{ mb: 2 }}>
             Password changed.
-          </Alert>
+          </ToastAlert>
         )}
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <ToastAlert severity="error" sx={{ mb: 2 }}>
             {error}
-          </Alert>
+          </ToastAlert>
         )}
         <form noValidate onSubmit={submit}>
           <Box sx={{ display: "grid", gap: 2.5 }}>
@@ -171,7 +191,9 @@ export function ChangePasswordCard() {
                 autoComplete="new-password"
                 value={confirm}
                 error={!!confirm && confirm !== next}
-                helperText={confirm && confirm !== next ? "Passwords do not match." : ""}
+                helperText={
+                  confirm && confirm !== next ? "Passwords do not match." : ""
+                }
                 onChange={(e) => setConfirm(e.target.value)}
               />
             </Labeled>
@@ -232,8 +254,15 @@ export function ChangePasswordCard() {
         </Typography>
         <Box sx={{ display: "grid", gap: 2.25 }}>
           {TIPS.map((tip) => (
-            <Box key={tip.text} sx={{ display: "flex", gap: 1.5, color: "text.secondary" }}>
-              <Box sx={{ flexShrink: 0, display: "grid", placeItems: "center" }}>{tip.icon}</Box>
+            <Box
+              key={tip.text}
+              sx={{ display: "flex", gap: 1.5, color: "text.secondary" }}
+            >
+              <Box
+                sx={{ flexShrink: 0, display: "grid", placeItems: "center" }}
+              >
+                {tip.icon}
+              </Box>
               <Typography variant="body2">{tip.text}</Typography>
             </Box>
           ))}

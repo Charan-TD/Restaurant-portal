@@ -1,6 +1,7 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState, type FormEvent } from "react";
-import { Alert, Box, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
@@ -34,8 +35,10 @@ export function BankAccountForm({
       return setError("Enter a valid account number (9 to 18 digits).");
     if (values.account !== values.confirm)
       return setError("Account numbers do not match.");
-    if (!IFSC.test(ifsc)) return setError("Enter a valid IFSC (e.g. HDFC0001234).");
-    if (!proof) return setError("Upload a bank proof, such as a cancelled cheque.");
+    if (!IFSC.test(ifsc))
+      return setError("Enter a valid IFSC (e.g. HDFC0001234).");
+    if (!proof)
+      return setError("Upload a bank proof, such as a cancelled cheque.");
     setBusy(true);
     setError("");
     try {
@@ -62,14 +65,14 @@ export function BankAccountForm({
         Saving replaces your whole bank account, so fill in every detail.
       </Typography>
       {done && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <ToastAlert severity="success" sx={{ mb: 2 }}>
           Bank account updated.
-        </Alert>
+        </ToastAlert>
       )}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <ToastAlert severity="error" sx={{ mb: 2 }}>
           {error}
-        </Alert>
+        </ToastAlert>
       )}
       <div className="form-grid compact-grid">
         <CommonTextField
@@ -106,14 +109,14 @@ export function BankAccountForm({
           }
         />
         <Box className="full">
-        <DocumentUpload
-          required
-          title="Bank proof"
-          hint="Cancelled cheque or passbook page"
-          value={proof}
-          onChange={setProof}
-          currentUrl={proofUrl}
-        />
+          <DocumentUpload
+            required
+            title="Bank proof"
+            hint="Cancelled cheque or passbook page"
+            value={proof}
+            onChange={setProof}
+            currentUrl={proofUrl}
+          />
         </Box>
       </div>
       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>

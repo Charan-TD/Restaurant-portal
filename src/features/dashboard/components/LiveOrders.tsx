@@ -1,4 +1,5 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState } from "react";
 import NextLink from "next/link";
 import { Alert, Box, Link, Tab, Tabs, Typography } from "@mui/material";
@@ -14,7 +15,11 @@ const tabs: { label: string; states: OrderStatus[]; empty: string }[] = [
     states: ["Accepted", "Preparing"],
     empty: "Nothing is being prepared.",
   },
-  { label: "Packed Orders", states: ["Ready"], empty: "No packed orders waiting." },
+  {
+    label: "Packed Orders",
+    states: ["Ready"],
+    empty: "No packed orders waiting.",
+  },
 ];
 const newestFirst = (a: Order, b: Order) =>
   (Date.parse(b.placedAt ?? "") || 0) - (Date.parse(a.placedAt ?? "") || 0);
@@ -86,9 +91,9 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
         </Alert>
       )}
       {vm.error && (
-        <Alert severity="error" sx={{ m: 2.5 }}>
+        <ToastAlert severity="error" sx={{ m: 2.5 }}>
           {vm.error}
-        </Alert>
+        </ToastAlert>
       )}
       <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: 200 }}>
         {shown.length ? (

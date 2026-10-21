@@ -1,4 +1,10 @@
-import { api, setTokens, clearTokens, claimsOf } from "@/core/api/axios";
+import {
+  api,
+  setTokens,
+  clearTokens,
+  claimsOf,
+  getRefreshToken,
+} from "@/core/api/axios";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type {
   LoginCredentials,
@@ -89,12 +95,21 @@ export async function verifyOtp(
   });
   return startSession(data);
 }
-// The backend has no restaurant logout endpoint yet; dropping the tokens is
-// what signs the user out. The request is sent only once a path is set.
+/**
+ * POST /auth/restaurant/logout: the server revokes the access token sent with
+ * the request, and the refresh token too when it is given. The tokens are
+ * dropped from this browser whether or not the call works, so the vendor is
+ * always signed out here.
+ */
 export async function logout(): Promise<void> {
   try {
-    if (!DEMO_MODE && API_PATHS.logout)
-      await api.post(endpoint(API_PATHS.logout));
+    if (!DEMO_MODE && API_PATHS.logout) {
+      const refreshToken = getRefreshToken();
+      await api.post(
+        endpoint(API_PATHS.logout),
+        refreshToken ? { refreshToken } : {},
+      );
+    }
   } finally {
     clearTokens();
   }

@@ -1,8 +1,9 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState, type FormEvent } from "react";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Alert, Box, Link, Typography } from "@mui/material";
+import { Box, Link, Typography } from "@mui/material";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { PasswordField } from "@/shared/components/form/PasswordField";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -43,15 +44,15 @@ export function ResetPasswordView() {
           <p>Choose a strong password for your restaurant account.</p>
         </div>
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <ToastAlert severity="error" sx={{ mb: 3 }}>
             {error}
-          </Alert>
+          </ToastAlert>
         )}
         {done ? (
           <>
-            <Alert severity="success" sx={{ mb: 3 }}>
+            <ToastAlert severity="success" sx={{ mb: 3 }}>
               Password reset. You can now log in with your new password.
-            </Alert>
+            </ToastAlert>
             <CommonButton
               variant="contained"
               fullWidth

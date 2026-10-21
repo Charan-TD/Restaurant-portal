@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
+import { BackButton } from "@/shared/components/actions/BackButton";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import AccountBalanceWalletOutlined from "@mui/icons-material/AccountBalanceWalletOutlined";
@@ -69,7 +70,13 @@ export function AuthShell({ children }: { children: ReactNode }) {
           ))}
         </ol>
       </aside>
-      <main className="auth-panel">{children}</main>
+      <main className="auth-panel" style={{ position: "relative" }}>
+        <BackButton
+          fallbackHref="/login"
+          sx={{ position: "absolute", top: 24, left: 24, m: 0 }}
+        />
+        {children}
+      </main>
     </div>
   );
 }

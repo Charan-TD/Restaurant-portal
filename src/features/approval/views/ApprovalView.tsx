@@ -1,5 +1,6 @@
 "use client";
-import { Typography, Chip, Alert } from "@mui/material";
+import { ToastAlert } from "@/core/providers/ToastProvider";
+import { Typography, Chip } from "@mui/material";
 import AccessTime from "@mui/icons-material/AccessTime";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlined";
 import Link from "next/link";
@@ -18,9 +19,9 @@ export function ApprovalView() {
         <Typography variant="h4">Verification</Typography>
       </div>
       {vm.error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <ToastAlert severity="error" sx={{ mb: 2 }}>
           {vm.error}
-        </Alert>
+        </ToastAlert>
       )}
       {!status ? (
         <CommonCard>
@@ -42,7 +43,7 @@ export function ApprovalView() {
           />
           <Typography variant="h5">
             {status === "Approved"
-              ? "You're approved to sell on Train Dhaba"
+              ? "Your restaurant is now approved on Train Dhaba."
               : status === "Rejected"
                 ? "Application not approved"
                 : "We're reviewing your restaurant"}

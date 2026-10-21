@@ -7,6 +7,9 @@ export function HoursStep() {
   const vm = useHoursViewModel();
   return (
     <>
+      <CommonButton variant="outlined" onClick={vm.openAllDay}>
+        Open 24/7
+      </CommonButton>
       {vm.days.map((day, i) => (
         <div className="day" key={day.day}>
           <div className="day-label">
@@ -19,7 +22,15 @@ export function HoursStep() {
                   slotProps={{ input: { "aria-label": `${day.day} open` } }}
                 />
               }
-              label={day.open ? "Open" : "Closed"}
+              label={
+                day.open
+                  ? day.shifts.length === 1 &&
+                    day.shifts[0].start === "00:00" &&
+                    day.shifts[0].end === "23:59"
+                    ? "Open 24 hours"
+                    : "Open"
+                  : "Closed"
+              }
             />
           </div>
           {day.open && (

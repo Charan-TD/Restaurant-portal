@@ -2,7 +2,6 @@
 import NextLink from "next/link";
 import type { ReactNode } from "react";
 import {
-  Alert,
   Box,
   Chip,
   CircularProgress,
@@ -11,49 +10,25 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  IconButton,
-  Switch,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AddOutlined from "@mui/icons-material/AddOutlined";
-import EditOutlined from "@mui/icons-material/EditOutlined";
-import DeleteOutline from "@mui/icons-material/DeleteOutlined";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import RoomServiceOutlined from "@mui/icons-material/RoomServiceOutlined";
 import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import HighlightOffOutlined from "@mui/icons-material/HighlightOffOutlined";
-import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
-import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
-import { formatRupees } from "@/shared/utils/format";
 import type { MenuItem } from "../models/menuItem";
-import { MenuItemThumb } from "../components/MenuItemThumb";
-import { MenuItemStatus } from "../components/MenuItemStatus";
+import { MenuItemRow } from "../components/MenuItemRow";
 import { MenuFilters } from "../components/MenuFilters";
-import { useMenuItemsViewModel } from "../viewmodels/useMenuItemsViewModel";
-function Price({ item }: { item: MenuItem }) {
-  if (item.discountedPrice === null)
-    return (
-      <Box sx={{ minWidth: 72, textAlign: "right" }}>
-        <strong>{formatRupees(item.price)}</strong>
-      </Box>
-    );
-  return (
-    <Box sx={{ minWidth: 72, textAlign: "right" }}>
-      <strong>{formatRupees(item.discountedPrice)}</strong>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", textDecoration: "line-through" }}
-      >
-        {formatRupees(item.price)}
-      </Typography>
-    </Box>
-  );
-}
+import { CategoriesPanel } from "../components/CategoriesPanel";
+import { AddOnsPanel } from "../components/AddOnsPanel";
+import {
+  useMenuItemsViewModel,
+  type MenuTab,
+} from "../viewmodels/useMenuItemsViewModel";
 function StatCard({
   label,
   value,
@@ -75,6 +50,8 @@ function StatCard({
         p: { xs: 1.5, sm: 2.5 },
         borderRadius: "16px",
         bgcolor: tone.tint,
+        boxShadow:
+          "0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 16px rgba(16, 24, 40, 0.07)",
       }}
     >
       <Box
@@ -99,148 +76,17 @@ function StatCard({
     </Box>
   );
 }
-const squareButton = {
-  width: 40,
-  height: 40,
-  borderRadius: "10px",
-  bgcolor: "#f3f4f2",
-  color: "text.secondary",
-} as const;
-function ItemRow({
-  item,
-  saving,
-  onDelete,
-  onAvailable,
-}: {
-  item: MenuItem;
-  saving: boolean;
-  onDelete: () => void;
-  onAvailable: (available: boolean) => void;
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: { xs: 1.5, md: 2.5 },
-        p: 2,
-        borderRadius: "14px",
-        border: 1,
-        borderColor: "divider",
-        bgcolor: "background.paper",
-      }}
-    >
-      <MenuItemThumb images={item.images} name={item.name} size={76} />
-      <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 18 }} noWrap>
-          {item.name}
-        </Typography>
-        {item.description && (
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {item.description}
-          </Typography>
-        )}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 1.5,
-            mt: 0.75,
-            color: "text.secondary",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <ScheduleOutlined sx={{ fontSize: 18 }} />
-            <Typography variant="body2">
-              {item.preparationMinutes} min
-            </Typography>
-          </Box>
-          {item.foodType && (
-            <Box
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.75,
-                height: 26,
-                px: 1.25,
-                border: 1,
-                borderColor: "divider",
-                borderRadius: 999,
-                fontSize: 13,
-                fontWeight: 600,
-                lineHeight: 1,
-                color: "text.primary",
-                "& .food-mark": { m: 0 },
-              }}
-            >
-              <FoodTypeMark type={item.foodType} />
-              {item.foodType}
-            </Box>
-          )}
-          {(item.subCategory || item.category) && (
-            <Typography variant="body2">
-              {[item.category, item.subCategory].filter(Boolean).join(" · ")}
-            </Typography>
-          )}
-          <MenuItemStatus item={item} />
-        </Box>
-      </Box>
-      <Price item={item} />
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          pl: 2.5,
-          borderLeft: { md: 1 },
-          borderColor: "divider",
-        }}
-      >
-        <Switch
-          checked={item.available}
-          disabled={saving}
-          onChange={(_, checked) => onAvailable(checked)}
-          slotProps={{
-            input: {
-              "aria-label": `${item.name} is ${item.available ? "in" : "out of"} stock`,
-            },
-          }}
-        />
-        <Chip
-          size="small"
-          label={item.available ? "In stock" : "Out of stock"}
-          sx={{
-            fontWeight: 700,
-            minWidth: 92,
-            bgcolor: item.available ? "rgba(46,125,50,.12)" : "rgba(211,47,47,.1)",
-            color: item.available ? "success.main" : "error.main",
-          }}
-        />
-      </Box>
-      <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-        <Tooltip title="Edit">
-          <IconButton
-            component={NextLink}
-            href={`/menu/items/${encodeURIComponent(item.id)}`}
-            aria-label={`Edit ${item.name}`}
-            sx={squareButton}
-          >
-            <EditOutlined fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton
-            onClick={onDelete}
-            aria-label={`Delete ${item.name}`}
-            sx={squareButton}
-          >
-            <DeleteOutline fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    </Box>
+const NO_SUB = "No sub category";
+/** Items split by sub category name, those without one last. */
+function bySubCategory(items: MenuItem[]) {
+  const groups = new Map<string, MenuItem[]>();
+  for (const item of items) {
+    const key = item.subCategory?.trim() || NO_SUB;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return [...groups.entries()].sort(
+    ([a], [b]) =>
+      Number(a === NO_SUB) - Number(b === NO_SUB) || a.localeCompare(b),
   );
 }
 export function MenuItemsView() {
@@ -253,21 +99,33 @@ export function MenuItemsView() {
         title="Menu items"
         subtitle="Manage your dishes, prices and stock status."
         actions={
-          <CommonButton
-            variant="contained"
-            startIcon={<AddOutlined />}
-            href="/menu/add"
-            LinkComponent={NextLink}
-          >
-            Add item
-          </CommonButton>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+            {(
+              [
+                ["items", "Items", total],
+                ["categories", "Category items", vm.categories.length],
+                ["addons", "Add-ons", vm.addOns.length],
+              ] as [MenuTab, string, number][]
+            ).map(([value, label, count]) => (
+              <CommonButton
+                key={value}
+                variant={vm.tab === value ? "contained" : "outlined"}
+                onClick={() => vm.setTab(value)}
+              >
+                {label} ({count})
+              </CommonButton>
+            ))}
+            <CommonButton
+              variant="contained"
+              startIcon={<AddOutlined />}
+              href="/menu/add"
+              LinkComponent={NextLink}
+            >
+              Add item
+            </CommonButton>
+          </Box>
         }
       />
-      {vm.error && (
-        <Alert severity="error" onClose={vm.dismissError} sx={{ mb: 3 }}>
-          {vm.error}
-        </Alert>
-      )}
       <Box
         sx={{
           display: "grid",
@@ -296,59 +154,121 @@ export function MenuItemsView() {
         />
       </Box>
       <CommonCard>
-        <MenuFilters
-          search={vm.search}
-          onSearch={vm.setSearch}
-          foodFilter={vm.foodFilter}
-          onFoodFilter={vm.setFoodFilter}
-        />
         {vm.loading ? (
           <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
             <CircularProgress aria-label="Loading menu items" />
           </Box>
-        ) : vm.items.length === 0 ? (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-              gap: 1.5,
-              py: 6,
-            }}
-          >
-            <RestaurantMenuOutlined color="disabled" sx={{ fontSize: 48 }} />
-            <Typography variant="h6">No menu items yet</Typography>
-            <Typography color="text.secondary" sx={{ maxWidth: 420 }}>
-              Add your first dish with its price, picture and food type.
-            </Typography>
-            <CommonButton
-              variant="outlined"
-              href="/menu/add"
-              LinkComponent={NextLink}
-              sx={{ mt: 1 }}
-            >
-              Add item
-            </CommonButton>
-          </Box>
-        ) : vm.visible.length === 0 ? (
-          <Typography color="text.secondary" sx={{ py: 4 }}>
-            No items match your search.
-          </Typography>
+        ) : vm.tab === "categories" ? (
+          <CategoriesPanel
+            categories={vm.categories}
+            saving={vm.savingCategory}
+            onView={vm.viewCategory}
+            onAdd={vm.addCategory}
+          />
+        ) : vm.tab === "addons" ? (
+          <AddOnsPanel
+            addOns={vm.addOns}
+            categories={vm.addOnCategories}
+            saving={vm.savingAddOn}
+            onSave={vm.saveAddOn}
+            onDelete={vm.removeAddOn}
+          />
         ) : (
-          <Box sx={{ display: "grid", gap: 1.5, mt: 2 }}>
-            {vm.visible.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                saving={vm.isSaving(item.id)}
-                onDelete={() => vm.askDelete(item)}
-                onAvailable={(available) =>
-                  void vm.setAvailable(item, available)
-                }
+          <>
+            <MenuFilters
+              search={vm.search}
+              onSearch={vm.setSearch}
+              foodFilter={vm.foodFilter}
+              onFoodFilter={vm.setFoodFilter}
+            />
+            {vm.categoryFilter !== null && (
+              <Chip
+                label={`Category: ${vm.categoryFilter}`}
+                onDelete={vm.clearCategoryFilter}
+                sx={{ mt: 1, fontWeight: 600 }}
               />
-            ))}
-          </Box>
+            )}
+            {vm.items.length === 0 ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  gap: 1.5,
+                  py: 6,
+                }}
+              >
+                <RestaurantMenuOutlined
+                  color="disabled"
+                  sx={{ fontSize: 48 }}
+                />
+                <Typography variant="h6">No menu items yet</Typography>
+                <Typography color="text.secondary" sx={{ maxWidth: 420 }}>
+                  Add your first dish with its price, picture and food type.
+                </Typography>
+                <CommonButton
+                  variant="outlined"
+                  href="/menu/add"
+                  LinkComponent={NextLink}
+                  sx={{ mt: 1 }}
+                >
+                  Add item
+                </CommonButton>
+              </Box>
+            ) : vm.visible.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 4 }}>
+                No items match your search.
+              </Typography>
+            ) : vm.categoryFilter !== null ? (
+              // A category's items, one block per sub category.
+              <Box sx={{ display: "grid", gap: 3, mt: 2 }}>
+                {bySubCategory(vm.visible).map(([sub, list]) => (
+                  <Box key={sub}>
+                    <Typography
+                      sx={{ fontWeight: 800, fontSize: 18, mb: 1.25 }}
+                    >
+                      {sub}{" "}
+                      <Typography
+                        component="span"
+                        color="text.secondary"
+                        sx={{ fontSize: 15 }}
+                      >
+                        · {list.length}
+                      </Typography>
+                    </Typography>
+                    <Box sx={{ display: "grid", gap: 1.5 }}>
+                      {list.map((item) => (
+                        <MenuItemRow
+                          key={item.id}
+                          item={item}
+                          saving={vm.isSaving(item.id)}
+                          onDelete={() => vm.askDelete(item)}
+                          onAvailable={(available) =>
+                            void vm.setAvailable(item, available)
+                          }
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Box sx={{ display: "grid", gap: 1.5, mt: 2 }}>
+                {vm.visible.map((item) => (
+                  <MenuItemRow
+                    key={item.id}
+                    item={item}
+                    saving={vm.isSaving(item.id)}
+                    onDelete={() => vm.askDelete(item)}
+                    onAvailable={(available) =>
+                      void vm.setAvailable(item, available)
+                    }
+                  />
+                ))}
+              </Box>
+            )}
+          </>
         )}
       </CommonCard>
       <Dialog open={!!vm.pendingDelete} onClose={vm.cancelDelete}>

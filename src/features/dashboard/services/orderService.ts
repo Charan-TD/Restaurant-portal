@@ -1,7 +1,12 @@
 import axios from "axios";
 import { api } from "@/core/api/axios";
 import { API_PATHS, endpoint } from "@/core/constants/config";
-import type { Order, OrderStatus } from "../models/order";
+import {
+  lineLabel,
+  type Order,
+  type OrderLine,
+  type OrderStatus,
+} from "../models/order";
 // The server's statuses: PLACED, CONFIRMED, PREPARING, READY, OUT_FOR_DELIVERY,
 // DELIVERED and CANCELLED.
 const fromServer: Record<string, OrderStatus> = {
@@ -34,22 +39,19 @@ const text = (value: unknown) =>
 const first = (...values: unknown[]) => values.map(text).find(Boolean);
 /** The GET /orders response is not documented, so likely names are all read. */
 function toOrder(row: Row): Order {
-  const lines = [row.order_items, row.items, row.line_items].find(Array.isArray) as
-    | unknown[]
-    | undefined;
-  const food = (lines ?? [])
-    .map((line) => {
-      const item = asRow(line),
-        name = first(
-          item.name,
-          item.item_name,
-          item.menu_item_name,
-          asRow(item.menu_item).name,
-        );
-      return name ? `${Number(item.quantity) || 1} × ${name}` : "";
-    })
-    .filter(Boolean)
-    .join(", ");
+  const lines = [row.order_items, row.items, row.line_items].find(
+    Array.isArray,
+  ) as unknown[] | undefined;
+  const items = (lines ?? []).flatMap((line): OrderLine[] => {
+    const item = asRow(line),
+      name = first(
+        item.name,
+        item.item_name,
+        item.menu_item_name,
+        asRow(item.menu_item).name,
+      );
+    return name ? [{ name, quantity: Number(item.quantity) || 1 }] : [];
+  });
   const station = first(
     asRow(row.boarding_station).name,
     row.station_name,
@@ -62,7 +64,8 @@ function toOrder(row: Row): Order {
   const user = asRow(row.customer_user ?? row.customer);
   return {
     id: String(row.id),
-    food: food || "Order",
+    items,
+    food: items.map(lineLabel).join(", ") || "Order",
     pnr: first(row.pnr, row.pnr_number, row.pnr_no),
     station: [station, ...seat].filter(Boolean).join(" · ") || "Train delivery",
     amount: Number(row.total) || 0,

@@ -1,8 +1,9 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState, type FormEvent } from "react";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, Link, Typography } from "@mui/material";
+import { Link, Typography } from "@mui/material";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { errorMessage } from "@/shared/utils/errors";
@@ -42,16 +43,16 @@ export function ForgotPasswordView() {
           <p>Enter your registered email and we will help you reset it.</p>
         </div>
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <ToastAlert severity="error" sx={{ mb: 3 }}>
             {error}
-          </Alert>
+          </ToastAlert>
         )}
         {sent ? (
           <>
-            <Alert severity="success" sx={{ mb: 3 }}>
+            <ToastAlert severity="success" sx={{ mb: 3 }}>
               If this email is registered, a password reset link has been sent
               to it.
-            </Alert>
+            </ToastAlert>
           </>
         ) : (
           <form noValidate onSubmit={submit}>

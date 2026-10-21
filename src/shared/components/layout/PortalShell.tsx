@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BackButton } from "../actions/BackButton";
 import { PortalHeader } from "./PortalHeader";
 import { SetupSidebar } from "./SetupSidebar";
 export function PortalShell({ children }: { children: ReactNode }) {
@@ -7,7 +8,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <PortalHeader />
       <div className="shell">
         <SetupSidebar />
-        <main>{children}</main>
+        <main>
+          <BackButton fallbackHref="/login" />
+          {children}
+        </main>
       </div>
     </>
   );

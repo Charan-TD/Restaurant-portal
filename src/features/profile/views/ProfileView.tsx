@@ -1,5 +1,5 @@
 "use client";
-import { Alert } from "@mui/material";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -31,14 +31,14 @@ export function ProfileView() {
         }
       />
       {vm.saved && (
-        <Alert severity="success" onClose={vm.dismissSaved} sx={{ mb: 3 }}>
+        <ToastAlert severity="success" onClose={vm.dismissSaved} sx={{ mb: 3 }}>
           Profile updated.
-        </Alert>
+        </ToastAlert>
       )}
       {vm.error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <ToastAlert severity="error" sx={{ mb: 3 }}>
           {vm.error}
-        </Alert>
+        </ToastAlert>
       )}
       {vm.editing ? (
         <EditProfileView vm={vm} />

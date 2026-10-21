@@ -1,6 +1,8 @@
 "use client";
-import { Alert, Box, Skeleton, Switch, Typography } from "@mui/material";
+import { ToastAlert } from "@/core/providers/ToastProvider";
+import { Box, Skeleton, Switch, Typography } from "@mui/material";
 import DoneAllOutlined from "@mui/icons-material/DoneAllOutlined";
+import AllInclusiveOutlined from "@mui/icons-material/AllInclusiveOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -19,14 +21,14 @@ export function WorkingHoursView() {
       />
       <SettingsTabs />
       {vm.done && (
-        <Alert severity="success" onClose={vm.dismissDone} sx={{ mb: 3 }}>
+        <ToastAlert severity="success" onClose={vm.dismissDone} sx={{ mb: 3 }}>
           Working hours updated.
-        </Alert>
+        </ToastAlert>
       )}
       {vm.error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <ToastAlert severity="error" sx={{ mb: 3 }}>
           {vm.error}
-        </Alert>
+        </ToastAlert>
       )}
       <CommonCard>
         {!vm.loading && (
@@ -67,7 +69,9 @@ export function WorkingHoursView() {
                 type="time"
                 value={vm.bulk.end}
                 error={vm.bulkInvalid}
-                onChange={(e) => vm.setBulk({ ...vm.bulk, end: e.target.value })}
+                onChange={(e) =>
+                  vm.setBulk({ ...vm.bulk, end: e.target.value })
+                }
                 sx={{ width: 140 }}
               />
             </FormField>
@@ -78,6 +82,13 @@ export function WorkingHoursView() {
               onClick={vm.applyToAll}
             >
               Apply to all days
+            </CommonButton>
+            <CommonButton
+              variant="outlined"
+              startIcon={<AllInclusiveOutlined />}
+              onClick={vm.openAllDay}
+            >
+              Open 24/7
             </CommonButton>
           </Box>
         )}
@@ -114,7 +125,11 @@ export function WorkingHoursView() {
                       variant="caption"
                       color={day.open ? "primary.main" : "text.disabled"}
                     >
-                      {day.open ? "Open" : "Closed"}
+                      {day.open
+                        ? day.start === "00:00" && day.end === "23:59"
+                          ? "Open 24 hours"
+                          : "Open"
+                        : "Closed"}
                     </Typography>
                   </div>
                 </Box>
@@ -135,7 +150,9 @@ export function WorkingHoursView() {
                           type="time"
                           size="small"
                           value={day.start}
-                          onChange={(e) => vm.edit(i, { start: e.target.value })}
+                          onChange={(e) =>
+                            vm.edit(i, { start: e.target.value })
+                          }
                         />
                       </FormField>
                       <FormField label="Closes at">

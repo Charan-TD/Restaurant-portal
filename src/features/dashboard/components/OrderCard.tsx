@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { Box, Chip, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { formatRupees } from "@/shared/utils/format";
-import type { Order, OrderStatus } from "../models/order";
+import { ItemsSummary } from "@/shared/components/feedback/ItemsSummary";
+import { lineLabel, type Order, type OrderStatus } from "../models/order";
 interface Props {
   order: Order;
   busy: boolean;
@@ -53,7 +54,10 @@ function Cell({
         ...sx,
       }}
     >
-      <Typography sx={{ fontWeight: strong ? 800 : 600, lineHeight: 1.35 }}>
+      <Typography
+        component="div"
+        sx={{ fontWeight: strong ? 800 : 600, lineHeight: 1.35 }}
+      >
         {value}
       </Typography>
       <Typography variant="body2" color="text.secondary">
@@ -85,7 +89,13 @@ export function OrderCard({ order, busy, onChange }: Props) {
       <Cell value={time(order.placedAt)} caption="Time" />
       <Cell value={order.customer || "Customer"} caption="Customer" />
       <Cell
-        value={order.food}
+        value={
+          order.items.length ? (
+            <ItemsSummary items={order.items.map(lineLabel)} />
+          ) : (
+            order.food
+          )
+        }
         caption={order.pnr ? `PNR ${order.pnr}` : "Order items"}
         sx={{ gridColumn: { xs: "1 / -1", lg: "auto" } }}
       />
@@ -141,7 +151,11 @@ export function OrderCard({ order, busy, onChange }: Props) {
             Handed to the rider
           </CommonButton>
         ) : (
-          <Chip size="small" label={stateLabel[order.state]} variant="outlined" />
+          <Chip
+            size="small"
+            label={stateLabel[order.state]}
+            variant="outlined"
+          />
         )}
       </Box>
     </Box>

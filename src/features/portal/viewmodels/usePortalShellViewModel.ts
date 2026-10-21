@@ -11,10 +11,10 @@ export function usePortalShellViewModel() {
     vendor = useVendorProfile(),
     notifications = useNotificationsViewModel(),
     [mobileOpen, setMobileOpen] = useState(false);
-  const { authenticated } = portal;
+  const { authenticated, restoring } = portal;
   useEffect(() => {
-    if (!authenticated) router.replace("/login");
-  }, [authenticated, router]);
+    if (!restoring && !authenticated) router.replace("/login");
+  }, [restoring, authenticated, router]);
   const logout = () => {
     // Leave the portal even if the backend call fails.
     void logoutRequest().catch(() => undefined);

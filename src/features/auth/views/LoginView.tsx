@@ -1,7 +1,7 @@
 "use client";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { Controller } from "react-hook-form";
 import {
-  Alert,
   Typography,
   Tabs,
   Tab,
@@ -32,9 +32,9 @@ export function LoginView() {
           <p>Sign in to manage your restaurant, orders and payouts.</p>
         </div>
         {vm.error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <ToastAlert severity="error" sx={{ mb: 3 }}>
             {vm.error}
-          </Alert>
+          </ToastAlert>
         )}
         <form noValidate onSubmit={vm.submit}>
           <Tabs

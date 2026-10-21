@@ -29,5 +29,24 @@ export function useHoursViewModel() {
     updateDay(dayIndex, {
       shifts: days[dayIndex].shifts.filter((_, i) => i !== shiftIndex),
     });
-  return { form, days, updateDay, updateShift, addShift, removeShift };
+  // 00:00 to 23:59 is sent as a 24-hour day; single days can be edited after.
+  const openAllDay = () =>
+    form.setValue(
+      "hours",
+      days.map((day) => ({
+        ...day,
+        open: true,
+        shifts: [{ start: "00:00", end: "23:59" }],
+      })),
+      { shouldDirty: true, shouldValidate: form.formState.isSubmitted },
+    );
+  return {
+    form,
+    days,
+    updateDay,
+    updateShift,
+    addShift,
+    removeShift,
+    openAllDay,
+  };
 }
