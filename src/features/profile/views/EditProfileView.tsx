@@ -61,7 +61,11 @@ function EditAccordion({
     >
       <AccordionSummary
         expandIcon={<ExpandMore />}
-        sx={{ px: 3, minHeight: 68, "& .MuiAccordionSummary-content": { my: 1.5 } }}
+        sx={{
+          px: 3,
+          minHeight: 68,
+          "& .MuiAccordionSummary-content": { my: 1.5 },
+        }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box
@@ -85,7 +89,9 @@ function EditAccordion({
           </div>
         </Box>
       </AccordionSummary>
-      <AccordionDetails sx={{ px: 3, pb: 3, pt: 1 }}>{children}</AccordionDetails>
+      <AccordionDetails sx={{ px: 3, pb: 3, pt: 1 }}>
+        {children}
+      </AccordionDetails>
     </Accordion>
   );
 }
@@ -172,7 +178,12 @@ export function EditProfileView({ vm }: { vm: ProfileViewModel }) {
             </>
           )}
           <Box
-            sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1.5,
+              mt: 3,
+            }}
           >
             <CommonButton onClick={vm.cancel}>Cancel</CommonButton>
             <CommonButton type="submit" variant="contained" disabled={vm.busy}>

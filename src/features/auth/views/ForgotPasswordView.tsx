@@ -1,39 +1,12 @@
 "use client";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { useState, type FormEvent } from "react";
 import NextLink from "next/link";
-import { useRouter } from "next/navigation";
 import { Link, Typography } from "@mui/material";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
-import { errorMessage } from "@/shared/utils/errors";
-import { requestPasswordReset } from "../services/authService";
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { useForgotPasswordViewModel } from "../viewmodels/useForgotPasswordViewModel";
 export function ForgotPasswordView() {
-  const router = useRouter(),
-    [email, setEmail] = useState(""),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [sent, setSent] = useState(false);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!EMAIL.test(email.trim())) return setError("Enter a valid email.");
-    setBusy(true);
-    setError("");
-    try {
-      const { token: issued } = await requestPasswordReset(email.trim());
-      // The server returns the token for now, so go straight to the reset.
-      if (issued) {
-        router.push(`/reset-password?token=${encodeURIComponent(issued)}`);
-        return;
-      }
-      setSent(true);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const vm = useForgotPasswordViewModel();
   return (
     <div className="login">
       <div className="login-body">
@@ -42,12 +15,12 @@ export function ForgotPasswordView() {
           <h1 className="auth-title">Forgot password?</h1>
           <p>Enter your registered email and we will help you reset it.</p>
         </div>
-        {error && (
+        {vm.error && (
           <ToastAlert severity="error" sx={{ mb: 3 }}>
-            {error}
+            {vm.error}
           </ToastAlert>
         )}
-        {sent ? (
+        {vm.sent ? (
           <>
             <ToastAlert severity="success" sx={{ mb: 3 }}>
               If this email is registered, a password reset link has been sent
@@ -55,23 +28,23 @@ export function ForgotPasswordView() {
             </ToastAlert>
           </>
         ) : (
-          <form noValidate onSubmit={submit}>
+          <form noValidate onSubmit={vm.submit}>
             <CommonTextField
               type="email"
               label="Email"
               autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={vm.email}
+              onChange={(e) => vm.setEmail(e.target.value)}
             />
             <CommonButton
               type="submit"
               variant="contained"
               fullWidth
               size="large"
-              disabled={busy || !email}
+              disabled={vm.busy || !vm.email}
               sx={{ mt: 4, minHeight: 52, fontSize: 16 }}
             >
-              {busy ? "Sending…" : "Send reset link"}
+              {vm.busy ? "Sending…" : "Send reset link"}
             </CommonButton>
           </form>
         )}

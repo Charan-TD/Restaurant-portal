@@ -1,21 +1,17 @@
 "use client";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Box, Chip, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
-import { errorMessage } from "@/shared/utils/errors";
+import { useChangeRequestFormViewModel } from "../viewmodels/useChangeRequestFormViewModel";
 import {
-  requestProfileChange,
   type ProfileChangeRequest,
   type RestaurantDetails,
 } from "../services/restaurantService";
 /** How many of the newest requests are listed before "See more requests". */
 const LATEST_REQUESTS = 3;
-const GST = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-const PAN = /^[A-Z]{5}\d{4}[A-Z]$/;
-const AADHAAR = /^\d{12}$/;
 const FIELD_LABELS: Record<string, string> = {
   rest_name: "Restaurant name",
   owner_name: "Owner name",
@@ -45,16 +41,6 @@ const STATUS_COLOR = {
   accepted: "success",
   rejected: "error",
 } as const;
-const EMPTY = {
-  restaurantName: "",
-  ownerName: "",
-  gst: "",
-  gstDocument: null as File | null,
-  panNumber: "",
-  pan: null as File | null,
-  aadhaarNumber: "",
-  aadhaar: null as File | null,
-};
 /** One identity document: its number on the left, its file on the right, centred together. */
 function DocumentRow({
   title,
@@ -96,51 +82,8 @@ export function ChangeRequestForm({
   onSent: () => void;
   details?: RestaurantDetails | null;
 }) {
-  const [values, setValues] = useState(EMPTY),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [sent, setSent] = useState(false);
-  const set = <K extends keyof typeof EMPTY>(
-    key: K,
-    value: (typeof EMPTY)[K],
-  ) => setValues((old) => ({ ...old, [key]: value }));
-  const gst = values.gst.trim().toUpperCase(),
-    pan = values.panNumber.trim().toUpperCase(),
-    aadhaar = values.aadhaarNumber.trim();
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSent(false);
-    const changes = {
-      rest_name: values.restaurantName.trim(),
-      owner_name: values.ownerName.trim(),
-      gst,
-      gst_document: values.gstDocument,
-      pan_number: pan,
-      pan_card: values.pan,
-      aadhaar_number: aadhaar,
-      adhaar_card: values.aadhaar,
-    };
-    if (!Object.values(changes).some(Boolean))
-      return setError("Fill in at least one field to request a change.");
-    if (gst && !GST.test(gst))
-      return setError("Enter a valid 15-character GSTIN.");
-    if (pan && !PAN.test(pan))
-      return setError("Enter a valid PAN (e.g. ABCDE1234F).");
-    if (aadhaar && !AADHAAR.test(aadhaar))
-      return setError("Enter a valid 12-digit Aadhaar number.");
-    setBusy(true);
-    setError("");
-    try {
-      await requestProfileChange(changes);
-      setValues(EMPTY);
-      setSent(true);
-      onSent();
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { values, set, busy, error, sent, submit } =
+    useChangeRequestFormViewModel(onSent);
   return (
     <form noValidate onSubmit={submit}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>

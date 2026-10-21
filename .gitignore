@@ -14,3 +14,7 @@ public/maplibre-gl-worker.mjs
 Thumbs.db
 .vscode/
 *.log
+
+# AI tool instruction files (regenerated locally)
+AGENTS.md
+CLAUDE.md

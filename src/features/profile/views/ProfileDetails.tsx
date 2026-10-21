@@ -123,7 +123,9 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
           <Field
             icon={<PersonOutlineOutlined />}
             label="Owner name"
-            value={details?.ownerName || (vendor.nameKnown ? vendor.vendorName : "")}
+            value={
+              details?.ownerName || (vendor.nameKnown ? vendor.vendorName : "")
+            }
           />
           <Field
             icon={<RoomServiceOutlined />}

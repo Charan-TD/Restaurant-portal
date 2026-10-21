@@ -1,7 +1,6 @@
 "use client";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { useState, type FormEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { Box, Typography } from "@mui/material";
 import LockOutlined from "@mui/icons-material/LockOutlined";
 import ShieldOutlined from "@mui/icons-material/ShieldOutlined";
@@ -15,8 +14,7 @@ import { PasswordField } from "@/shared/components/form/PasswordField";
 import { PasswordChecklist } from "@/features/onboarding/components/PasswordChecklist";
 import { passwordRules } from "@/features/onboarding/models/validation";
 import { DEMO_MODE } from "@/core/constants/config";
-import { errorMessage } from "@/shared/utils/errors";
-import { changePassword } from "../services/restaurantService";
+import { useChangePasswordViewModel } from "../viewmodels/useChangePasswordViewModel";
 const STRENGTH = [
   { label: "Weak password", color: "error.main" },
   { label: "Fair password", color: "warning.main" },
@@ -87,38 +85,8 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 export function ChangePasswordCard() {
-  const router = useRouter(),
-    [current, setCurrent] = useState(""),
-    [next, setNext] = useState(""),
-    [confirm, setConfirm] = useState(""),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [done, setDone] = useState(false);
+  const vm = useChangePasswordViewModel();
   if (DEMO_MODE) return null;
-  const clear = () => {
-    setCurrent("");
-    setNext("");
-    setConfirm("");
-    setError("");
-  };
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setDone(false);
-    if (!passwordRules.every((rule) => rule.test(next)) || next.length > 128)
-      return setError("New password does not meet all the requirements below.");
-    if (next !== confirm) return setError("Passwords do not match.");
-    setBusy(true);
-    setError("");
-    try {
-      await changePassword(current, next);
-      clear();
-      setDone(true);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <Box
       sx={{
@@ -156,45 +124,47 @@ export function ChangePasswordCard() {
             </Typography>
           </div>
         </Box>
-        {done && (
+        {vm.done && (
           <ToastAlert severity="success" sx={{ mb: 2 }}>
             Password changed.
           </ToastAlert>
         )}
-        {error && (
+        {vm.error && (
           <ToastAlert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {vm.error}
           </ToastAlert>
         )}
-        <form noValidate onSubmit={submit}>
+        <form noValidate onSubmit={vm.submit}>
           <Box sx={{ display: "grid", gap: 2.5 }}>
             <Labeled label="Current password">
               <PasswordField
                 placeholder="Enter your current password"
                 autoComplete="current-password"
-                value={current}
-                onChange={(e) => setCurrent(e.target.value)}
+                value={vm.current}
+                onChange={(e) => vm.setCurrent(e.target.value)}
               />
             </Labeled>
             <Labeled label="New password">
               <PasswordField
                 placeholder="Create a new password"
                 autoComplete="new-password"
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
+                value={vm.next}
+                onChange={(e) => vm.setNext(e.target.value)}
               />
-              <StrengthMeter password={next} />
+              <StrengthMeter password={vm.next} />
             </Labeled>
             <Labeled label="Confirm new password">
               <PasswordField
                 placeholder="Re-enter your new password"
                 autoComplete="new-password"
-                value={confirm}
-                error={!!confirm && confirm !== next}
+                value={vm.confirm}
+                error={!!vm.confirm && vm.confirm !== vm.next}
                 helperText={
-                  confirm && confirm !== next ? "Passwords do not match." : ""
+                  vm.confirm && vm.confirm !== vm.next
+                    ? "Passwords do not match."
+                    : ""
                 }
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => vm.setConfirm(e.target.value)}
               />
             </Labeled>
           </Box>
@@ -213,20 +183,17 @@ export function ChangePasswordCard() {
               type="button"
               variant="outlined"
               color="inherit"
-              disabled={busy}
-              onClick={() => {
-                clear();
-                router.push("/dashboard");
-              }}
+              disabled={vm.busy}
+              onClick={vm.cancel}
             >
               Cancel
             </CommonButton>
             <CommonButton
               type="submit"
               variant="contained"
-              disabled={busy || !current || !next || !confirm}
+              disabled={vm.busy || !vm.current || !vm.next || !vm.confirm}
             >
-              {busy ? "Updating…" : "Update password"}
+              {vm.busy ? "Updating…" : "Update password"}
             </CommonButton>
           </Box>
         </form>
