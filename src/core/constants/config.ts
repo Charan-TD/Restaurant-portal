@@ -33,9 +33,8 @@ export const API_PATHS = {
   /** A literal {id} segment is replaced with the order number. */
   updateOrder: "/api/v1/restaurant/orders/{id}/status",
   reviews: "/api/v1/restaurant/reviews",
-  // No endpoints for these yet.
-  dashboardSummary: process.env.NEXT_PUBLIC_DASHBOARD_SUMMARY_PATH,
-  notifications: process.env.NEXT_PUBLIC_NOTIFICATIONS_PATH,
+  // The backend has no notifications endpoint yet.
+  notifications: undefined as string | undefined,
 } as const;
 /**
  * Public URL that menu picture storage paths are appended to, e.g. the
