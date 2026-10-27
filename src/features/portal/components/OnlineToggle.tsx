@@ -1,5 +1,5 @@
 "use client";
-import { Box, Switch, Typography } from "@mui/material";
+import { Box, Switch, Tooltip, Typography } from "@mui/material";
 const ONLINE = "#2e7d32",
   OFFLINE = "#9aa19c";
 /** Lets the vendor pause or resume taking orders. */
@@ -51,24 +51,32 @@ export function OnlineToggle({
       >
         {online ? "Online" : "Offline"}
       </Typography>
-      <Switch
-        size={size}
-        checked={online}
-        onChange={(_, checked) => onChange(checked)}
-        slotProps={{
-          input: {
-            "aria-label": online
-              ? "Restaurant is online. Turn off to stop taking orders."
-              : "Restaurant is offline. Turn on to start taking orders.",
-          },
-        }}
-        sx={{
-          "& .MuiSwitch-switchBase.Mui-checked": { color: ONLINE },
-          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-            bgcolor: ONLINE,
-          },
-        }}
-      />
+      <Tooltip
+        title={
+          online
+            ? "You are taking orders. Turn off to stop."
+            : "You are not taking orders. Turn on to start."
+        }
+      >
+        <Switch
+          size={size}
+          checked={online}
+          onChange={(_, checked) => onChange(checked)}
+          slotProps={{
+            input: {
+              "aria-label": online
+                ? "Restaurant is online. Turn off to stop taking orders."
+                : "Restaurant is offline. Turn on to start taking orders.",
+            },
+          }}
+          sx={{
+            "& .MuiSwitch-switchBase.Mui-checked": { color: ONLINE },
+            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+              bgcolor: ONLINE,
+            },
+          }}
+        />
+      </Tooltip>
     </Box>
   );
 }

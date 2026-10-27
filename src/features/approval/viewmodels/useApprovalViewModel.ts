@@ -4,11 +4,12 @@ import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
 import { stepIndex, LAST_STEP } from "@/core/constants/onboarding";
-import { getApproval } from "../services/approvalService";
+import { useLazyGetApprovalQuery } from "../services/approvalApi";
 import type { ApprovalStatus } from "../models/approval";
 import { errorMessage } from "@/shared/utils/errors";
 export function useApprovalViewModel() {
-  const portal = usePortal(),
+  const [loadApproval] = useLazyGetApprovalQuery(),
+    portal = usePortal(),
     router = useRouter(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -16,7 +17,8 @@ export function useApprovalViewModel() {
   useEffect(() => {
     if (DEMO_MODE || !API_PATHS.approval || !registrationId) return;
     let active = true;
-    getApproval(registrationId)
+    loadApproval(registrationId)
+      .unwrap()
       .then((value) => {
         if (active) setApproval(value);
       })
@@ -26,13 +28,13 @@ export function useApprovalViewModel() {
     return () => {
       active = false;
     };
-  }, [setApproval, registrationId]);
+  }, [loadApproval, setApproval, registrationId]);
   const refresh = async () => {
     if (!registrationId) return;
     setBusy(true);
     setError("");
     try {
-      portal.setApproval(await getApproval(registrationId));
+      portal.setApproval(await loadApproval(registrationId).unwrap());
     } catch (e) {
       setError(errorMessage(e));
     } finally {

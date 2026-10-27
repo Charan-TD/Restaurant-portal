@@ -3,20 +3,20 @@ import { useState } from "react";
 import Image from "next/image";
 import {
   Box,
-  Collapse,
   Divider,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Collapse,
   Typography,
 } from "@mui/material";
-import ExpandMore from "@mui/icons-material/ExpandMore";
+import ChevronRight from "@mui/icons-material/ChevronRight";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
-import type { NavSection } from "@/core/constants/navigation";
+import { navbarMenus, type NavSection } from "@/core/constants/navigation";
 import { navIcons } from "../navigation/navIcons";
-export const SIDEBAR_WIDTH = 272;
+export const SIDEBAR_WIDTH = 248;
 export interface AppSidebarProps {
   sections: NavSection[];
   pathname: string;
@@ -24,14 +24,6 @@ export interface AppSidebarProps {
   onNavigate: (href: string) => void;
   onLogout: () => void;
 }
-const itemSx = {
-  borderRadius: "12px",
-  minHeight: 44,
-  px: 1.5,
-  color: "text.secondary",
-  "& .MuiListItemIcon-root": { minWidth: 36, color: "inherit" },
-  "&:hover": { bgcolor: "action.hover", color: "text.primary" },
-} as const;
 export function AppSidebar({
   sections,
   pathname,
@@ -39,24 +31,111 @@ export function AppSidebar({
   onNavigate,
   onLogout,
 }: AppSidebarProps) {
-  const activeSection = sections.find((s) =>
-    s.pages.some((p) => pathname.startsWith(p.href)),
+  const activeSection = [...sections, ...navbarMenus].find((section) =>
+    section.pages.some((page) => page.href === pathname),
   )?.id;
-  // The section holding the current page starts open; others toggle freely.
-  const [open, setOpen] = useState<string[]>(
-    activeSection ? [activeSection] : [],
+  const [expandedSection, setExpandedSection] = useState<string | undefined>(
+    activeSection,
   );
-  // Also open it when navigating there from the search or navbar.
-  const [shownSection, setShownSection] = useState(activeSection);
-  if (activeSection !== shownSection) {
-    setShownSection(activeSection);
-    if (activeSection && !open.includes(activeSection))
-      setOpen([...open, activeSection]);
-  }
-  const toggle = (id: string) =>
-    setOpen((old) =>
-      old.includes(id) ? old.filter((o) => o !== id) : [...old, id],
+  const itemSx = {
+    borderRadius: "10px",
+    minHeight: 36,
+    px: 1.5,
+    color: "text.secondary",
+    "& .MuiListItemIcon-root": {
+      minWidth: 34,
+      color: "inherit",
+    },
+    "&.Mui-selected, &.Mui-selected:hover": {
+      bgcolor: "rgba(242,106,46,.1)",
+      color: "primary.dark",
+    },
+  };
+  const renderSection = (section: NavSection) => {
+    const selected =
+      section.href === pathname ||
+      section.pages.some((page) => pathname === page.href);
+    const hasPages = section.pages.length > 0;
+    const expanded = expandedSection === section.id;
+    return (
+      <Box key={section.id}>
+        <ListItemButton
+          selected={selected}
+          aria-label={section.label}
+          aria-current={selected && !hasPages ? "page" : undefined}
+          aria-expanded={hasPages ? expanded : undefined}
+          aria-controls={hasPages ? `sidebar-${section.id}-pages` : undefined}
+          onClick={() => {
+            if (hasPages) {
+              setExpandedSection(expanded ? undefined : section.id);
+            } else if (section.href) {
+              onNavigate(section.href);
+            }
+          }}
+          sx={itemSx}
+        >
+          <ListItemIcon>{navIcons[section.id]}</ListItemIcon>
+          <>
+            <ListItemText
+              primary={section.label}
+              slotProps={{
+                primary: { sx: { fontWeight: 600, fontSize: 13 } },
+              }}
+            />
+            {hasPages && (
+              <ChevronRight
+                fontSize="small"
+                sx={{
+                  transform: expanded ? "rotate(90deg)" : "none",
+                  transition: "transform .2s",
+                }}
+              />
+            )}
+          </>
+        </ListItemButton>
+        {hasPages && (
+          <Collapse in={expanded} unmountOnExit>
+            <List
+              id={`sidebar-${section.id}-pages`}
+              aria-label={`${section.label} subpages`}
+              disablePadding
+              sx={{
+                ml: 3,
+                pl: 1,
+                my: 0.5,
+                borderLeft: 1,
+                borderColor: "divider",
+                display: "grid",
+                gap: 0.25,
+              }}
+            >
+              {section.pages.map((page) => (
+                <ListItemButton
+                  key={page.href}
+                  selected={pathname === page.href}
+                  aria-current={pathname === page.href ? "page" : undefined}
+                  onClick={() => onNavigate(page.href)}
+                  sx={{ ...itemSx, minHeight: 32, px: 1.25 }}
+                >
+                  <ListItemText
+                    primary={page.label}
+                    slotProps={{
+                      primary: {
+                        sx: {
+                          fontSize: 12.5,
+                          fontWeight: pathname === page.href ? 600 : 500,
+                        },
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </Collapse>
+        )}
+      </Box>
     );
+  };
   return (
     <Box
       sx={{
@@ -64,197 +143,80 @@ export function AppSidebar({
         display: "flex",
         flexDirection: "column",
         px: 2,
-        py: 2.5,
+        py: 1.5,
         bgcolor: "background.paper",
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          justifyContent: "center",
+        }}
+      >
         <Image
           src="/logo.jpg"
           alt="Train Dhaba logo"
-          width={40}
-          height={40}
+          width={30}
+          height={30}
           className="brand-logo"
           priority
         />
-        <div>
-          <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-            Train Dhaba
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Partner portal
-          </Typography>
-        </div>
+        <Typography sx={{ fontWeight: 700, flex: 1, fontSize: 15 }}>
+          Train Dhaba
+        </Typography>
       </Box>
       <Box
         sx={{
-          mt: 3,
-          mb: 3,
-          px: 1.5,
-          py: 1.25,
-          borderRadius: "12px",
+          my: 1.5,
+          p: 1,
+          borderRadius: "10px",
           bgcolor: "rgba(242,106,46,.07)",
-          border: 1,
-          borderColor: "rgba(242,106,46,.18)",
           display: "flex",
           alignItems: "center",
-          gap: 1.25,
+          justifyContent: "center",
+          gap: 1,
         }}
       >
         <StorefrontOutlined
           fontSize="small"
           sx={{ color: "primary.main", flexShrink: 0 }}
         />
-        <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+        <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>
           {restaurantName}
         </Typography>
       </Box>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        sx={{ px: 1.5, mb: 1, letterSpacing: 1.2 }}
-      >
-        Main menu
-      </Typography>
       <List
         component="nav"
         aria-label="Main menu"
         disablePadding
-        sx={{ display: "grid", gap: 1, overflowY: "auto" }}
+        sx={{ display: "grid", gap: 0.25 }}
       >
-        {sections.map((section) => {
-          if (section.href) {
-            const selected = pathname === section.href;
-            return (
-              <ListItemButton
-                key={section.id}
-                selected={selected}
-                aria-current={selected ? "page" : undefined}
-                onClick={() => onNavigate(section.href!)}
-                sx={{
-                  ...itemSx,
-                  "&.Mui-selected, &.Mui-selected:hover": {
-                    bgcolor: "primary.main",
-                    color: "primary.contrastText",
-                  },
-                }}
-              >
-                <ListItemIcon>{navIcons[section.id]}</ListItemIcon>
-                <ListItemText
-                  primary={section.label}
-                  slotProps={{
-                    primary: { sx: { fontWeight: 600, fontSize: 14 } },
-                  }}
-                />
-              </ListItemButton>
-            );
-          }
-          const expanded = open.includes(section.id),
-            containsActive = activeSection === section.id;
-          return (
-            <div key={section.id}>
-              <ListItemButton
-                aria-expanded={expanded}
-                onClick={() => toggle(section.id)}
-                sx={{
-                  ...itemSx,
-                  // A clicked (open) section looks the same for every section.
-                  ...(expanded && {
-                    bgcolor: "action.hover",
-                    color: "text.primary",
-                  }),
-                  ...(containsActive && !expanded && { color: "primary.main" }),
-                }}
-              >
-                <ListItemIcon>{navIcons[section.id]}</ListItemIcon>
-                <ListItemText
-                  primary={section.label}
-                  slotProps={{
-                    primary: {
-                      sx: { fontWeight: expanded ? 700 : 600, fontSize: 14 },
-                    },
-                  }}
-                />
-                <ExpandMore
-                  fontSize="small"
-                  sx={{
-                    transition: "transform .2s",
-                    transform: expanded ? "rotate(180deg)" : "none",
-                  }}
-                />
-              </ListItemButton>
-              <Collapse in={expanded} unmountOnExit>
-                <List
-                  disablePadding
-                  sx={{
-                    ml: 3.25,
-                    mt: 0.5,
-                    pl: 1.5,
-                    borderLeft: 1,
-                    borderColor: "divider",
-                    display: "grid",
-                    gap: 0.5,
-                  }}
-                >
-                  {section.pages.map((page) => {
-                    const selected = pathname === page.href;
-                    return (
-                      <ListItemButton
-                        key={page.href}
-                        selected={selected}
-                        aria-current={selected ? "page" : undefined}
-                        onClick={() => onNavigate(page.href)}
-                        sx={{
-                          ...itemSx,
-                          minHeight: 38,
-                          "&.Mui-selected, &.Mui-selected:hover": {
-                            bgcolor: "rgba(242,106,46,.1)",
-                            color: "primary.dark",
-                            boxShadow: "inset 3px 0 0 #f26a2e",
-                          },
-                        }}
-                      >
-                        <ListItemText
-                          primary={page.label}
-                          slotProps={{
-                            primary: {
-                              sx: {
-                                fontSize: 13.5,
-                                fontWeight: selected ? 600 : 500,
-                              },
-                            },
-                          }}
-                        />
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              </Collapse>
-            </div>
-          );
-        })}
+        {sections.map(renderSection)}
       </List>
-      <Box sx={{ flex: 1, minHeight: 24 }} />
-      <Divider sx={{ mb: 1.5 }} />
-      {/* ListItemButton grows by default; keep it a single compact row. */}
+      <Divider sx={{ my: 1 }} />
+      <List
+        component="nav"
+        aria-label="Management"
+        disablePadding
+        sx={{ display: "grid", gap: 0.25 }}
+      >
+        {navbarMenus.map(renderSection)}
+      </List>
+      <Box sx={{ flex: 1, minHeight: 8 }} />
+      <Divider sx={{ my: 1 }} />
       <ListItemButton
+        aria-label="Log out"
         onClick={onLogout}
-        sx={{
-          ...itemSx,
-          flexGrow: 0,
-          minHeight: 40,
-          "&:hover": {
-            bgcolor: "rgba(211, 47, 47, 0.08)",
-            color: "error.main",
-          },
-        }}
+        sx={{ ...itemSx, flexGrow: 0 }}
       >
         <ListItemIcon>
           <LogoutOutlined fontSize="small" />
         </ListItemIcon>
         <ListItemText
           primary="Log out"
-          slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }}
+          slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 13 } } }}
         />
       </ListItemButton>
     </Box>

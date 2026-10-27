@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Collapse, IconButton, Typography } from "@mui/material";
+import { Box, Collapse, IconButton, Tooltip, Typography } from "@mui/material";
 import AddOutlined from "@mui/icons-material/AddOutlined";
 import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
 import ExpandMoreOutlined from "@mui/icons-material/ExpandMoreOutlined";
@@ -157,18 +157,22 @@ export function CategoriesPanel({
                 </Typography>
                 <Typography color="text.secondary">{caption}</Typography>
               </Box>
-              <IconButton
-                tabIndex={-1}
-                aria-label={
-                  isOpen ? "Hide sub categories" : "Show sub categories"
-                }
-                sx={{
-                  transform: isOpen ? "rotate(180deg)" : "none",
-                  transition: "transform .2s",
-                }}
+              <Tooltip
+                title={isOpen ? "Hide sub categories" : "Show sub categories"}
               >
-                <ExpandMoreOutlined />
-              </IconButton>
+                <IconButton
+                  tabIndex={-1}
+                  aria-label={
+                    isOpen ? "Hide sub categories" : "Show sub categories"
+                  }
+                  sx={{
+                    transform: isOpen ? "rotate(180deg)" : "none",
+                    transition: "transform .2s",
+                  }}
+                >
+                  <ExpandMoreOutlined />
+                </IconButton>
+              </Tooltip>
             </Box>
             <Collapse in={isOpen} unmountOnExit>
               <Box

@@ -15,9 +15,9 @@ export function WorkingHoursView() {
   return (
     <>
       <PageHeader
-        eyebrow="Settings / Working hours"
+        eyebrow="Settings"
         title="Working hours"
-        subtitle="The days and times customers can order from your restaurant."
+        subtitle="Set the days and times you accept orders."
       />
       <SettingsTabs />
       {vm.done && (

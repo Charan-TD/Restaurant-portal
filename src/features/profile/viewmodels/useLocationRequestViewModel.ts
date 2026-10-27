@@ -6,10 +6,11 @@ import {
 } from "@/features/onboarding/services/locationService";
 import type { LocationSuggestion } from "@/features/onboarding/models/location";
 import { errorMessage } from "@/shared/utils/errors";
-import { requestProfileChange } from "../services/restaurantService";
+import { useRequestProfileChangeMutation } from "../services/restaurantApi";
 const EMPTY = { building: "", landmark: "", city: "", state: "", pincode: "" };
 export function useLocationRequestViewModel(onSent: () => void) {
-  const [values, setValues] = useState(EMPTY),
+  const [requestProfileChange] = useRequestProfileChangeMutation(),
+    [values, setValues] = useState(EMPTY),
     [picked, setPicked] = useState<LocationSuggestion | null>(null),
     [options, setOptions] = useState<LocationSuggestion[]>([]),
     // The exact spot: starts at the search result and moves with the pin.
@@ -87,7 +88,7 @@ export function useLocationRequestViewModel(onSent: () => void) {
         pincode: values.pincode.trim(),
         lat: pin?.lat ?? picked.latitude,
         lon: pin?.lon ?? picked.longitude,
-      });
+      }).unwrap();
       setValues(EMPTY);
       setPicked(null);
       setPin(null);

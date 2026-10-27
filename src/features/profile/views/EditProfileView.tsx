@@ -204,10 +204,10 @@ export function EditProfileView({ vm }: { vm: ProfileViewModel }) {
           <EditAccordion
             icon={<ScheduleOutlined fontSize="small" />}
             title="Operating hours"
-            hint="Choose the days and times you take orders."
+            hint="Managed in Settings."
           >
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              Working hours are managed in Settings.
+              Change your opening days and times on the Working hours page.
             </Typography>
             <CommonButton
               variant="outlined"

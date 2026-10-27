@@ -21,7 +21,7 @@ export function PageHeader({
         alignItems: "flex-end",
         justifyContent: "space-between",
         gap: 2,
-        mb: 4,
+        mb: 3,
       }}
     >
       <div>

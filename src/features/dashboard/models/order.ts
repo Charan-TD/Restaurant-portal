@@ -1,15 +1,9 @@
 /**
- * New → Accepted → Preparing → Ready (packed) → HandedOver (given to the
+ * New → Preparing (accepted) → Ready (packed) → HandedOver (given to the
  * rider); Rejected is a cancelled order.
  */
 export type OrderStatus =
-  | "New"
-  | "Accepted"
-  | "Preparing"
-  | "Ready"
-  | "HandedOver"
-  | "Delivered"
-  | "Rejected";
+  "New" | "Preparing" | "Ready" | "HandedOver" | "Delivered" | "Rejected";
 export interface OrderLine {
   name: string;
   quantity: number;
@@ -30,7 +24,33 @@ export interface Order {
   amount: number;
   state: OrderStatus;
   customer?: string;
+  customerPhone?: string;
+  /** The customer's id; the orders API does not send one. */
+  customerId?: string;
+  trainName?: string;
+  trainNumber?: string;
+  /** The boarding station's id; the orders API sends no station name. */
+  stationId?: string;
+  stationName?: string;
+  coach?: string;
+  seat?: string;
+  /** The date of the passenger's journey (YYYY-MM-DD). */
+  journeyDate?: string;
+  /** Minutes the passenger expects to queue at the station. */
+  queueMinutes?: number;
+  /** The bill, as the server prices it. */
+  bill?: {
+    subtotal: number;
+    tax: number;
+    packagingFee: number;
+    deliveryFee: number;
+    discount: number;
+  };
+  /** When the order is expected to reach the passenger. */
+  deliveryBy?: string;
   /** The passenger's train ticket number. */
   pnr?: string;
   placedAt?: string;
+  /** What the customer asked for, e.g. "No spicy food." */
+  note?: string;
 }

@@ -8,9 +8,9 @@ export function ChangePasswordView() {
   return (
     <>
       <PageHeader
-        eyebrow="Settings / Security"
+        eyebrow="Settings"
         title="Change password"
-        subtitle="Keep your account secure with a strong password and update it regularly."
+        subtitle="Update the password you use to sign in to this portal."
       />
       <SettingsTabs />
       {DEMO_MODE && (

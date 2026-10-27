@@ -27,7 +27,12 @@ export function NotificationsMenu({ vm }: { vm: NotificationsViewModel }) {
           aria-label={label}
           aria-haspopup="dialog"
           onClick={(e) => setAnchor(e.currentTarget)}
-          sx={{ border: 1, borderColor: "divider" }}
+          sx={{
+            border: 1,
+            borderColor: "divider",
+            borderRadius: "10px",
+            bgcolor: "background.paper",
+          }}
         >
           <BlinkBadge active={vm.unreadCount > 0}>
             <NotificationsNoneOutlined fontSize="small" />

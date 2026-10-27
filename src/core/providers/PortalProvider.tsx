@@ -8,7 +8,8 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import axios from "axios";
+import { useDispatch } from "react-redux";
+import { baseApi } from "@/core/api/baseApi";
 import { useForm, FormProvider, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -21,7 +22,7 @@ import type { Order } from "@/features/dashboard/models/order";
 import type { SessionProfile } from "@/features/auth/models/auth";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
 import { claimsOf, clearTokens, getAccessToken } from "@/core/api/axios";
-import { getMyRestaurant } from "@/features/profile/services/restaurantService";
+import { useLazyGetMyRestaurantQuery } from "@/features/profile/services/restaurantApi";
 interface PortalState {
   form: UseFormReturn<RegistrationForm>;
   currentStep: number;
@@ -53,6 +54,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     defaultValues: initialRegistration,
     mode: "onTouched",
   });
+  const [loadRestaurant] = useLazyGetMyRestaurantQuery(),
+    dispatch = useDispatch();
   const [currentStep, setCurrentStep] = useState(0),
     [completed, setCompleted] = useState<number[]>([]),
     [registrationId, setRegistrationId] = useState<string | null>(null),
@@ -62,6 +65,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     [profile, setProfile] = useState<SessionProfile>({}),
     [online, setOnline] = useState(true),
     [orders, setOrders] = useState<Order[]>([]);
+  // Signing out drops everything fetched for that account.
+  useEffect(() => {
+    if (!authenticated) dispatch(baseApi.util.resetApiState());
+  }, [authenticated, dispatch]);
   // A page reload empties React state, but the token is still saved: pick the
   // login back up instead of sending the vendor to the sign-in page.
   useEffect(() => {
@@ -80,10 +87,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         });
         setAuthenticated(true);
         if (API_PATHS.restaurantMe)
-          void getMyRestaurant()
+          void loadRestaurant()
+            .unwrap()
             .catch((error) => {
               // A revoked or rejected token: drop the saved login.
-              if (axios.isAxiosError(error) && error.response?.status === 401) {
+              if ((error as { status?: number })?.status === 401) {
                 clearTokens();
                 setAuthenticated(false);
                 setProfile({});
@@ -105,7 +113,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       } else if (token) clearTokens();
       setRestoring(false);
     });
-  }, []);
+  }, [loadRestaurant]);
   return (
     <PortalContext.Provider
       value={{

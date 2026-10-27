@@ -16,7 +16,7 @@ import NextLink from "next/link";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { LocationMap } from "@/features/onboarding/components/LocationMap";
-import type { RestaurantDetails } from "../services/restaurantService";
+import type { RestaurantDetails } from "../services/restaurantApi";
 import type { VendorProfile } from "../viewmodels/useVendorProfile";
 import { Field, FieldGrid, ProfileSection } from "./ProfileSection";
 const noop = () => undefined;
@@ -107,7 +107,7 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
       <ProfileSection
         icon={<StorefrontOutlined />}
         title="Basic information"
-        subtitle="Key details about your restaurant"
+        subtitle="Contact details and registration"
       >
         <FieldGrid>
           <Field
@@ -157,7 +157,7 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
       <ProfileSection
         icon={<PlaceOutlined />}
         title="Location"
-        subtitle="Your restaurant address and location on map"
+        subtitle="Address and map pin customers see"
       >
         <Box
           sx={{
@@ -218,7 +218,7 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
       <ProfileSection
         icon={<ScheduleOutlined />}
         title="Operating hours"
-        subtitle="Your restaurant working hours"
+        subtitle="Days and times you take orders"
         action={
           <Button
             component={NextLink}
@@ -279,7 +279,7 @@ export function ProfileDetails({ vendor, details, onEdit }: Props) {
       <ProfileSection
         icon={<AccountBalanceOutlined />}
         title="Bank details"
-        subtitle="Your bank account information for payments"
+        subtitle="Account that receives your payouts"
       >
         <FieldGrid>
           <Field

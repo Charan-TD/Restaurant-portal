@@ -1,4 +1,4 @@
-import { api } from "@/core/api/axios";
+import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 
 /** A restaurant add-on: an extra customers can add to a dish. */
@@ -83,14 +83,17 @@ let demo: RestaurantAddOn[] = [
 ];
 
 /** The signed-in restaurant's active add-ons. */
-export async function listAddOns(): Promise<RestaurantAddOn[]> {
+async function listAddOns(send: Send): Promise<RestaurantAddOn[]> {
   if (DEMO_MODE) return [...demo];
-  const { data } = await api.get(endpoint(API_PATHS.addons));
+  const data = await send({ url: endpoint(API_PATHS.addons) });
   return toRows(data)
     .map(fromAddOnRow)
     .filter((a) => a.id && a.name && a.active);
 }
-export async function createAddOn(form: AddOnForm): Promise<RestaurantAddOn> {
+async function createAddOn(
+  form: AddOnForm,
+  send: Send,
+): Promise<RestaurantAddOn> {
   if (DEMO_MODE) {
     const added = {
       id: `demo-a${Date.now()}`,
@@ -103,12 +106,16 @@ export async function createAddOn(form: AddOnForm): Promise<RestaurantAddOn> {
     demo = [...demo, added];
     return added;
   }
-  const { data } = await api.post(endpoint(API_PATHS.addons), body(form));
+  const data = await send({
+    url: endpoint(API_PATHS.addons),
+    method: "post",
+    data: body(form),
+  });
   return fromAddOnRow(unwrap(data) as Row);
 }
-export async function updateAddOn(
-  id: string,
-  form: AddOnForm,
+async function updateAddOn(
+  { id, form }: { id: string; form: AddOnForm },
+  send: Send,
 ): Promise<RestaurantAddOn> {
   if (DEMO_MODE) {
     const next = {
@@ -122,7 +129,11 @@ export async function updateAddOn(
     demo = demo.map((a) => (a.id === id ? next : a));
     return next;
   }
-  const { data } = await api.patch(addOnPath(id), body(form));
+  const data = await send({
+    url: addOnPath(id),
+    method: "patch",
+    data: body(form),
+  });
   const saved = fromAddOnRow(unwrap(data) as Row);
   // Fall back to what was sent if the reply carries no add-on.
   return saved.id
@@ -136,10 +147,40 @@ export async function updateAddOn(
         imageUrl: form.image ? URL.createObjectURL(form.image) : "",
       };
 }
-export async function deleteAddOn(id: string): Promise<void> {
+async function deleteAddOn(id: string, send: Send): Promise<void> {
   if (DEMO_MODE) {
     demo = demo.filter((a) => a.id !== id);
     return;
   }
-  await api.delete(addOnPath(id));
+  await send({ url: addOnPath(id), method: "delete" });
 }
+
+export const addOnApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    listAddOns: build.query<RestaurantAddOn[], void>({
+      queryFn: flow((_: void, send: Send) => listAddOns(send)),
+      providesTags: ["AddOns"],
+    }),
+    createAddOn: build.mutation<RestaurantAddOn, AddOnForm>({
+      queryFn: flow(createAddOn),
+      invalidatesTags: ["AddOns"],
+    }),
+    updateAddOn: build.mutation<
+      RestaurantAddOn,
+      { id: string; form: AddOnForm }
+    >({
+      queryFn: flow(updateAddOn),
+      invalidatesTags: ["AddOns"],
+    }),
+    deleteAddOn: build.mutation<void, string>({
+      queryFn: flow(deleteAddOn),
+      invalidatesTags: ["AddOns"],
+    }),
+  }),
+});
+export const {
+  useListAddOnsQuery,
+  useCreateAddOnMutation,
+  useUpdateAddOnMutation,
+  useDeleteAddOnMutation,
+} = addOnApi;

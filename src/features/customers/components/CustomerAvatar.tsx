@@ -9,13 +9,21 @@ const tints = [
 ];
 
 /** The customer's first letter on a soft colour picked from their name. */
-export function CustomerAvatar({ name }: { name: string }) {
+export function CustomerAvatar({
+  name,
+  photo,
+}: {
+  name: string;
+  photo?: string;
+}) {
   const tint =
     tints[
       [...name].reduce((sum, c) => sum + c.charCodeAt(0), 0) % tints.length
     ];
   return (
     <Avatar
+      src={photo}
+      alt={name}
       sx={{
         width: 52,
         height: 52,

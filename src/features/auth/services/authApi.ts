@@ -1,5 +1,5 @@
+import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import {
-  api,
   setTokens,
   clearTokens,
   claimsOf,
@@ -67,31 +67,38 @@ function startSession(body: Payload): AuthSession {
   setTokens(session.accessToken, session.refreshToken);
   return session;
 }
-export async function login(
+async function login(
   credentials: LoginCredentials,
+  send: Send,
 ): Promise<AuthSession> {
   if (DEMO_MODE)
     throw new Error(
       "Demo authentication is handled in memory by the login ViewModel.",
     );
-  const { data } = await api.post(endpoint(API_PATHS.login), credentials);
+  const data = await send({
+    url: endpoint(API_PATHS.login),
+    method: "post",
+    data: credentials,
+  });
   return startSession(data);
 }
 /** `phone` is the full number with country code, e.g. +919876543210. */
-export async function sendOtp(phone: string): Promise<OtpChallenge> {
-  const { data } = await api.post<{ data?: OtpChallenge }>(
-    endpoint(API_PATHS.sendOtp),
-    { phone },
-  );
+async function sendOtp(phone: string, send: Send): Promise<OtpChallenge> {
+  const data = await send<{ data?: OtpChallenge }>({
+    url: endpoint(API_PATHS.sendOtp),
+    method: "post",
+    data: { phone },
+  });
   return data.data ?? {};
 }
-export async function verifyOtp(
-  phone: string,
-  otp: string,
+async function verifyOtp(
+  { phone, otp }: { phone: string; otp: string },
+  send: Send,
 ): Promise<AuthSession> {
-  const { data } = await api.post(endpoint(API_PATHS.verifyOtp), {
-    phone,
-    otp,
+  const data = await send({
+    url: endpoint(API_PATHS.verifyOtp),
+    method: "post",
+    data: { phone, otp },
   });
   return startSession(data);
 }
@@ -101,14 +108,15 @@ export async function verifyOtp(
  * dropped from this browser whether or not the call works, so the vendor is
  * always signed out here.
  */
-export async function logout(): Promise<void> {
+async function logout(send: Send): Promise<void> {
   try {
     if (!DEMO_MODE && API_PATHS.logout) {
       const refreshToken = getRefreshToken();
-      await api.post(
-        endpoint(API_PATHS.logout),
-        refreshToken ? { refreshToken } : {},
-      );
+      await send({
+        url: endpoint(API_PATHS.logout),
+        method: "post",
+        data: refreshToken ? { refreshToken } : {},
+      });
     }
   } finally {
     clearTokens();
@@ -120,11 +128,14 @@ export async function logout(): Promise<void> {
  * either at the top level or inside `data`, so the reset can continue
  * without email.
  */
-export async function requestPasswordReset(
+async function requestPasswordReset(
   email: string,
+  send: Send,
 ): Promise<{ token?: string }> {
-  const { data } = await api.post(endpoint(API_PATHS.forgotPassword), {
-    email,
+  const data = await send({
+    url: endpoint(API_PATHS.forgotPassword),
+    method: "post",
+    data: { email },
   });
   const sources = [data, data?.data].filter(
     (value): value is Record<string, unknown> =>
@@ -142,6 +153,42 @@ export async function requestPasswordReset(
   return {};
 }
 /** POST /auth/restaurant/reset-password with the one-time token. */
-export async function resetPassword(token: string, newPassword: string) {
-  await api.post(endpoint(API_PATHS.resetPassword), { token, newPassword });
+async function resetPassword(
+  { token, newPassword }: { token: string; newPassword: string },
+  send: Send,
+) {
+  await send({
+    url: endpoint(API_PATHS.resetPassword),
+    method: "post",
+    data: { token, newPassword },
+  });
 }
+
+export const authApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    login: build.mutation<AuthSession, LoginCredentials>({
+      queryFn: flow(login),
+    }),
+    sendOtp: build.mutation<OtpChallenge, string>({ queryFn: flow(sendOtp) }),
+    verifyOtp: build.mutation<AuthSession, { phone: string; otp: string }>({
+      queryFn: flow(verifyOtp),
+    }),
+    logout: build.mutation<void, void>({
+      queryFn: flow((_: void, send: Send) => logout(send)),
+    }),
+    requestPasswordReset: build.mutation<{ token?: string }, string>({
+      queryFn: flow(requestPasswordReset),
+    }),
+    resetPassword: build.mutation<void, { token: string; newPassword: string }>(
+      { queryFn: flow(resetPassword) },
+    ),
+  }),
+});
+export const {
+  useLoginMutation,
+  useSendOtpMutation,
+  useVerifyOtpMutation,
+  useLogoutMutation,
+  useRequestPasswordResetMutation,
+  useResetPasswordMutation,
+} = authApi;

@@ -1,6 +1,5 @@
 "use client";
 import NextLink from "next/link";
-import type { ReactNode } from "react";
 import {
   Box,
   Chip,
@@ -18,7 +17,8 @@ import RoomServiceOutlined from "@mui/icons-material/RoomServiceOutlined";
 import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import HighlightOffOutlined from "@mui/icons-material/HighlightOffOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
-import { CommonCard } from "@/shared/components/layout/CommonCard";
+import { Hint } from "@/shared/components/feedback/Hint";
+import { MetricCard } from "@/shared/components/layout/MetricCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import type { MenuItem } from "../models/menuItem";
 import { MenuItemRow } from "../components/MenuItemRow";
@@ -29,53 +29,11 @@ import {
   useMenuItemsViewModel,
   type MenuTab,
 } from "../viewmodels/useMenuItemsViewModel";
-function StatCard({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: ReactNode;
-  tone: { bg: string; fg: string; tint: string };
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        alignItems: { xs: "flex-start", sm: "center" },
-        gap: { xs: 1, sm: 2 },
-        p: { xs: 1.5, sm: 2.5 },
-        borderRadius: "16px",
-        bgcolor: tone.tint,
-        boxShadow:
-          "0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 16px rgba(16, 24, 40, 0.07)",
-      }}
-    >
-      <Box
-        sx={{
-          width: { xs: 40, sm: 56 },
-          height: { xs: 40, sm: 56 },
-          borderRadius: "14px",
-          display: "grid",
-          placeItems: "center",
-          bgcolor: tone.bg,
-          color: tone.fg,
-        }}
-      >
-        {icon}
-      </Box>
-      <div>
-        <Typography color="text.secondary">{label}</Typography>
-        <Typography sx={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15 }}>
-          {value}
-        </Typography>
-      </div>
-    </Box>
-  );
-}
+const hints: Record<MenuTab, string> = {
+  items: "All your dishes with price and stock",
+  categories: "Your dishes grouped by category and sub category",
+  addons: "Extras customers can add to a dish",
+};
 const NO_SUB = "No sub category";
 /** Items split by sub category name, those without one last. */
 function bySubCategory(items: MenuItem[]) {
@@ -95,9 +53,9 @@ export function MenuItemsView() {
   return (
     <>
       <PageHeader
-        eyebrow="Menu / Items"
+        eyebrow="Menu"
         title="Menu items"
-        subtitle="Manage your dishes, prices and stock status."
+        subtitle="Your dishes, add-ons and categories, with prices and stock."
         actions={
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
             {(
@@ -107,53 +65,56 @@ export function MenuItemsView() {
                 ["addons", "Add-ons", vm.addOns.length],
               ] as [MenuTab, string, number][]
             ).map(([value, label, count]) => (
-              <CommonButton
-                key={value}
-                variant={vm.tab === value ? "contained" : "outlined"}
-                onClick={() => vm.setTab(value)}
-              >
-                {label} ({count})
-              </CommonButton>
+              <Hint key={value} title={hints[value]}>
+                <CommonButton
+                  variant={vm.tab === value ? "contained" : "outlined"}
+                  onClick={() => vm.setTab(value)}
+                >
+                  {label} ({count})
+                </CommonButton>
+              </Hint>
             ))}
-            <CommonButton
-              variant="contained"
-              startIcon={<AddOutlined />}
-              href="/menu/add"
-              LinkComponent={NextLink}
-            >
-              Add item
-            </CommonButton>
+            <Hint title="Add a new dish to your menu">
+              <CommonButton
+                variant="contained"
+                startIcon={<AddOutlined />}
+                href="/menu/add"
+                LinkComponent={NextLink}
+              >
+                Add item
+              </CommonButton>
+            </Hint>
           </Box>
         }
       />
       <Box
         sx={{
           display: "grid",
-          gap: { xs: 1.5, md: 2.5 },
-          mb: 3,
+          gap: { xs: 1, md: 1.5 },
+          mb: 2,
           gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
         }}
       >
-        <StatCard
+        <MetricCard
           label="Total items"
+          hint="Every dish on your menu."
           value={total}
           icon={<RoomServiceOutlined />}
-          tone={{ bg: "rgba(242,106,46,.12)", fg: "#f26a2e", tint: "#fdf1ea" }}
         />
-        <StatCard
+        <MetricCard
           label="In stock"
+          hint="Dishes customers can order right now."
           value={vm.availableCount}
           icon={<Inventory2Outlined />}
-          tone={{ bg: "rgba(46,125,50,.12)", fg: "#2e7d32", tint: "#eef7ef" }}
         />
-        <StatCard
+        <MetricCard
           label="Out of stock"
+          hint="Dishes switched off, so customers cannot order them."
           value={total - vm.availableCount}
           icon={<HighlightOffOutlined />}
-          tone={{ bg: "rgba(211,47,47,.1)", fg: "#d32f2f", tint: "#fdf0f0" }}
         />
       </Box>
-      <CommonCard>
+      <Box>
         {vm.loading ? (
           <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
             <CircularProgress aria-label="Loading menu items" />
@@ -218,7 +179,7 @@ export function MenuItemsView() {
               </Box>
             ) : vm.visible.length === 0 ? (
               <Typography color="text.secondary" sx={{ py: 4 }}>
-                No items match your search.
+                {vm.searching ? "Searching…" : "No items match your search."}
               </Typography>
             ) : vm.categoryFilter !== null ? (
               // A category's items, one block per sub category.
@@ -270,7 +231,7 @@ export function MenuItemsView() {
             )}
           </>
         )}
-      </CommonCard>
+      </Box>
       <Dialog open={!!vm.pendingDelete} onClose={vm.cancelDelete}>
         <DialogTitle>Delete {vm.pendingDelete?.name}?</DialogTitle>
         <DialogContent>

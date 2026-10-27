@@ -93,8 +93,7 @@ export function DocumentUpload({
             sx={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          (icon ??
-          (image ? <ImageOutlined /> : <DescriptionOutlined />))
+          (icon ?? (image ? <ImageOutlined /> : <DescriptionOutlined />))
         )}
       </Box>
       <Box sx={{ flex: "1 1 160px", minWidth: 0 }}>

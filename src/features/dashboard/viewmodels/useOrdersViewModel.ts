@@ -4,74 +4,94 @@ import { usePortal } from "@/core/providers/PortalProvider";
 import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
 import { clearTokens } from "@/core/api/axios";
+import { useLazyGetMyRestaurantQuery } from "@/features/profile/services/restaurantApi";
 import {
-  getOrders,
-  ordersAuthProblem,
-  updateOrder,
-} from "../services/orderService";
+  useGetOrdersQuery,
+  useUpdateOrderMutation,
+} from "../services/orderApi";
 import type { OrderStatus } from "../models/order";
-import { sampleOrders } from "../models/sampleOrders";
 import { errorMessage } from "@/shared/utils/errors";
+/**
+ * Works out why the orders API refused a request. The profile endpoint takes
+ * the same restaurant login: if it refuses too, the session has expired;
+ * if it works, the orders API simply does not accept this account.
+ */
+async function ordersAuthProblem(
+  error: unknown,
+  checkProfile: ReturnType<typeof useLazyGetMyRestaurantQuery>[0],
+): Promise<"expired" | "not-allowed" | null> {
+  const status = (error as { status?: number } | undefined)?.status;
+  if (status !== 401 && status !== 403) return null;
+  try {
+    await checkProfile().unwrap();
+    return "not-allowed";
+  } catch (e) {
+    return (e as { status?: number })?.status === 401
+      ? "expired"
+      : "not-allowed";
+  }
+}
 export function useOrdersViewModel() {
   const { orders, setOrders, setAuthenticated } = usePortal(),
     toast = useToast(),
-    [error, setError] = useState(""),
+    [problem, setProblem] = useState<"expired" | "not-allowed" | null>(null),
+    [actionError, setActionError] = useState(""),
     [busyId, setBusyId] = useState<string | null>(null),
-    [sample, setSample] = useState(false);
+    // New orders arrive while the vendor is on the page, so poll every 30s.
+    { data, error: queryError } = useGetOrdersQuery(undefined, {
+      skip: DEMO_MODE,
+      pollingInterval: 30_000,
+    }),
+    [updateOrder] = useUpdateOrderMutation(),
+    [checkProfile] = useLazyGetMyRestaurantQuery();
+  // The dashboard and the navbar read the shared order list.
   useEffect(() => {
-    if (DEMO_MODE) return;
+    if (data) setOrders(data);
+  }, [data, setOrders]);
+  useEffect(() => {
+    if (!queryError) return;
     let active = true;
-    const load = () =>
-      getOrders()
-        .then((data) => {
-          if (!active) return;
-          setError("");
-          setOrders(data);
-        })
-        .catch(async (e) => {
-          const problem = await ordersAuthProblem(e);
-          if (!active) return;
-          if (problem === "expired") {
-            // The login ran out; sign in again instead of showing a raw token error.
-            clearTokens();
-            setAuthenticated(false);
-          } else if (problem === "not-allowed") {
-            clearInterval(timer);
-            // Show sample orders so the screen can be reviewed.
-            setSample(true);
-            setOrders((old) => (old.length ? old : sampleOrders()));
-          } else setError(errorMessage(e));
-        });
-    // New orders arrive while the vendor is on the page.
-    const timer = setInterval(load, 30_000);
-    void load();
+    void ordersAuthProblem(queryError, checkProfile).then((result) => {
+      if (!active) return;
+      if (result === "expired") {
+        // The login ran out; sign in again instead of showing a raw token error.
+        clearTokens();
+        setAuthenticated(false);
+      } else if (result === "not-allowed") {
+        setProblem(result);
+      }
+    });
     return () => {
       active = false;
-      clearInterval(timer);
     };
-  }, [setOrders, setAuthenticated]);
+  }, [queryError, checkProfile, setAuthenticated]);
+  const error =
+    actionError ||
+    (problem === "not-allowed"
+      ? "The orders API does not accept this restaurant account."
+      : queryError
+        ? errorMessage(queryError)
+        : "");
   async function changeOrder(id: string, state: OrderStatus) {
-    setError("");
+    setActionError("");
     setBusyId(id);
     try {
-      if (DEMO_MODE || sample)
-        setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
-      else {
-        await updateOrder(id, state);
-        setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
-      }
+      if (!DEMO_MODE) await updateOrder({ id, state }).unwrap();
+      setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
       toast.success(
         state === "Rejected"
           ? "Order rejected."
-          : state === "Accepted"
+          : state === "Preparing"
             ? "Order accepted."
-            : "Order updated.",
+            : state === "Delivered"
+              ? "Order marked as delivered."
+              : "Order updated.",
       );
     } catch (e) {
-      setError(errorMessage(e));
+      setActionError(errorMessage(e));
     } finally {
       setBusyId(null);
     }
   }
-  return { orders, error, sample, busyId, changeOrder };
+  return { orders, error, busyId, changeOrder };
 }

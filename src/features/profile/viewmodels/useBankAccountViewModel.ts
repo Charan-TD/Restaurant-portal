@@ -1,11 +1,12 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { errorMessage } from "@/shared/utils/errors";
-import { replaceBankAccount } from "../services/restaurantService";
+import { useReplaceBankAccountMutation } from "../services/restaurantApi";
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const EMPTY = { holder: "", account: "", confirm: "", ifsc: "", bank: "" };
 export function useBankAccountViewModel(onSaved: () => void) {
-  const [values, setValues] = useState(EMPTY),
+  const [replaceBankAccount] = useReplaceBankAccountMutation(),
+    [values, setValues] = useState(EMPTY),
     [proof, setProof] = useState<File | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -35,7 +36,7 @@ export function useBankAccountViewModel(onSaved: () => void) {
         ifsc,
         bank: values.bank.trim(),
         proof,
-      });
+      }).unwrap();
       setValues(EMPTY);
       setProof(null);
       setDone(true);

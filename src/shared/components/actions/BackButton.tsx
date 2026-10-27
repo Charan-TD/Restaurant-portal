@@ -13,7 +13,11 @@ interface Props extends Omit<CommonButtonProps, "onClick" | "children"> {
 }
 
 /** Goes back to the previous screen; hidden on the entry screens. */
-export function BackButton({ fallbackHref = "/dashboard", sx, ...props }: Props) {
+export function BackButton({
+  fallbackHref = "/dashboard",
+  sx,
+  ...props
+}: Props) {
   const router = useRouter(),
     pathname = usePathname();
   if (rootPaths.includes(pathname)) return null;

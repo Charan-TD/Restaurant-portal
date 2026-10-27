@@ -19,13 +19,13 @@ import AddPhotoAlternateOutlined from "@mui/icons-material/AddPhotoAlternateOutl
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { formatRupees } from "@/shared/utils/format";
-import type { CategoryOption } from "../services/menuItemService";
+import type { CategoryOption } from "../services/menuItemApi";
 import {
   ADDON_IMAGE_MAX_BYTES,
   ADDON_IMAGE_TYPES,
   type AddOnForm,
   type RestaurantAddOn,
-} from "../services/addOnService";
+} from "../services/addOnApi";
 import { MenuItemThumb } from "./MenuItemThumb";
 import { InfoCell, rowSx } from "./InfoCell";
 

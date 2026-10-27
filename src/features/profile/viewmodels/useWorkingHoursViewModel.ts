@@ -1,15 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
 import { errorMessage } from "@/shared/utils/errors";
 import {
   DEFAULT_CLOSES,
   DEFAULT_OPENS,
   WEEK_DAYS,
-  getWorkingHours,
-  updateWorkingHours,
+  useGetWorkingHoursQuery,
+  useUpdateWorkingHoursMutation,
   type WorkingDay,
-} from "../services/restaurantService";
+} from "../services/restaurantApi";
 const defaults = (): WorkingDay[] =>
   WEEK_DAYS.map((day) => ({
     day,
@@ -28,25 +28,20 @@ export function hoursProblem(days: WorkingDay[]) {
 export function useWorkingHoursViewModel() {
   const [days, setDays] = useState<WorkingDay[]>(defaults),
     [saved, setSaved] = useState<WorkingDay[]>(defaults),
-    [loading, setLoading] = useState(!DEMO_MODE),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    hoursQuery = useGetWorkingHoursQuery(undefined, { skip: DEMO_MODE }),
+    [updateWorkingHours] = useUpdateWorkingHoursMutation(),
     [done, setDone] = useState(false);
-  useEffect(() => {
-    if (DEMO_MODE) return;
-    let cancelled = false;
-    getWorkingHours()
-      .then((hours) => {
-        if (cancelled) return;
-        setDays(hours);
-        setSaved(hours);
-      })
-      .catch((e) => !cancelled && setError(errorMessage(e)))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Show the saved hours once they have loaded.
+  const loadedHours = hoursQuery.data;
+  const [syncedHours, setSyncedHours] = useState<WorkingDay[]>();
+  if (loadedHours && loadedHours !== syncedHours) {
+    setSyncedHours(loadedHours);
+    setDays(loadedHours);
+    setSaved(loadedHours);
+  }
+  const loading = !DEMO_MODE && hoursQuery.isLoading;
   const edit = (index: number, change: Partial<WorkingDay>) => {
     setDone(false);
     setDays((old) =>
@@ -76,7 +71,7 @@ export function useWorkingHoursViewModel() {
     setBusy(true);
     setError("");
     try {
-      if (!DEMO_MODE) await updateWorkingHours(days);
+      if (!DEMO_MODE) await updateWorkingHours(days).unwrap();
       setSaved(days);
       setDone(true);
     } catch (e) {
@@ -89,7 +84,7 @@ export function useWorkingHoursViewModel() {
     days,
     loading,
     busy,
-    error,
+    error: error || (hoursQuery.error ? errorMessage(hoursQuery.error) : ""),
     done,
     problem,
     dirty,

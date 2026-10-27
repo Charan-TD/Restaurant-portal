@@ -1,4 +1,4 @@
-import { api } from "@/core/api/axios";
+import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type { StepId } from "@/core/constants/onboarding";
 import {
@@ -36,10 +36,14 @@ function multipart(fields: Record<string, string | File | null>) {
   });
   return body;
 }
-async function createRegistration(form: RegistrationForm): Promise<string> {
-  const { data } = await api.post<{ data: { registrationId: string } }>(
-    `${endpoint(API_PATHS.register)}/restaurant-details`,
-    {
+async function createRegistration(
+  form: RegistrationForm,
+  send: Send,
+): Promise<string> {
+  const body = await send<{ data: { registrationId: string } }>({
+    url: `${endpoint(API_PATHS.register)}/restaurant-details`,
+    method: "post",
+    data: {
       restaurant_name: form.restaurantName,
       owner_name: form.ownerName,
       mobile: `${COUNTRY_CODE}${form.mobile}`,
@@ -52,26 +56,34 @@ async function createRegistration(form: RegistrationForm): Promise<string> {
       password: form.password,
       food_served: form.foodServed.map((type) => foodTypeValues[type]),
     },
-  );
-  return data.data.registrationId;
+  });
+  return body.data.registrationId;
 }
 const savers: Partial<
-  Record<StepId, (id: string, form: RegistrationForm) => Promise<unknown>>
+  Record<
+    StepId,
+    (id: string, form: RegistrationForm, send: Send) => Promise<unknown>
+  >
 > = {
-  location: (id, form) =>
-    api.put(stepPath(id, "location"), {
-      lat: form.latitude,
-      lon: form.longitude,
-      city: form.city,
-      state: form.state,
-      pincode: form.pincode,
-      landmark: form.landmark,
-      house_no: form.building,
+  location: (id, form, send) =>
+    send({
+      url: stepPath(id, "location"),
+      method: "put",
+      data: {
+        lat: form.latitude,
+        lon: form.longitude,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        landmark: form.landmark,
+        house_no: form.building,
+      },
     }),
-  documents: (id, { documentNumbers: numbers, documents }) =>
-    api.put(
-      stepPath(id, "business-documents"),
-      multipart({
+  documents: (id, { documentNumbers: numbers, documents }, send) =>
+    send({
+      url: stepPath(id, "business-documents"),
+      method: "put",
+      data: multipart({
         fssai_number: numbers.fssai,
         fssai_expiry_date: numbers.fssaiExpiry,
         fssai_document: documents.fssai,
@@ -84,22 +96,24 @@ const savers: Partial<
         aadhaar_number: numbers.identity,
         aadhaar_document: documents.identity,
       }),
-    ),
-  bank: (id, form) =>
-    api.put(
-      stepPath(id, "bank-account"),
-      multipart({
+    }),
+  bank: (id, form, send) =>
+    send({
+      url: stepPath(id, "bank-account"),
+      method: "put",
+      data: multipart({
         account_holder_name: form.accountHolder,
         account_number: form.accountNumber,
         IFSC: form.ifsc,
         Bank_name: form.bankName,
         bank_proof: form.bankProof,
       }),
-    ),
-  hours: (id, form) =>
-    api.put(
-      stepPath(id, "operating-hours"),
-      Object.fromEntries(
+    }),
+  hours: (id, form, send) =>
+    send({
+      url: stepPath(id, "operating-hours"),
+      method: "put",
+      data: Object.fromEntries(
         form.hours.map((day) => {
           const around =
             day.open &&
@@ -122,34 +136,37 @@ const savers: Partial<
           ];
         }),
       ),
-    ),
+    }),
 };
 /**
  * Saves one step and returns the registration id to use for the next steps.
  * The details step has no update endpoint, so it is sent only once.
  */
-export async function saveRegistrationStep(
-  step: StepId,
-  form: RegistrationForm,
-  registrationId: string | null,
+async function saveRegistrationStep(
+  {
+    step,
+    form,
+    registrationId,
+  }: { step: StepId; form: RegistrationForm; registrationId: string | null },
+  send: Send,
 ): Promise<string | null> {
   if (DEMO_MODE) return registrationId;
   if (step === "details")
-    return registrationId ?? (await createRegistration(form));
+    return registrationId ?? (await createRegistration(form, send));
   const save = savers[step];
   if (!save) return registrationId;
   if (!registrationId)
     throw new Error("Please complete the restaurant details step first.");
-  await save(registrationId, form);
+  await save(registrationId, form, send);
   return registrationId;
 }
 /**
  * Tells the backend every section is done. It re-checks completeness and
  * answers 400 with the missing sections if something was not saved.
  */
-export async function submitRegistration(registrationId: string) {
+async function submitRegistration(registrationId: string, send: Send) {
   if (DEMO_MODE) return;
-  await api.post(stepPath(registrationId, "submit"));
+  await send({ url: stepPath(registrationId, "submit"), method: "post" });
 }
 // The registration id is kept across reloads so a vendor can pick up where
 // they left off. It is dropped once the registration is submitted.
@@ -313,20 +330,23 @@ export interface SavedRegistration {
  * Reads back every section the backend marks as saved, using the progress
  * endpoint to know which ones to ask for.
  */
-export async function loadRegistration(
+async function loadRegistration(
   registrationId: string,
+  send: Send,
 ): Promise<SavedRegistration> {
-  const { data } = await api.get(stepPath(registrationId, "progress"));
+  const data = await send({ url: stepPath(registrationId, "progress") });
   const sections = asRow(unwrap(data).sections),
     done = Object.keys(loaders).filter((name) => sections[name] === true);
   const parts = await Promise.all(
     done.map(async (name) => {
       const loader = loaders[name];
       try {
-        const response = await api.get(stepPath(registrationId, loader.path));
+        const response = await send({
+          url: stepPath(registrationId, loader.path),
+        });
         return {
           step: loader.step,
-          values: loader.read(unwrap(response.data)),
+          values: loader.read(unwrap(response)),
         };
       } catch {
         // A section that fails to load is still saved; it just stays empty.
@@ -339,3 +359,27 @@ export async function loadRegistration(
     values: Object.assign({}, ...parts.map((part) => part.values)),
   };
 }
+
+export const registrationApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    saveRegistrationStep: build.mutation<
+      string | null,
+      {
+        step: StepId;
+        form: RegistrationForm;
+        registrationId: string | null;
+      }
+    >({ queryFn: flow(saveRegistrationStep) }),
+    submitRegistration: build.mutation<void, string>({
+      queryFn: flow(submitRegistration),
+    }),
+    loadRegistration: build.query<SavedRegistration, string>({
+      queryFn: flow(loadRegistration),
+    }),
+  }),
+});
+export const {
+  useSaveRegistrationStepMutation,
+  useSubmitRegistrationMutation,
+  useLazyLoadRegistrationQuery,
+} = registrationApi;

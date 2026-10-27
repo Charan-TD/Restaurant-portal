@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { errorMessage } from "@/shared/utils/errors";
-import { requestProfileChange } from "../services/restaurantService";
+import { useRequestProfileChangeMutation } from "../services/restaurantApi";
 const GST = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const PAN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const AADHAAR = /^\d{12}$/;
@@ -16,7 +16,8 @@ const EMPTY = {
   aadhaar: null as File | null,
 };
 export function useChangeRequestFormViewModel(onSent: () => void) {
-  const [values, setValues] = useState(EMPTY),
+  const [requestProfileChange] = useRequestProfileChangeMutation(),
+    [values, setValues] = useState(EMPTY),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sent, setSent] = useState(false);
@@ -51,7 +52,7 @@ export function useChangeRequestFormViewModel(onSent: () => void) {
     setBusy(true);
     setError("");
     try {
-      await requestProfileChange(changes);
+      await requestProfileChange(changes).unwrap();
       setValues(EMPTY);
       setSent(true);
       onSent();

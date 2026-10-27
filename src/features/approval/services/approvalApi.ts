@@ -1,4 +1,4 @@
-import { api } from "@/core/api/axios";
+import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
 import type { ApprovalResult, ApprovalStatus } from "../models/approval";
 const STATUS: Record<string, ApprovalStatus> = {
@@ -7,12 +7,13 @@ const STATUS: Record<string, ApprovalStatus> = {
   rejected: "Rejected",
 };
 /** GET /restaurants/registration/{id}/review-status. */
-export async function getApproval(
+async function getApproval(
   registrationId: string,
+  send: Send,
 ): Promise<ApprovalResult> {
-  const { data } = await api.get(
-    `${endpoint(API_PATHS.approval)}/${encodeURIComponent(registrationId)}/review-status`,
-  );
+  const data = await send({
+    url: `${endpoint(API_PATHS.approval)}/${encodeURIComponent(registrationId)}/review-status`,
+  });
   const review = data?.data ?? data;
   return {
     status: STATUS[String(review?.status).toLowerCase()] ?? "Under review",
@@ -22,3 +23,12 @@ export async function getApproval(
       : undefined,
   };
 }
+
+export const approvalApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    getApproval: build.query<ApprovalResult, string>({
+      queryFn: flow(getApproval),
+    }),
+  }),
+});
+export const { useLazyGetApprovalQuery } = approvalApi;

@@ -6,8 +6,12 @@ import { usePortal } from "@/core/providers/PortalProvider";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 import { errorMessage } from "@/shared/utils/errors";
-import { getMyRestaurant } from "@/features/profile/services/restaurantService";
-import { login, sendOtp, verifyOtp } from "../services/authService";
+import { useLazyGetMyRestaurantQuery } from "@/features/profile/services/restaurantApi";
+import {
+  useLoginMutation,
+  useSendOtpMutation,
+  useVerifyOtpMutation,
+} from "../services/authApi";
 import {
   emailLoginSchema,
   initialLogin,
@@ -16,7 +20,11 @@ import {
   type LoginMethod,
 } from "../models/auth";
 export function useLoginViewModel() {
-  const portal = usePortal(),
+  const [loadRestaurant] = useLazyGetMyRestaurantQuery(),
+    [login] = useLoginMutation(),
+    [sendOtp] = useSendOtpMutation(),
+    [verifyOtp] = useVerifyOtpMutation(),
+    portal = usePortal(),
     router = useRouter(),
     [otpSent, setOtpSent] = useState(false),
     [sendingOtp, setSendingOtp] = useState(false),
@@ -53,7 +61,7 @@ export function useLoginViewModel() {
     }
     setSendingOtp(true);
     try {
-      const challenge = await sendOtp(fullPhone());
+      const challenge = await sendOtp(fullPhone()).unwrap();
       setOtpSent(true);
       // Test backends echo the OTP back; production ones never do.
       setOtpHint(challenge.otp ? `Test OTP: ${challenge.otp}` : "");
@@ -77,13 +85,13 @@ export function useLoginViewModel() {
         );
         return null;
       }
-      return login(parsed.data);
+      return login(parsed.data).unwrap();
     }
     if (!/^\d{6}$/.test(values.otp)) {
       form.setError("otp", { message: "Enter the 6-digit OTP." });
       return null;
     }
-    return verifyOtp(fullPhone(), values.otp);
+    return verifyOtp({ phone: fullPhone(), otp: values.otp }).unwrap();
   };
   const submit = form.handleSubmit(async (values) => {
     setError("");
@@ -110,7 +118,8 @@ export function useLoginViewModel() {
       // The login response may only carry the restaurant id; look up the
       // name in the background so the dashboard opens without waiting.
       if (API_PATHS.restaurantMe)
-        void getMyRestaurant()
+        void loadRestaurant()
+          .unwrap()
           .then((restaurant) => {
             if (restaurant.active !== undefined)
               portal.setOnline(restaurant.active);

@@ -2,17 +2,17 @@
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { useState } from "react";
 import NextLink from "next/link";
-import { Alert, Box, Link, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Link, Tab, Tabs, Typography } from "@mui/material";
 import InboxOutlined from "@mui/icons-material/InboxOutlined";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { useOrdersViewModel } from "../viewmodels/useOrdersViewModel";
 import type { Order, OrderStatus } from "../models/order";
-import { OrderCard } from "./OrderCard";
+import { OrderCard, OrderListHeadings } from "./OrderCard";
 const tabs: { label: string; states: OrderStatus[]; empty: string }[] = [
   { label: "New Orders", states: ["New"], empty: "No new orders right now." },
   {
     label: "Preparing",
-    states: ["Accepted", "Preparing"],
+    states: ["Preparing"],
     empty: "Nothing is being prepared.",
   },
   {
@@ -20,17 +20,24 @@ const tabs: { label: string; states: OrderStatus[]; empty: string }[] = [
     states: ["Ready"],
     empty: "No packed orders waiting.",
   },
+  {
+    label: "Order status",
+    states: ["HandedOver", "Delivered"],
+    empty: "No orders to update yet.",
+  },
 ];
-const newestFirst = (a: Order, b: Order) =>
+/** Orders still to deliver come first, delivered ones last; newest first within each. */
+const pendingFirst = (a: Order, b: Order) =>
+  Number(a.state === "Delivered") - Number(b.state === "Delivered") ||
   (Date.parse(b.placedAt ?? "") || 0) - (Date.parse(a.placedAt ?? "") || 0);
-/** Accept or reject new orders, then follow them through preparing and packed. */
+/** Accept or reject new orders, then follow them through preparing, packed and delivery. */
 export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
   const vm = useOrdersViewModel(),
     [tab, setTab] = useState(0),
     current = tabs[tab];
   const shown = vm.orders
     .filter((o) => current.states.includes(o.state))
-    .sort(newestFirst);
+    .sort(pendingFirst);
   const count = (index: number) =>
     vm.orders.filter((o) => tabs[index].states.includes(o.state)).length;
   return (
@@ -51,17 +58,18 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
             Live orders
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Accept, prepare and pack orders as they come in.
+            Accept, prepare and pack orders, then update their status until
+            delivered.
           </Typography>
         </div>
         {showViewAll && (
           <Link
             component={NextLink}
-            href="/orders/live"
+            href="/orders/all"
             sx={{ fontWeight: 600 }}
             underline="hover"
           >
-            View all
+            View all orders →
           </Link>
         )}
       </Box>
@@ -84,12 +92,6 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
           />
         ))}
       </Tabs>
-      {vm.sample && (
-        <Alert severity="info" sx={{ mx: { xs: 2, sm: 3 }, mt: 2 }}>
-          Sample data: live orders are not available for this restaurant account
-          yet, so these orders are examples.
-        </Alert>
-      )}
       {vm.error && (
         <ToastAlert severity="error" sx={{ m: 2.5 }}>
           {vm.error}
@@ -99,19 +101,43 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
         {shown.length ? (
           <Box
             sx={{
-              display: "grid",
-              gap: 1.5,
-              alignContent: "start",
+              overflowX: "auto",
+              // Its wide content scrolls here instead of widening the page.
+              contain: "inline-size",
+              // The list always scrolls inside the card once it is taller than this.
+              maxHeight: 520,
+              overflowY: "auto",
+              pr: 0.5,
             }}
           >
-            {shown.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                busy={vm.busyId === order.id}
-                onChange={vm.changeOrder}
-              />
-            ))}
+            <Box
+              sx={{
+                display: "grid",
+                gap: 1.5,
+                alignContent: "start",
+                minWidth: 1060,
+              }}
+            >
+              {/* Column headings, shown once above all the rows. */}
+              <Box
+                sx={{
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 1,
+                  bgcolor: "background.paper",
+                }}
+              >
+                <OrderListHeadings />
+              </Box>
+              {shown.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  busy={vm.busyId === order.id}
+                  onChange={vm.changeOrder}
+                />
+              ))}
+            </Box>
           </Box>
         ) : (
           <Box

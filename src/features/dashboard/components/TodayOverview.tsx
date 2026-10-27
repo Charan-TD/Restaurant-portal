@@ -1,108 +1,92 @@
-import type { ReactNode } from "react";
 import { Box, Typography } from "@mui/material";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
-import ShoppingBagOutlined from "@mui/icons-material/ShoppingBagOutlined";
-import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
-import StarBorderRounded from "@mui/icons-material/StarBorderRounded";
-import { CommonCard } from "@/shared/components/layout/CommonCard";
+import CurrencyRupee from "@mui/icons-material/CurrencyRupee";
+import OutdoorGrillOutlined from "@mui/icons-material/OutdoorGrillOutlined";
+import StarRounded from "@mui/icons-material/StarRounded";
+import ArrowUpward from "@mui/icons-material/ArrowUpward";
+import ArrowDownward from "@mui/icons-material/ArrowDownward";
+import { MetricCard } from "@/shared/components/layout/MetricCard";
 import { formatRupees } from "@/shared/utils/format";
 import type { DashboardViewModel } from "../viewmodels/useDashboardViewModel";
-function Tile({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-  tone: { bg: string; fg: string };
-}) {
+/** "+100% vs yesterday" in green, or red when it is lower; nothing when there is no yesterday. */
+function Versus({ change }: { change: number | null }) {
+  if (change === null) return null;
+  const up = change >= 0;
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
-        p: 1.75,
-        border: 1,
-        borderColor: "divider",
-        borderRadius: "14px",
-        minWidth: 0,
-      }}
+    <Typography
+      variant="body2"
+      component="div"
+      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
     >
       <Box
+        component="span"
         sx={{
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          display: "grid",
-          placeItems: "center",
-          flexShrink: 0,
-          bgcolor: tone.bg,
-          color: tone.fg,
+          display: "inline-flex",
+          alignItems: "center",
+          fontWeight: 700,
+          color: up ? "success.main" : "error.main",
         }}
       >
-        {icon}
+        {up ? (
+          <ArrowUpward sx={{ fontSize: 15 }} />
+        ) : (
+          <ArrowDownward sx={{ fontSize: 15 }} />
+        )}
+        {up ? "+" : "−"}
+        {Math.abs(change)}%
       </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {label}
-        </Typography>
-        <Typography sx={{ fontSize: 24, fontWeight: 800, lineHeight: 1.15 }}>
-          {value}
-        </Typography>
+      <Box component="span" sx={{ color: "text.secondary" }}>
+        vs yesterday
       </Box>
-    </Box>
+    </Typography>
   );
 }
-/** Key numbers for today. There is no ratings API yet, so the rating shows a dash. */
+/** Key numbers for today. The rating shows a dash until the dashboard has a ratings summary. */
 export function TodayOverview({
   overview,
 }: {
   overview: DashboardViewModel["overview"];
 }) {
   return (
-    <CommonCard style={{ height: "100%" }}>
-      <Typography variant="h6" component="h2">
-        Today&apos;s overview
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Key stats for today&apos;s business.
-      </Typography>
-      <Box
-        sx={{
-          mt: 2.5,
-          display: "grid",
-          gap: 1.5,
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-        }}
-      >
-        <Tile
-          label="Today's orders"
-          value={String(overview.orders)}
-          icon={<ReceiptLongOutlined />}
-          tone={{ bg: "rgba(242,106,46,.12)", fg: "#f26a2e" }}
-        />
-        <Tile
-          label="Today's revenue"
-          value={formatRupees(overview.revenue)}
-          icon={<ShoppingBagOutlined />}
-          tone={{ bg: "rgba(46,125,50,.12)", fg: "#2e7d32" }}
-        />
-        <Tile
-          label="Preparing orders"
-          value={String(overview.preparing)}
-          icon={<AssignmentOutlined />}
-          tone={{ bg: "rgba(224,155,0,.16)", fg: "#c98a00" }}
-        />
-        <Tile
-          label="Customer rating"
-          value="–"
-          icon={<StarBorderRounded />}
-          tone={{ bg: "rgba(25,118,210,.12)", fg: "#1976d2" }}
-        />
-      </Box>
-    </CommonCard>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 2.5,
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "repeat(2, minmax(0, 1fr))",
+          lg: "repeat(4, minmax(0, 1fr))",
+        },
+      }}
+    >
+      <MetricCard
+        label="Today's orders"
+        hint="Orders placed with you today, compared with yesterday."
+        value={String(overview.orders)}
+        icon={<ReceiptLongOutlined />}
+        note={<Versus change={overview.ordersChange} />}
+      />
+      <MetricCard
+        label="Today's revenue"
+        hint="Total value of today's orders, compared with yesterday."
+        value={formatRupees(overview.revenue)}
+        icon={<CurrencyRupee />}
+        note={<Versus change={overview.revenueChange} />}
+      />
+      <MetricCard
+        label="Preparing orders"
+        hint="Orders you have accepted that are still being prepared."
+        value={String(overview.preparing)}
+        icon={<OutdoorGrillOutlined />}
+        note="In kitchen"
+      />
+      <MetricCard
+        label="Customer rating"
+        hint="Average rating from customer reviews."
+        value="–"
+        icon={<StarRounded />}
+        note="Not enough reviews yet"
+      />
+    </Box>
   );
 }

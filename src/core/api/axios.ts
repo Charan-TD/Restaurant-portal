@@ -24,9 +24,7 @@ export function getRefreshToken(): string | null {
   }
 }
 /** Reads the JWT's claims, which often carry the user's name and email. */
-export function claimsOf(
-  token: string,
-): Record<string, unknown> | undefined {
+export function claimsOf(token: string): Record<string, unknown> | undefined {
   try {
     const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const bytes = Uint8Array.from(atob(part), (c) => c.charCodeAt(0));

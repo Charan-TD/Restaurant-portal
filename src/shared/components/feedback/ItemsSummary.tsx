@@ -12,7 +12,8 @@ export function ItemsSummary({
   /** How many items are named before the rest collapse into "+N more". */
   visible?: number;
 }) {
-  if (items.length === 0) return <Typography color="text.secondary">–</Typography>;
+  if (items.length === 0)
+    return <Typography color="text.secondary">–</Typography>;
   const shown = items.slice(0, visible),
     hidden = items.length - shown.length;
   return (

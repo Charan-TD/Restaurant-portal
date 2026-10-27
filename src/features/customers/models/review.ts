@@ -1,12 +1,17 @@
-export type Sentiment = "Positive" | "Neutral" | "Low rating";
+export interface ReviewItem {
+  name: string;
+  quantity: number;
+}
 
 export interface ReviewRow {
+  /** One order can be reviewed once, so the order number identifies a review. */
   id: string;
   name: string;
-  /** Already masked, e.g. "98****1234". */
-  phone: string;
+  /** Signed picture URL; the avatar shows the first letter when there is none. */
+  photo?: string;
   orderId: string;
-  item: string;
+  /** Every item in the order. */
+  items: ReviewItem[];
   rating: number;
   /** Shown as written, e.g. "12 Apr 2024, 2:15 PM". */
   date: string;
@@ -15,5 +20,5 @@ export interface ReviewRow {
   comment: string;
 }
 
-export const sentimentOf = (rating: number): Sentiment =>
-  rating >= 4.5 ? "Positive" : rating >= 3.5 ? "Neutral" : "Low rating";
+export const itemLabel = ({ name, quantity }: ReviewItem) =>
+  quantity > 1 ? `${quantity} × ${name}` : name;

@@ -10,13 +10,15 @@ export const theme = createTheme({
     },
     // One secondary colour, a deep charcoal green, pairs with the orange.
     secondary: { main: "#26332b", contrastText: "#ffffff" },
-    background: { default: "#f5f6f4" },
+    background: { default: "#ffffff" },
     text: { primary: "#202621", secondary: "#68706a" },
     divider: "#e6eae6",
   },
   typography: {
     fontFamily: "Roboto, Arial, sans-serif",
-    h4: { fontWeight: 800, fontSize: 28, letterSpacing: "-0.4px" },
+    // Smaller than the 14px default; every variant scales with it.
+    fontSize: 13,
+    h4: { fontWeight: 800, fontSize: 24, letterSpacing: "-0.4px" },
     h5: { fontWeight: 700 },
     h6: { fontWeight: 700 },
     button: { textTransform: "none", fontWeight: 600 },
@@ -32,6 +34,23 @@ export const theme = createTheme({
         },
       },
     },
+    MuiTooltip: {
+      defaultProps: { arrow: true, enterDelay: 250, enterNextDelay: 100 },
+      styleOverrides: {
+        tooltip: {
+          backgroundColor: "#26332b",
+          color: "#fff",
+          fontSize: 12.5,
+          fontWeight: 500,
+          lineHeight: 1.4,
+          padding: "7px 12px",
+          borderRadius: 8,
+          maxWidth: 260,
+          boxShadow: "0 6px 18px rgba(16,24,40,.18)",
+        },
+        arrow: { color: "#26332b" },
+      },
+    },
     MuiTab: { styleOverrides: { root: { textTransform: "none" } } },
     MuiTabs: { styleOverrides: { indicator: { height: 3, borderRadius: 3 } } },
     MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
@@ -41,5 +60,8 @@ export const theme = createTheme({
 });
 /** The signed-in portal uses compact inputs; sign-in and onboarding keep the roomier default. */
 export const portalTheme = createTheme(theme, {
-  components: { MuiTextField: { defaultProps: { size: "small" } } },
+  components: {
+    MuiTextField: { defaultProps: { size: "small" } },
+    MuiButton: { styleOverrides: { root: { minHeight: 38 } } },
+  },
 });

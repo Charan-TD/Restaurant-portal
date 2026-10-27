@@ -1,6 +1,6 @@
-import { api } from "@/core/api/axios";
+import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
-import { getCuisines } from "@/features/onboarding/services/cuisineService";
+import { fetchCuisines } from "@/features/onboarding/services/cuisineApi";
 export interface RestaurantSummary {
   name?: string;
   city?: string;
@@ -17,8 +17,8 @@ const first = (...values: unknown[]) => values.map(text).find(Boolean);
  * GET /restaurant/profile: the signed-in restaurant's profile. The
  * response shape is not documented, so the likely key names are all read.
  */
-export async function getMyRestaurant(): Promise<RestaurantSummary> {
-  const { data } = await api.get(endpoint(API_PATHS.restaurantMe));
+async function getMyRestaurant(send: Send): Promise<RestaurantSummary> {
+  const data = await send({ url: endpoint(API_PATHS.restaurantMe) });
   const body = (data?.data ?? data) as Record<string, unknown>;
   const restaurant = (body?.restaurant ?? body?.profile ?? body) as Record<
     string,
@@ -53,9 +53,11 @@ const ownerActive = (value: unknown) => {
  * PATCH /restaurant/profile/status: the owner switches the restaurant ACTIVE
  * (online) or INACTIVE (offline). Takes effect at once, no approval needed.
  */
-export async function setRestaurantActive(active: boolean) {
-  await api.patch(`${endpoint(API_PATHS.restaurantMe)}/status`, {
-    owner_restaurant_status: active ? "ACTIVE" : "INACTIVE",
+async function setRestaurantActive(active: boolean, send: Send) {
+  await send({
+    url: `${endpoint(API_PATHS.restaurantMe)}/status`,
+    method: "patch",
+    data: { owner_restaurant_status: active ? "ACTIVE" : "INACTIVE" },
   });
 }
 const profilePath = (page: string) =>
@@ -65,16 +67,19 @@ const profilePath = (page: string) =>
  * cover are saved straight away. (Name, owner and type need approval; see
  * requestProfileChange.)
  */
-export async function updateRestaurantProfile(changes: {
-  contact?: string;
-  logo?: File | null;
-  cover?: File | null;
-}) {
+async function updateRestaurantProfile(
+  changes: { contact?: string; logo?: File | null; cover?: File | null },
+  send: Send,
+) {
   const body = new FormData();
   if (changes.contact) body.append("restaurant_contact", changes.contact);
   if (changes.logo) body.append("logo", changes.logo);
   if (changes.cover) body.append("cover", changes.cover);
-  await api.patch(profilePath("restaurant-details"), body);
+  await send({
+    url: profilePath("restaurant-details"),
+    method: "patch",
+    data: body,
+  });
 }
 export type ProfileChangeRequestInput = ProfileChangeInput;
 export interface ProfileChangeInput {
@@ -127,7 +132,7 @@ const hasValue = (value: unknown) =>
  * proof to business-documents. A change already under review is refused by
  * the server (409).
  */
-export async function requestProfileChange(changes: ProfileChangeInput) {
+async function requestProfileChange(changes: ProfileChangeInput, send: Send) {
   const entries = Object.entries(changes).filter(([, v]) => hasValue(v));
   const pick = (keys: string[]) =>
     entries.filter(([key]) => keys.includes(key));
@@ -145,11 +150,23 @@ export async function requestProfileChange(changes: ProfileChangeInput) {
   };
   // One at a time: the server allows a single request under review.
   if (details.length)
-    await api.patch(profilePath("restaurant-details"), form(details));
+    await send({
+      url: profilePath("restaurant-details"),
+      method: "patch",
+      data: form(details),
+    });
   if (place.length)
-    await api.patch(profilePath("location"), Object.fromEntries(place));
+    await send({
+      url: profilePath("location"),
+      method: "patch",
+      data: Object.fromEntries(place),
+    });
   if (documents.length)
-    await api.patch(profilePath("business-documents"), form(documents));
+    await send({
+      url: profilePath("business-documents"),
+      method: "patch",
+      data: form(documents),
+    });
 }
 const FIELD_KEYS = [
   "rest_name",
@@ -175,10 +192,10 @@ const FIELD_KEYS = [
   "lon",
 ];
 /** GET /restaurant/profile/change-requests: this restaurant's requests. */
-export async function getProfileChangeRequests(): Promise<
-  ProfileChangeRequest[]
-> {
-  const { data } = await api.get(endpoint(API_PATHS.profileChangeRequests));
+async function getProfileChangeRequests(
+  send: Send,
+): Promise<ProfileChangeRequest[]> {
+  const data = await send({ url: endpoint(API_PATHS.profileChangeRequests) });
   const body = data?.data ?? data;
   const rows: Record<string, unknown>[] = Array.isArray(body)
     ? body
@@ -242,8 +259,8 @@ function readDay(day: string, raw: unknown): WorkingDay {
   return start && end ? { day, open: true, start, end } : closed;
 }
 /** GET /restaurant/profile/operating-hours: the weekly hours the restaurant is open. */
-export async function getWorkingHours(): Promise<WorkingDay[]> {
-  const { data } = await api.get(profilePath("operating-hours"));
+async function getWorkingHours(send: Send): Promise<WorkingDay[]> {
+  const data = await send({ url: profilePath("operating-hours") });
   const body = (data?.data ?? data) as Row;
   return hoursOf(
     (body?.operating_hours ?? body?.opening_hours ?? body) as Row,
@@ -251,8 +268,8 @@ export async function getWorkingHours(): Promise<WorkingDay[]> {
   );
 }
 type Row = Record<string, unknown>;
-async function fetchRestaurantRow(): Promise<Row> {
-  const { data } = await api.get(endpoint(API_PATHS.restaurantMe));
+async function fetchRestaurantRow(send: Send): Promise<Row> {
+  const data = await send({ url: endpoint(API_PATHS.restaurantMe) });
   const body = (data?.data ?? data) as Row;
   return (body?.restaurant ?? body?.profile ?? body) as Row;
 }
@@ -281,7 +298,7 @@ const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
  * PATCH /restaurant/profile/operating-hours: the weekly schedule keyed mon to
  * sun, in the registration format. Saved immediately.
  */
-export async function updateWorkingHours(days: WorkingDay[]) {
+async function updateWorkingHours(days: WorkingDay[], send: Send) {
   const schedule: Record<string, unknown> = {};
   days.forEach((d, index) => {
     const around = d.open && d.start === "00:00" && d.end === "23:59";
@@ -294,16 +311,24 @@ export async function updateWorkingHours(days: WorkingDay[]) {
           : [],
     };
   });
-  await api.patch(profilePath("operating-hours"), schedule);
+  await send({
+    url: profilePath("operating-hours"),
+    method: "patch",
+    data: schedule,
+  });
 }
 /** POST /auth/restaurant/change-password for the signed-in restaurant. */
-export async function changePassword(
-  currentPassword: string,
-  newPassword: string,
+async function changePassword(
+  {
+    currentPassword,
+    newPassword,
+  }: { currentPassword: string; newPassword: string },
+  send: Send,
 ) {
-  await api.post(endpoint(API_PATHS.changePassword), {
-    current_password: currentPassword,
-    new_password: newPassword,
+  await send({
+    url: endpoint(API_PATHS.changePassword),
+    method: "post",
+    data: { current_password: currentPassword, new_password: newPassword },
   });
 }
 export interface RestaurantDetails {
@@ -356,11 +381,11 @@ const label = (value: string | undefined) =>
  * response is not documented, so likely names are read, including nested
  * "location" and "bank_account" objects.
  */
-export async function getRestaurantDetails(): Promise<RestaurantDetails> {
-  const row = await fetchRestaurantRow();
+async function getRestaurantDetails(send: Send): Promise<RestaurantDetails> {
+  const row = await fetchRestaurantRow(send);
   // The profile may hold cuisine ids (e.g. C2803947234); show their names.
   const cuisineNames = new Map(
-    (await getCuisines().catch(() => [])).map((c) => [c.id, c.name]),
+    (await fetchCuisines(send).catch(() => [])).map((c) => [c.id, c.name]),
   );
   const place = asRow(row.location ?? row.restaurant_location),
     bank = asRow(row.bank_account ?? row.bank ?? row.bank_details);
@@ -424,12 +449,77 @@ export interface BankAccountInput {
   proof: File;
 }
 /** PUT /restaurant/profile/bank-account: replaces every bank detail at once. */
-export async function replaceBankAccount(input: BankAccountInput) {
+async function replaceBankAccount(input: BankAccountInput, send: Send) {
   const body = new FormData();
   body.append("account_holder_name", input.holder);
   body.append("account_number", input.account);
   body.append("ifsc", input.ifsc);
   body.append("bank_name", input.bank);
   body.append("bank_proof", input.proof);
-  await api.put(`${endpoint(API_PATHS.restaurantMe)}/bank-account`, body);
+  await send({
+    url: `${endpoint(API_PATHS.restaurantMe)}/bank-account`,
+    method: "put",
+    data: body,
+  });
 }
+
+export const restaurantApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    getMyRestaurant: build.query<RestaurantSummary, void>({
+      queryFn: flow((_: void, send: Send) => getMyRestaurant(send)),
+      providesTags: ["Profile"],
+    }),
+    getRestaurantDetails: build.query<RestaurantDetails, void>({
+      queryFn: flow((_: void, send: Send) => getRestaurantDetails(send)),
+      providesTags: ["Profile"],
+    }),
+    getWorkingHours: build.query<WorkingDay[], void>({
+      queryFn: flow((_: void, send: Send) => getWorkingHours(send)),
+      providesTags: ["Hours"],
+    }),
+    getProfileChangeRequests: build.query<ProfileChangeRequest[], void>({
+      queryFn: flow((_: void, send: Send) => getProfileChangeRequests(send)),
+      providesTags: ["ChangeRequests"],
+    }),
+    setRestaurantActive: build.mutation<void, boolean>({
+      queryFn: flow(setRestaurantActive),
+    }),
+    updateRestaurantProfile: build.mutation<
+      void,
+      { contact?: string; logo?: File | null; cover?: File | null }
+    >({
+      queryFn: flow(updateRestaurantProfile),
+      invalidatesTags: ["Profile"],
+    }),
+    requestProfileChange: build.mutation<void, ProfileChangeInput>({
+      queryFn: flow(requestProfileChange),
+      invalidatesTags: ["ChangeRequests"],
+    }),
+    updateWorkingHours: build.mutation<void, WorkingDay[]>({
+      queryFn: flow(updateWorkingHours),
+      invalidatesTags: ["Hours", "Profile"],
+    }),
+    changePassword: build.mutation<
+      void,
+      { currentPassword: string; newPassword: string }
+    >({
+      queryFn: flow(changePassword),
+    }),
+    replaceBankAccount: build.mutation<void, BankAccountInput>({
+      queryFn: flow(replaceBankAccount),
+      invalidatesTags: ["Profile"],
+    }),
+  }),
+});
+export const {
+  useLazyGetMyRestaurantQuery,
+  useGetRestaurantDetailsQuery,
+  useGetWorkingHoursQuery,
+  useGetProfileChangeRequestsQuery,
+  useSetRestaurantActiveMutation,
+  useUpdateRestaurantProfileMutation,
+  useRequestProfileChangeMutation,
+  useUpdateWorkingHoursMutation,
+  useChangePasswordMutation,
+  useReplaceBankAccountMutation,
+} = restaurantApi;

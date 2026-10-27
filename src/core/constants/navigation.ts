@@ -24,21 +24,13 @@ export const sidebarSections: NavSection[] = [
   {
     id: "orders",
     label: "Orders",
+    href: "/orders/all",
     pages: [
-      {
-        label: "Live orders",
-        href: "/orders/live",
-        description: "Accept, prepare and hand over orders as they come in.",
-      },
       {
         label: "All orders",
         href: "/orders/all",
-        description: "Every order placed with your restaurant.",
-      },
-      {
-        label: "Order history",
-        href: "/orders/history",
-        description: "Completed and cancelled orders from previous days.",
+        description:
+          "Every order you have received, including completed and cancelled ones.",
       },
     ],
   },
@@ -49,12 +41,12 @@ export const sidebarSections: NavSection[] = [
       {
         label: "Items",
         href: "/menu/items",
-        description: "Browse and edit the dishes on your menu.",
+        description: "Your dishes, add-ons and categories, with prices and stock.",
       },
       {
         label: "Add items",
         href: "/menu/add",
-        description: "Add new dishes with price, picture and food type.",
+        description: "Create a new dish customers can order.",
       },
     ],
   },
@@ -65,12 +57,12 @@ export const sidebarSections: NavSection[] = [
       {
         label: "All customers",
         href: "/customers/list",
-        description: "Customers who have ordered from your restaurant.",
+        description: "People who have ordered from you, and how much they have spent.",
       },
       {
         label: "Customer feedback",
         href: "/customers/feedback",
-        description: "Reviews and ratings left by your customers.",
+        description: "What customers said about their orders.",
       },
     ],
   },
@@ -141,12 +133,12 @@ export const navbarMenus: NavSection[] = [
       {
         label: "Working hours",
         href: "/settings/working-hours",
-        description: "Choose the days and times you take orders.",
+        description: "Set the days and times you accept orders.",
       },
       {
         label: "Change password",
         href: "/settings/password",
-        description: "Update the password you use to sign in.",
+        description: "Update the password you use to sign in to this portal.",
       },
     ],
   },

@@ -1,5 +1,5 @@
 import type { MenuItem } from "./menuItem";
-import type { MenuCategories } from "../services/menuItemService";
+import type { MenuCategories } from "../services/menuItemApi";
 
 export const UNCATEGORISED = "Uncategorised";
 

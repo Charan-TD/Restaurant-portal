@@ -11,17 +11,35 @@ export interface SearchOption {
   href: string;
   /** Heading the option is listed under, e.g. "Orders" or "Payments". */
   group: string;
+  /** Already matched by the server, so it is never filtered again here. */
+  remote?: boolean;
 }
-const filter = createFilterOptions<SearchOption>({
+const pageFilter = createFilterOptions<SearchOption>({
   stringify: (option) => `${option.label} ${option.group}`,
   limit: 12,
 });
+/** Pages are matched here; results the server found are all kept. */
+const filter = (
+  options: SearchOption[],
+  state: Parameters<typeof pageFilter>[1],
+) => [
+  ...pageFilter(
+    options.filter((o) => !o.remote),
+    state,
+  ),
+  ...options.filter((o) => o.remote),
+];
 export function UniversalSearch({
   options,
   onSelect,
+  onQuery,
+  loading,
 }: {
   options: SearchOption[];
   onSelect: (option: SearchOption) => void;
+  /** Called with the text as it is typed, so results can be fetched. */
+  onQuery?: (text: string) => void;
+  loading?: boolean;
 }) {
   return (
     <Autocomplete
@@ -31,18 +49,27 @@ export function UniversalSearch({
       getOptionLabel={(option) => option.label}
       isOptionEqualToValue={(a, b) => a.href === b.href && a.label === b.label}
       value={null}
+      loading={loading}
+      onInputChange={(_, text, reason) => {
+        if (reason !== "reset") onQuery?.(text);
+      }}
       blurOnSelect
       autoHighlight
       clearOnBlur
       popupIcon={null}
       noOptionsText="No matches"
+      loadingText="Searching…"
       onChange={(_, option) => option && onSelect(option)}
-      sx={{ flex: 1, minWidth: 0, maxWidth: 440 }}
+      sx={{
+        flex: 1,
+        // Takes all the room between the greeting and the buttons.
+        ml: { md: 2 },
+        minWidth: 0,
+      }}
       renderInput={(params) => (
         <CommonTextField
           {...params}
-          size="small"
-          placeholder="Search orders, menu, payments…"
+          placeholder="Search orders, customers, items…"
           slotProps={{
             ...params.slotProps,
             htmlInput: {
@@ -53,13 +80,15 @@ export function UniversalSearch({
               ...params.slotProps.input,
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
+                  <SearchOutlined />
                 </InputAdornment>
               ),
               sx: {
-                borderRadius: 999,
-                bgcolor: "action.hover",
-                "& fieldset": { borderColor: "transparent" },
+                borderRadius: "12px",
+                bgcolor: "background.paper",
+                fontSize: 15,
+                minHeight: 44,
+                "& fieldset": { borderColor: "divider" },
               },
             },
           }}

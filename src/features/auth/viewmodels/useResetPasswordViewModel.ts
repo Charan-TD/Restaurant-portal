@@ -3,9 +3,10 @@ import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { passwordRules } from "@/features/onboarding/models/validation";
 import { errorMessage } from "@/shared/utils/errors";
-import { resetPassword } from "../services/authService";
+import { useResetPasswordMutation } from "../services/authApi";
 export function useResetPasswordViewModel() {
-  const linkToken = useSearchParams().get("token") ?? "",
+  const [resetPassword] = useResetPasswordMutation(),
+    linkToken = useSearchParams().get("token") ?? "",
     [token, setToken] = useState(linkToken),
     [next, setNext] = useState(""),
     [confirm, setConfirm] = useState(""),
@@ -21,7 +22,7 @@ export function useResetPasswordViewModel() {
     setBusy(true);
     setError("");
     try {
-      await resetPassword(token.trim(), next);
+      await resetPassword({ token: token.trim(), newPassword: next }).unwrap();
       setDone(true);
     } catch (e) {
       setError(errorMessage(e));

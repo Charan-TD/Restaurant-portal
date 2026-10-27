@@ -1,7 +1,15 @@
-import { Box, MenuItem, Select, Typography } from "@mui/material";
-import ArrowUpward from "@mui/icons-material/ArrowUpward";
-import ArrowDownward from "@mui/icons-material/ArrowDownward";
+import {
+  Box,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
+import BarChartOutlined from "@mui/icons-material/BarChartOutlined";
+import EmojiEventsOutlined from "@mui/icons-material/EmojiEventsOutlined";
+import TrendingUpOutlined from "@mui/icons-material/TrendingUpOutlined";
+import ShoppingBagOutlined from "@mui/icons-material/ShoppingBagOutlined";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
+import { MetricCard } from "@/shared/components/layout/MetricCard";
 import { formatRupees } from "@/shared/utils/format";
 import {
   RANGES,
@@ -16,23 +24,44 @@ function niceMax(value: number) {
   return ceil % 2 ? ceil + 1 : ceil;
 }
 const axis = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+const GRID_LINES = 4;
+const CHART_HEIGHT = 220;
 /** Daily revenue, worked out from the restaurant's orders. */
 export function RevenueSummary({
   vm,
 }: {
   vm: Pick<
     DashboardViewModel,
-    "series" | "total" | "best" | "change" | "range" | "setRange"
+    | "series"
+    | "total"
+    | "best"
+    | "change"
+    | "range"
+    | "setRange"
+    | "average"
+    | "periodOrders"
   >;
 }) {
-  const { series, total, best, change, range } = vm,
+  const { series, total, best, range } = vm,
     max = niceMax(Math.max(...series.map((d) => d.total))),
     dense = series.length > 7,
-    gap = dense ? 0.5 : { xs: 1, sm: 3 };
+    gap = dense ? 0.5 : { xs: 1, sm: 3 },
+    ticks = Array.from(
+      { length: GRID_LINES + 1 },
+      (_, i) => (max / GRID_LINES) * (GRID_LINES - i),
+    );
   return (
-    <CommonCard style={{ height: "100%" }}>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-        <Box sx={{ flex: 1, minWidth: 200 }}>
+    <CommonCard>
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box>
           <Typography variant="h6" component="h2">
             Revenue summary
           </Typography>
@@ -40,60 +69,64 @@ export function RevenueSummary({
             Daily revenue for the last {range} days.
           </Typography>
         </Box>
-        <Select
+        <ToggleButtonGroup
+          exclusive
           size="small"
+          color="primary"
           value={range}
-          onChange={(e) => vm.setRange(e.target.value as RangeDays)}
-          inputProps={{ "aria-label": "Revenue period" }}
-          sx={{ minWidth: 140, fontWeight: 600 }}
+          aria-label="Revenue period"
+          onChange={(_, days: RangeDays | null) => days && vm.setRange(days)}
+          sx={{
+            "& .MuiToggleButton-root": { px: 2, fontWeight: 600 },
+            "& .MuiToggleButton-root.Mui-selected, & .MuiToggleButton-root.Mui-selected:hover":
+              { bgcolor: "primary.main", color: "primary.contrastText" },
+          }}
         >
           {RANGES.map((days) => (
-            <MenuItem key={days} value={days}>
-              Last {days} days
-            </MenuItem>
+            <ToggleButton key={days} value={days}>
+              {days} days
+            </ToggleButton>
           ))}
-        </Select>
-        <Box sx={{ display: "flex", gap: 3 }}>
-          <div>
-            <Typography variant="caption" color="text.secondary">
-              This period
-            </Typography>
-            <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>
-              {formatRupees(total)}
-            </Typography>
-            {change !== null && (
-              <Typography
-                variant="caption"
-                sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontWeight: 700,
-                  color: change >= 0 ? "success.main" : "error.main",
-                }}
-              >
-                {change >= 0 ? (
-                  <ArrowUpward sx={{ fontSize: 14 }} />
-                ) : (
-                  <ArrowDownward sx={{ fontSize: 14 }} />
-                )}
-                {Math.abs(change)}%
-              </Typography>
-            )}
-          </div>
-          <Box sx={{ pl: 3, borderLeft: 1, borderColor: "divider" }}>
-            <Typography variant="caption" color="text.secondary">
-              Best day
-            </Typography>
-            <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>
-              {best ? formatRupees(best.total) : "–"}
-            </Typography>
-            {best && (
-              <Typography variant="caption" color="text.secondary">
-                ({best.label})
-              </Typography>
-            )}
-          </Box>
-        </Box>
+        </ToggleButtonGroup>
+      </Box>
+      <Box
+        sx={{
+          mt: 2,
+          display: "grid",
+          gap: 1.5,
+          gridTemplateColumns: {
+            xs: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(4, minmax(0, 1fr))",
+          },
+        }}
+      >
+        <MetricCard
+          label="This period"
+          hint="Total revenue for the selected days."
+          value={formatRupees(total)}
+          icon={<BarChartOutlined />}
+        />
+        <MetricCard
+          label="Best day"
+          hint="The day with the highest revenue in this period."
+          value={best ? formatRupees(best.total) : "–"}
+          note={best?.label}
+          icon={<EmojiEventsOutlined />}
+        />
+        <MetricCard
+          label="Daily average"
+          hint="Total revenue divided by the number of days."
+          value={formatRupees(vm.average)}
+          note="per day"
+          icon={<TrendingUpOutlined />}
+        />
+        <MetricCard
+          label="Orders"
+          hint="Orders placed in the selected days."
+          value={vm.periodOrders}
+          note={`in the last ${range} days`}
+          icon={<ShoppingBagOutlined />}
+        />
       </Box>
       <Box
         sx={{
@@ -105,7 +138,7 @@ export function RevenueSummary({
       >
         <Box
           sx={{
-            height: 150,
+            height: CHART_HEIGHT,
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
@@ -113,7 +146,7 @@ export function RevenueSummary({
             color: "text.secondary",
           }}
         >
-          {[max, max / 2, 0].map((tick) => (
+          {ticks.map((tick) => (
             <Typography key={tick} variant="caption" sx={{ lineHeight: 1 }}>
               {axis(tick)}
             </Typography>
@@ -121,7 +154,7 @@ export function RevenueSummary({
         </Box>
         <Box
           sx={{
-            height: 150,
+            height: CHART_HEIGHT,
             display: "grid",
             gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))`,
             gap,
@@ -130,7 +163,7 @@ export function RevenueSummary({
             borderColor: "divider",
             backgroundImage:
               "linear-gradient(to bottom, #e6eae6 1px, transparent 1px)",
-            backgroundSize: "100% 50%",
+            backgroundSize: `100% ${100 / GRID_LINES}%`,
             backgroundRepeat: "repeat-y",
           }}
         >
@@ -144,10 +177,7 @@ export function RevenueSummary({
                 maxWidth: 56,
                 height: `${Math.max((day.total / max) * 100, 2)}%`,
                 borderRadius: "6px 6px 0 0",
-                bgcolor:
-                  best && day.label === best.label
-                    ? "primary.main"
-                    : "rgba(242,106,46,.4)",
+                bgcolor: "primary.main",
               }}
             />
           ))}

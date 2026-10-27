@@ -9,7 +9,6 @@ import {
   Box,
   Typography,
 } from "@mui/material";
-import ExpandMore from "@mui/icons-material/ExpandMore";
 import { BlinkBadge } from "../feedback/BlinkBadge";
 import type { NavPage } from "@/core/constants/navigation";
 export interface NavDropdownProps {
@@ -46,20 +45,25 @@ export function NavDropdown({
         aria-label={alert ? `${label}, new alerts` : label}
         onClick={(e) => setAnchor(e.currentTarget)}
         startIcon={<BlinkBadge active={alert}>{icon}</BlinkBadge>}
-        endIcon={<ExpandMore fontSize="small" />}
         sx={{
-          color: "text.secondary",
+          color: "text.primary",
           px: { xs: 1, lg: 1.5 },
           minWidth: 0,
-          borderRadius: 999,
+          minHeight: 36,
+          fontSize: 12.5,
+          fontWeight: 700,
+          borderRadius: "10px",
+          border: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
           "&:hover, &[aria-expanded='true']": {
             color: "primary.main",
-            bgcolor: "action.hover",
+            borderColor: "primary.main",
+            bgcolor: "background.paper",
           },
-          "& .nav-label, & .MuiButton-endIcon": {
-            display: { xs: "none", lg: "inline-flex" },
-          },
-          "& .MuiButton-startIcon": { mr: { xs: 0, lg: 1 } },
+          "& .nav-label": { display: { xs: "none", lg: "inline-flex" } },
+          "& .MuiButton-startIcon": { mr: { xs: 0, lg: 0.75 } },
+          "& .MuiButton-startIcon svg": { fontSize: 18 },
         }}
       >
         <span className="nav-label">{label}</span>
@@ -71,7 +75,15 @@ export function NavDropdown({
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
-          paper: { sx: { mt: 1, width: 300, maxWidth: "calc(100vw - 24px)", borderRadius: 3, p: 0.5 } },
+          paper: {
+            sx: {
+              mt: 1,
+              width: 300,
+              maxWidth: "calc(100vw - 24px)",
+              borderRadius: 3,
+              p: 0.5,
+            },
+          },
         }}
       >
         <Typography
@@ -94,7 +106,7 @@ export function NavDropdown({
               primary={page.label}
               secondary={page.description}
               slotProps={{
-                primary: { sx: { fontWeight: 600, fontSize: 14 } },
+                primary: { sx: { fontWeight: 600, fontSize: 13 } },
                 secondary: { sx: { fontSize: 12, whiteSpace: "normal" } },
               }}
             />

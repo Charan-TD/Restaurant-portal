@@ -11,12 +11,12 @@ export function ProfileView() {
   return (
     <>
       <PageHeader
-        eyebrow={vm.editing ? "Account / Edit profile" : "Account / Profile"}
+        eyebrow="Account"
         title={vm.editing ? "Edit profile" : "My profile"}
         subtitle={
           vm.editing
-            ? "Update your details, or ask for changes that need approval."
-            : "Your restaurant, location, hours and bank details."
+            ? "Change what you can here. Other changes are sent for approval."
+            : "How your restaurant appears to customers and where payouts go."
         }
         actions={
           vm.editing && (

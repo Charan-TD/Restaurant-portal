@@ -11,12 +11,12 @@ import {
 import { DEMO_MODE } from "@/core/constants/config";
 import {
   forgetRegistration,
-  loadRegistration,
   rememberRegistration,
   rememberedRegistration,
-  saveRegistrationStep,
-  submitRegistration,
-} from "../services/registrationService";
+  useLazyLoadRegistrationQuery,
+  useSaveRegistrationStepMutation,
+  useSubmitRegistrationMutation,
+} from "../services/registrationApi";
 import { errorMessage } from "@/shared/utils/errors";
 import type { RegistrationForm } from "../models/registration";
 const matchChecks: Partial<
@@ -47,7 +47,10 @@ export function useOnboardingViewModel() {
     [busy, setBusy] = useState(false),
     [restoring, setRestoring] = useState(false),
     [restored, setRestored] = useState(false),
-    restoreStarted = useRef(false);
+    restoreStarted = useRef(false),
+    [loadRegistration] = useLazyLoadRegistrationQuery(),
+    [saveStep] = useSaveRegistrationStepMutation(),
+    [submitRegistration] = useSubmitRegistrationMutation();
   const { form, registrationId, setRegistrationId, setCompleted } = portal,
     { setCurrentStep } = portal;
   // Coming back to an unfinished registration: reload what was saved and
@@ -59,6 +62,7 @@ export function useOnboardingViewModel() {
     restoreStarted.current = true;
     setRestoring(true);
     loadRegistration(savedId)
+      .unwrap()
       .then(({ completed, values }) => {
         form.reset({ ...form.getValues(), ...values });
         const done = steps
@@ -74,7 +78,14 @@ export function useOnboardingViewModel() {
       })
       .catch(() => forgetRegistration())
       .finally(() => setRestoring(false));
-  }, [form, registrationId, setRegistrationId, setCompleted, setCurrentStep]);
+  }, [
+    form,
+    registrationId,
+    setRegistrationId,
+    setCompleted,
+    setCurrentStep,
+    loadRegistration,
+  ]);
   const keepId = (id: string | null) => {
     portal.setRegistrationId(id);
     if (id) rememberRegistration(id);
@@ -129,11 +140,11 @@ export function useOnboardingViewModel() {
     try {
       if (!isLast) {
         keepId(
-          await saveRegistrationStep(
-            id,
-            portal.form.getValues(),
-            portal.registrationId,
-          ),
+          await saveStep({
+            step: id,
+            form: portal.form.getValues(),
+            registrationId: portal.registrationId,
+          }).unwrap(),
         );
         portal.setCompleted((old) =>
           old.includes(portal.currentStep) ? old : [...old, portal.currentStep],
@@ -146,14 +157,14 @@ export function useOnboardingViewModel() {
       let registrationId = portal.registrationId;
       for (const [i, step] of steps.entries()) {
         if (i === LAST_STEP || portal.completed.includes(i)) continue;
-        registrationId = await saveRegistrationStep(
-          step.id,
+        registrationId = await saveStep({
+          step: step.id,
           form,
           registrationId,
-        );
+        }).unwrap();
         keepId(registrationId);
       }
-      if (registrationId) await submitRegistration(registrationId);
+      if (registrationId) await submitRegistration(registrationId).unwrap();
       forgetRegistration();
       // Submitted; the admin portal now verifies the registration.
       portal.setApproval({

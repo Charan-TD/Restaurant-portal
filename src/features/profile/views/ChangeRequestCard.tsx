@@ -9,7 +9,7 @@ import { useChangeRequestFormViewModel } from "../viewmodels/useChangeRequestFor
 import {
   type ProfileChangeRequest,
   type RestaurantDetails,
-} from "../services/restaurantService";
+} from "../services/restaurantApi";
 /** How many of the newest requests are listed before "See more requests". */
 const LATEST_REQUESTS = 3;
 const FIELD_LABELS: Record<string, string> = {

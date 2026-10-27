@@ -117,10 +117,10 @@ export function ChangePasswordCard() {
           </Box>
           <div>
             <Typography variant="h6" component="h2">
-              Update your password
+              New password
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Choose a strong password to keep your account safe.
+              Enter your current password, then choose a new one.
             </Typography>
           </div>
         </Box>
@@ -217,7 +217,7 @@ export function ChangePasswordCard() {
           Security tips
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          A strong password helps keep your restaurant and customer data safe.
+          Habits that keep your restaurant and customer data safe.
         </Typography>
         <Box sx={{ display: "grid", gap: 2.25 }}>
           {TIPS.map((tip) => (

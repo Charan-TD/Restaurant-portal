@@ -21,6 +21,7 @@ import {
   MenuItem,
   Select,
   Switch,
+  Tooltip,
   FormHelperText,
   ToggleButton,
   ToggleButtonGroup,
@@ -28,7 +29,6 @@ import {
 } from "@mui/material";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import CurrencyRupee from "@mui/icons-material/CurrencyRupee";
-import ImageOutlined from "@mui/icons-material/ImageOutlined";
 import EnergySavingsLeafOutlined from "@mui/icons-material/EnergySavingsLeafOutlined";
 import EggOutlined from "@mui/icons-material/EggOutlined";
 import SetMealOutlined from "@mui/icons-material/SetMealOutlined";
@@ -50,8 +50,8 @@ import {
   type MenuItemForm,
 } from "../models/menuItem";
 import { formatRupees } from "@/shared/utils/format";
-import { menuImageUrl } from "../services/menuItemService";
-import type { RestaurantAddOn } from "../services/addOnService";
+import { menuImageUrl } from "../services/menuItemApi";
+import type { RestaurantAddOn } from "../services/addOnApi";
 import { useMenuItemFormViewModel } from "../viewmodels/useMenuItemFormViewModel";
 type NumberName =
   "price" | "discountedPrice" | "taxRate" | "preparationMinutes";
@@ -194,14 +194,13 @@ function Section({
     >
       <Box
         sx={{
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          display: { xs: "none", sm: "grid" },
-          placeItems: "center",
-          bgcolor: "rgba(242,106,46,.1)",
+          width: 32,
+          display: { xs: "none", sm: "flex" },
+          justifyContent: "center",
+          pt: 0.5,
           color: "primary.main",
           flexShrink: 0,
+          "& svg": { fontSize: 28 },
         }}
       >
         {icon}
@@ -227,7 +226,6 @@ function Section({
     </Box>
   );
 }
-const fullRow = { gridColumn: { md: "1 / -1" } } as const;
 
 /** Inline box to create an add-on while filling in the item. */
 function NewAddOn({
@@ -258,13 +256,16 @@ function NewAddOn({
   };
   if (!open)
     return (
-      <Button
-        startIcon={<AddOutlined />}
-        onClick={() => setOpen(true)}
-        sx={{ mt: 1, ml: -1, fontWeight: 700, color: "primary.dark" }}
-      >
-        Add new add-on
-      </Button>
+      <Box sx={{ mt: 1 }}>
+        <Button
+          size="small"
+          startIcon={<AddOutlined />}
+          onClick={() => setOpen(true)}
+          sx={{ minHeight: 0, px: 0.5, fontWeight: 600 }}
+        >
+          Add new add-on
+        </Button>
+      </Box>
     );
   const enter = (e: { key: string; preventDefault: () => void }) => {
     if (e.key === "Enter") {
@@ -275,10 +276,10 @@ function NewAddOn({
   return (
     <Box
       sx={{
-        mt: 1.5,
-        p: 2,
+        mt: 1,
+        p: 1.5,
         display: "grid",
-        gap: 2,
+        gap: 1.5,
         alignItems: "start",
         border: 1,
         borderColor: "divider",
@@ -322,6 +323,7 @@ function NewAddOn({
       />
       <Box sx={{ display: "flex", gap: 1 }}>
         <CommonButton
+          size="small"
           variant="contained"
           disabled={busy}
           onClick={() => void save()}
@@ -329,6 +331,7 @@ function NewAddOn({
           {busy ? "Adding…" : "Add"}
         </CommonButton>
         <CommonButton
+          size="small"
           variant="outlined"
           color="inherit"
           disabled={busy}
@@ -355,7 +358,7 @@ function AddOnsField({
     <div>
       <FieldLabel text="Add-ons" htmlFor="menu-addons" />
       {addOns.length === 0 ? (
-        <Typography color="text.secondary">
+        <Typography variant="body2" color="text.secondary">
           No add-ons yet. Add one below.
         </Typography>
       ) : (
@@ -423,9 +426,11 @@ function AddOnsField({
 function AvailabilityFields({
   control,
   addOns,
+  qtyOptions,
   onCreateAddOn,
 }: {
   control: Control<MenuItemForm>;
+  qtyOptions: string[];
   addOns: RestaurantAddOn[];
   onCreateAddOn: (name: string, price: number) => Promise<string>;
 }) {
@@ -435,36 +440,33 @@ function AvailabilityFields({
         control={control}
         name="available"
         render={({ field }) => (
-          <Box
-            sx={{
-              ...fullRow,
-              border: 1,
-              borderColor: "divider",
-              borderRadius: "12px",
-              px: 2,
-              py: 1,
-            }}
-          >
-            <FormControlLabel
-              sx={{ m: 0, width: "100%", justifyContent: "space-between" }}
-              labelPlacement="start"
-              control={
-                <Switch
-                  checked={field.value ?? true}
-                  onChange={(e) => field.onChange(e.target.checked)}
-                />
-              }
-              label={
-                <div>
-                  <Typography sx={{ fontWeight: 600 }}>
+          <Box sx={{ gridColumn: { md: "1 / -1" } }}>
+            <Tooltip title="Turn off to show this item as out of stock.">
+              <FormControlLabel
+                sx={{
+                  m: 0,
+                  gap: 1,
+                  px: 1.5,
+                  py: 0.25,
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: "10px",
+                }}
+                labelPlacement="start"
+                control={
+                  <Switch
+                    size="small"
+                    checked={field.value ?? true}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                  />
+                }
+                label={
+                  <Typography sx={{ fontWeight: 600, fontSize: 13.5 }}>
                     Available for orders
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Turn off to show this item as out of stock.
-                  </Typography>
-                </div>
-              }
-            />
+                }
+              />
+            </Tooltip>
           </Box>
         )}
       />
@@ -477,7 +479,7 @@ function AvailabilityFields({
             <ChoiceField
               id="menu-qty-type"
               value={field.value ?? ""}
-              options={[...qtyTypes]}
+              options={qtyOptions.length ? qtyOptions : [...qtyTypes]}
               placeholder="e.g. Plate, Half Plate"
               addLabel="Add new quantity type"
               newPlaceholder="Type how it is sold, e.g. Family pack"
@@ -643,16 +645,34 @@ function DiscountField({
   const price = useWatch({ control, name: "price" }),
     offer = useWatch({ control, name: "discountedPrice" }),
     [mode, setMode] = useState<"percent" | "flat">("percent"),
-    [amount, setAmount] = useState("");
-  const apply = (nextMode: typeof mode, raw: string, base: number | null) => {
-    const n = Number(raw);
-    if (!raw || !base || !Number.isFinite(n) || n <= 0)
-      return setValue("discountedPrice", null, { shouldValidate: true });
-    const off =
-      nextMode === "percent" ? Math.round((base * n) / 100) : Math.round(n);
-    setValue("discountedPrice", off > 0 && off < base ? base - off : null, {
-      shouldValidate: true,
-    });
+    // What the vendor typed here, and the offer price it produced. When the
+    // offer price changes any other way, the discount is worked out from it.
+    [typed, setTyped] = useState<{ text: string; offer: number | null } | null>(
+      null,
+    ),
+    off = offer != null && price ? price - offer : 0,
+    derived =
+      off > 0 && price
+        ? mode === "percent"
+          ? String(Math.round((off / price) * 10000) / 100)
+          : String(off)
+        : "",
+    amount = typed && typed.offer === offer ? typed.text : derived;
+  const type = (raw: string) => {
+    const text =
+        mode === "percent"
+          ? raw.replace(/[^d.]/g, "").replace(/(..*)./g, "$1")
+          : raw.replace(/D/g, ""),
+      n = Number(text),
+      cut =
+        price && Number.isFinite(n) && n > 0
+          ? mode === "percent"
+            ? Math.round((price * n) / 100)
+            : Math.round(n)
+          : 0,
+      next = price && cut > 0 && cut < price ? price - cut : null;
+    setTyped({ text, offer: next });
+    setValue("discountedPrice", next, { shouldValidate: true });
   };
   return (
     <div>
@@ -664,7 +684,7 @@ function DiscountField({
           onChange={(e) => {
             const next = e.target.value as typeof mode;
             setMode(next);
-            apply(next, amount, price);
+            setTyped(null);
           }}
           inputProps={{ "aria-label": "Discount type" }}
           sx={{ flex: 1.3, minWidth: 0 }}
@@ -676,13 +696,9 @@ function DiscountField({
           id="menu-discount"
           value={amount}
           placeholder="10"
-          onChange={(e) => {
-            const next = e.target.value.replace(/\D/g, "");
-            setAmount(next);
-            apply(mode, next, price);
-          }}
+          onChange={(e) => type(e.target.value)}
           slotProps={{
-            htmlInput: { inputMode: "numeric", "aria-label": "Discount value" },
+            htmlInput: { inputMode: "decimal", "aria-label": "Discount value" },
             input: {
               endAdornment: (
                 <Typography color="text.secondary">
@@ -694,7 +710,7 @@ function DiscountField({
           sx={{ flex: 1 }}
         />
       </Box>
-      {offer != null && price != null && amount ? (
+      {offer != null && price != null && off > 0 ? (
         <Typography
           variant="caption"
           sx={{
@@ -704,8 +720,8 @@ function DiscountField({
             color: "success.main",
           }}
         >
-          Customers pay {formatRupees(offer)} · save{" "}
-          {formatRupees(price - offer)}
+          Customers pay {formatRupees(offer)} · flat {formatRupees(off)} off ·{" "}
+          {Math.round((off / price) * 10000) / 100}% off
         </Typography>
       ) : (
         <Typography
@@ -713,7 +729,7 @@ function DiscountField({
           color="text.secondary"
           sx={{ display: "block", mt: 0.75 }}
         >
-          Optional. Sets the offer price from the price.
+          Optional. Fills in from the offer price, or sets it.
         </Typography>
       )}
     </div>
@@ -728,6 +744,8 @@ const fileSize = (bytes: number) =>
  * Picture upload: tap or drop a photo, see it large straight away, and
  * replace or remove it. Wrong types or big files are refused on the spot.
  */
+/** The description box and the picture box beside it are this tall. */
+const PICTURE_HEIGHT = 140;
 function PictureDrop({
   value,
   currentUrl,
@@ -779,15 +797,16 @@ function PictureDrop({
     />
   );
   return (
-    <Box sx={fullRow}>
+    <Box>
+      <FieldLabel text="Dish picture" />
       {shown ? (
         <Box
           sx={{
             display: "flex",
-            flexWrap: "wrap",
             alignItems: "center",
-            gap: 2.5,
-            p: 2,
+            gap: 2,
+            height: PICTURE_HEIGHT,
+            p: 1.5,
             border: 1,
             borderColor: "divider",
             borderRadius: "14px",
@@ -799,8 +818,9 @@ function PictureDrop({
             src={shown}
             alt="Dish preview"
             sx={{
-              width: { xs: "100%", sm: 240 },
-              height: { xs: 200, sm: 160 },
+              width: 110,
+              height: "100%",
+              flexShrink: 0,
               objectFit: "cover",
               borderRadius: "12px",
               display: "block",
@@ -874,7 +894,7 @@ function PictureDrop({
             justifyContent: "center",
             gap: 1,
             px: 2,
-            py: { xs: 4, sm: 5 },
+            height: PICTURE_HEIGHT,
             textAlign: "center",
             cursor: "pointer",
             border: "2px dashed",
@@ -896,16 +916,12 @@ function PictureDrop({
         >
           <Box
             sx={{
-              width: 56,
-              height: 56,
-              borderRadius: "50%",
               display: "grid",
               placeItems: "center",
-              bgcolor: "rgba(242,106,46,.12)",
               color: "primary.main",
             }}
           >
-            <AddPhotoAlternateOutlined sx={{ fontSize: 28 }} />
+            <AddPhotoAlternateOutlined sx={{ fontSize: 34 }} />
           </Box>
           <Typography sx={{ fontWeight: 700 }}>
             {over ? "Drop it here" : "Add a photo of your dish"}
@@ -931,17 +947,16 @@ function PictureDrop({
 }
 export function MenuItemFormView({ id }: { id?: string }) {
   const vm = useMenuItemFormViewModel(id),
-    { control, setValue } = vm.form,
-    title = vm.editing ? "Edit item" : "Add items";
+    { control, setValue } = vm.form;
   return (
     <>
       <PageHeader
-        eyebrow={`Menu / ${title}`.toUpperCase()}
+        eyebrow="Menu"
         title={vm.editing ? vm.item?.name || "Edit item" : "Add a menu item"}
         subtitle={
           vm.editing
-            ? "Update the price, picture or details of this dish."
-            : "Add a new dish with details, pricing, image and availability."
+            ? "Change the price, photo or details of this dish."
+            : "Create a new dish customers can order."
         }
       />
       {vm.editing && vm.item?.adminAvailable === false && (
@@ -972,7 +987,7 @@ export function MenuItemFormView({ id }: { id?: string }) {
             <Section
               icon={<DescriptionOutlined />}
               title="Basic details"
-              subtitle="Enter the basic information about your menu item."
+              subtitle="Name, description and food type."
             >
               <Controller
                 control={control}
@@ -1084,14 +1099,21 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 control={control}
                 name="description"
                 render={({ field, fieldState }) => (
-                  <Box sx={fullRow}>
+                  <Box>
                     <FieldLabel text="Description" htmlFor="menu-description" />
                     <CommonTextField
                       {...field}
                       id="menu-description"
                       placeholder="Describe your dish, ingredients, taste, etc..."
                       multiline
-                      minRows={3}
+                      rows={4}
+                      sx={{
+                        "& .MuiInputBase-root": {
+                          height: PICTURE_HEIGHT,
+                          alignItems: "flex-start",
+                        },
+                        "& textarea": { height: "100% !important" },
+                      }}
                       error={!!fieldState.error}
                       helperText={fieldState.error?.message}
                       slotProps={{ htmlInput: { maxLength: 500 } }}
@@ -1106,22 +1128,39 @@ export function MenuItemFormView({ id }: { id?: string }) {
                   </Box>
                 )}
               />
+              <Controller
+                control={control}
+                name="images.0"
+                render={({ field, fieldState }) => (
+                  <PictureDrop
+                    value={field.value ?? null}
+                    currentUrl={
+                      vm.editing && vm.item?.images[0]
+                        ? menuImageUrl(vm.item.images[0])
+                        : null
+                    }
+                    onChange={field.onChange}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
             </Section>
             <Section
               icon={<Inventory2Outlined />}
               title="Availability"
-              subtitle="Choose if the item is available, how it is sold and its add-ons."
+              subtitle="Whether it is in stock, how it is sold and which add-ons go with it."
             >
               <AvailabilityFields
                 control={control}
                 addOns={vm.addOns}
+                qtyOptions={vm.qtyOptions}
                 onCreateAddOn={vm.createAddOn}
               />
             </Section>
             <Section
               icon={<CurrencyRupee />}
               title="Pricing & preparation"
-              subtitle="Set the price, discount and preparation details."
+              subtitle="Price, discount and how long it takes to make."
             >
               <NumberField
                 control={control}
@@ -1148,32 +1187,6 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 placeholder="15"
               />
             </Section>
-            <Section
-              icon={<ImageOutlined />}
-              title="Media"
-              subtitle={
-                vm.editing && vm.item?.images.length
-                  ? "Choosing a new picture replaces the current one."
-                  : "Add a picture of your dish."
-              }
-            >
-              <Controller
-                control={control}
-                name="images.0"
-                render={({ field, fieldState }) => (
-                  <PictureDrop
-                    value={field.value ?? null}
-                    currentUrl={
-                      vm.editing && vm.item?.images[0]
-                        ? menuImageUrl(vm.item.images[0])
-                        : null
-                    }
-                    onChange={field.onChange}
-                    error={fieldState.error?.message}
-                  />
-                )}
-              />
-            </Section>
             <Box
               sx={{
                 display: "flex",
@@ -1185,15 +1198,6 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 borderColor: "divider",
               }}
             >
-              {!vm.editing && (
-                <Button
-                  startIcon={<DescriptionOutlined />}
-                  onClick={vm.saveDraft}
-                  sx={{ fontWeight: 600 }}
-                >
-                  Save draft
-                </Button>
-              )}
               <Box sx={{ flex: 1 }} />
               <CommonButton
                 variant="outlined"

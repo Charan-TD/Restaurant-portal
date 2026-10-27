@@ -1,6 +1,6 @@
 import { Box } from "@mui/material";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
-import { menuImageUrl } from "../services/menuItemService";
+import { menuImageUrl } from "../services/menuItemApi";
 /** First picture of the item, or a placeholder icon. */
 export function MenuItemThumb({
   images,

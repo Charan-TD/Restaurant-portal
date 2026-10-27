@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { usePortal } from "@/core/providers/PortalProvider";
@@ -7,36 +7,27 @@ import { DEMO_MODE } from "@/core/constants/config";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 import { errorMessage } from "@/shared/utils/errors";
 import {
-  getRestaurantDetails,
-  updateRestaurantProfile,
-  type RestaurantDetails,
-} from "../services/restaurantService";
+  useGetRestaurantDetailsQuery,
+  useUpdateRestaurantProfileMutation,
+} from "../services/restaurantApi";
 import { profileSchema, type ProfileForm } from "../models/profile";
 import { useVendorProfile } from "./useVendorProfile";
 export function useProfileViewModel() {
   const portal = usePortal(),
     vendor = useVendorProfile(),
+    // The page still shows what the login already told us if this fails.
+    { data: details = null, refetch } = useGetRestaurantDetailsQuery(
+      undefined,
+      { skip: DEMO_MODE },
+    ),
+    [updateRestaurantProfile] = useUpdateRestaurantProfileMutation(),
     [editing, setEditing] = useState(false),
     [saved, setSaved] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [details, setDetails] = useState<RestaurantDetails | null>(null),
     [logo, setLogo] = useState<File | null>(null),
     [cover, setCover] = useState<File | null>(null);
-  // Bumping the key reloads the profile, e.g. after a save.
-  const [reloadKey, setReloadKey] = useState(0);
-  useEffect(() => {
-    if (DEMO_MODE) return;
-    let active = true;
-    getRestaurantDetails()
-      .then((data) => active && setDetails(data))
-      // The page still shows what the login already told us.
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [reloadKey]);
-  const loadDetails = () => setReloadKey((key) => key + 1);
+  const loadDetails = () => void (DEMO_MODE || refetch());
   const current = (): ProfileForm => ({
     name: vendor.nameKnown ? vendor.vendorName : "",
     restaurantName: vendor.restaurantName,
@@ -68,8 +59,7 @@ export function useProfileViewModel() {
             contact: phoneChanged ? values.phone : undefined,
             logo,
             cover,
-          });
-          loadDetails();
+          }).unwrap();
         } catch (e) {
           setError(errorMessage(e));
           return;

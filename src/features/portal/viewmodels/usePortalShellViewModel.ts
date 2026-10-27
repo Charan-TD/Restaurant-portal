@@ -2,11 +2,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
-import { logout as logoutRequest } from "@/features/auth/services/authService";
+import { useLogoutMutation } from "@/features/auth/services/authApi";
 import { useNotificationsViewModel } from "@/features/notifications/viewmodels/useNotificationsViewModel";
 import { useVendorProfile } from "@/features/profile/viewmodels/useVendorProfile";
 export function usePortalShellViewModel() {
-  const portal = usePortal(),
+  const [logoutRequest] = useLogoutMutation(),
+    portal = usePortal(),
     router = useRouter(),
     vendor = useVendorProfile(),
     notifications = useNotificationsViewModel(),
@@ -17,7 +18,9 @@ export function usePortalShellViewModel() {
   }, [restoring, authenticated, router]);
   const logout = () => {
     // Leave the portal even if the backend call fails.
-    void logoutRequest().catch(() => undefined);
+    void logoutRequest()
+      .unwrap()
+      .catch(() => undefined);
     portal.setAuthenticated(false);
     portal.setProfile({});
     router.replace("/login");

@@ -1,22 +1,10 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
-import {
-  getProfileChangeRequests,
-  type ProfileChangeRequest,
-} from "../services/restaurantService";
-/** This restaurant's change requests, reloaded after a new one is sent. */
+import { useGetProfileChangeRequestsQuery } from "../services/restaurantApi";
+/** This restaurant's change requests; sending a new one refreshes the list. */
 export function useChangeRequests() {
-  const [requests, setRequests] = useState<ProfileChangeRequest[]>([]);
-  const reload = useCallback(
-    () =>
-      getProfileChangeRequests()
-        .then(setRequests)
-        .catch(() => undefined),
-    [],
-  );
-  useEffect(() => {
-    if (!DEMO_MODE) void reload();
-  }, [reload]);
-  return { requests, reload };
+  const { data, refetch } = useGetProfileChangeRequestsQuery(undefined, {
+    skip: DEMO_MODE,
+  });
+  return { requests: data ?? [], reload: () => void (DEMO_MODE || refetch()) };
 }

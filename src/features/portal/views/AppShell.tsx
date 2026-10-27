@@ -45,7 +45,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         <Box
           component="aside"
-          sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: 0 }}
+          sx={{
+            width: { md: SIDEBAR_WIDTH },
+            flexShrink: 0,
+          }}
         >
           <Drawer
             variant="temporary"
@@ -54,7 +57,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             ModalProps={{ keepMounted: true }}
             sx={{
               display: { xs: "block", md: "none" },
-              "& .MuiDrawer-paper": paperSx,
+              "& .MuiDrawer-paper": {
+                ...paperSx,
+                overflowX: "hidden",
+              },
             }}
           >
             {sidebar}
@@ -64,7 +70,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             open
             sx={{
               display: { xs: "none", md: "block" },
-              "& .MuiDrawer-paper": paperSx,
+              "& .MuiDrawer-paper": {
+                ...paperSx,
+                overflowX: "hidden",
+              },
             }}
           >
             {sidebar}
@@ -85,10 +94,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             sx={{
               flex: 1,
               width: "100%",
-              maxWidth: 1280,
+              maxWidth: 1680,
               mx: "auto",
-              px: { xs: 2, sm: 3, md: 4 },
-              py: { xs: 3, md: 4 },
+              px: { xs: 2, sm: 2.5, md: 3 },
+              py: { xs: 2.5, md: 3 },
             }}
           >
             <BackButton />

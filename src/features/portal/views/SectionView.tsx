@@ -20,7 +20,7 @@ export function SectionView({
   return (
     <>
       <PageHeader
-        eyebrow={`${section.label} / ${page.label}`}
+        eyebrow={section.label}
         title={page.label}
         subtitle={page.description}
       />
@@ -39,9 +39,11 @@ export function SectionView({
             }}
           >
             <ConstructionOutlined color="disabled" sx={{ fontSize: 48 }} />
-            <Typography variant="h6">{page.label} is under development</Typography>
+            <Typography variant="h6">
+              {page.label} is coming soon
+            </Typography>
             <Typography color="text.secondary" sx={{ maxWidth: 420 }}>
-              This page is under development and will be available soon.
+              We are still building this. Check back soon.
             </Typography>
             <CommonButton
               variant="outlined"
