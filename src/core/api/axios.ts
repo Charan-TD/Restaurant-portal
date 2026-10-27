@@ -1,8 +1,9 @@
 import axios from "axios";
+import { API_BASE_URL } from "@/core/constants/config";
 // The backend uses bearer tokens, not cookies, and allows any origin (*).
 // Browsers block credentialed requests to a "*" origin, so none are sent.
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || undefined,
+  baseURL: API_BASE_URL,
   timeout: 15000,
 });
 const TOKEN_KEY = "td.accessToken",
