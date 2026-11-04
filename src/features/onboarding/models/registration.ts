@@ -5,6 +5,9 @@ export type FoodType = (typeof foodTypes)[number];
 /** Menu items use the same veg / egg / non-veg types. */
 export const itemTypes = foodTypes;
 export type ItemType = FoodType;
+/** Who delivers the food to the train, as the API names it. */
+export const riderOwners = ["Traindhaba", "restaurant"] as const;
+export type RiderOwner = (typeof riderOwners)[number];
 export const COUNTRY_CODE = "+91";
 /** A cuisine from the backend; the form stores its id. */
 export interface Cuisine {
@@ -19,6 +22,8 @@ export interface RestaurantRegistration {
   restaurantType: RestaurantType | "";
   /** Any mix of veg, egg and non-veg; menu items must match it. */
   foodServed: FoodType[];
+  /** TrainDhaba's riders or the restaurant's own riders. */
+  riderOwner: RiderOwner | "";
   email: string;
   /** Cuisine ids from the backend. */
   cuisines: string[];
@@ -81,6 +86,7 @@ export const initialRegistration: RegistrationForm = {
   mobile: "",
   restaurantType: "",
   foodServed: [],
+  riderOwner: "",
   email: "",
   cuisines: [],
   customerContact: "",

@@ -83,7 +83,8 @@ export interface FieldDefinition {
     | "select"
     | "radio"
     | "checkboxes"
-    | "cuisines";
+    | "cuisines"
+    | "riders";
   options?: readonly string[];
   /** Text shown before the input, e.g. the country code. */
   prefix?: string;
@@ -134,6 +135,12 @@ export const fieldGroups: Partial<Record<StepId, FieldDefinition[]>> = {
       type: "checkboxes",
       options: foodTypes,
     },
+    {
+      name: "riderOwner",
+      label: "Delivery to the train",
+      type: "riders",
+      fullWidth: true,
+    },
   ],
   location: [
     { name: "building", label: "Shop no. / Building / Floor" },
@@ -179,9 +186,9 @@ export const restaurantPhotoFields = [
     name: "coverPhoto",
     label: "Restaurant picture",
     optional: true,
-    accept: "image",
+    accept: "picture",
   },
-  { name: "logo", label: "Restaurant logo", optional: true, accept: "image" },
+  { name: "logo", label: "Restaurant logo", optional: true, accept: "picture" },
 ] as const;
 /** Step 1 is long, so its fields are shown in titled groups, in this order. */
 export const detailSections: {
@@ -199,6 +206,7 @@ export const detailSections: {
       "cuisines",
       "restaurantType",
       "foodServed",
+      "riderOwner",
     ],
   },
   {

@@ -1,35 +1,12 @@
 "use client";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
-import { PageHeader } from "@/shared/components/layout/PageHeader";
-import { CommonButton } from "@/shared/components/actions/CommonButton";
+import { ScreenSurface } from "@/shared/components/layout/ScreenSurface";
 import { useProfileViewModel } from "../viewmodels/useProfileViewModel";
-import { EditProfileView } from "./EditProfileView";
-import { ProfileDetails } from "./ProfileDetails";
+import { ProfileLayout } from "./ProfileLayout";
 export function ProfileView() {
   const vm = useProfileViewModel();
   return (
-    <>
-      <PageHeader
-        eyebrow="Account"
-        title={vm.editing ? "Edit profile" : "My profile"}
-        subtitle={
-          vm.editing
-            ? "Change what you can here. Other changes are sent for approval."
-            : "How your restaurant appears to customers and where payouts go."
-        }
-        actions={
-          vm.editing && (
-            <CommonButton
-              variant="outlined"
-              startIcon={<ArrowBackOutlined />}
-              onClick={vm.cancel}
-            >
-              Back to profile
-            </CommonButton>
-          )
-        }
-      />
+    <ScreenSurface>
       {vm.saved && (
         <ToastAlert severity="success" onClose={vm.dismissSaved} sx={{ mb: 3 }}>
           Profile updated.
@@ -40,15 +17,7 @@ export function ProfileView() {
           {vm.error}
         </ToastAlert>
       )}
-      {vm.editing ? (
-        <EditProfileView vm={vm} />
-      ) : (
-        <ProfileDetails
-          vendor={vm.vendor}
-          details={vm.details}
-          onEdit={vm.startEditing}
-        />
-      )}
-    </>
+      <ProfileLayout vm={vm} />
+    </ScreenSurface>
   );
 }

@@ -9,9 +9,10 @@ export interface CommonUploadProps {
   optional?: boolean;
   /**
    * "document" accepts PDF only; "image" accepts JPG/PNG only; "photo"
-   * accepts JPG/WEBP only (menu item pictures).
+   * accepts JPG/WEBP only (menu item pictures); "picture" accepts JPG, PNG
+   * or WEBP (restaurant photo and logo).
    */
-  accept?: "image" | "photo" | "document";
+  accept?: "image" | "photo" | "picture" | "document";
   errorMessage?: string;
 }
 const acceptTypes = {
@@ -19,6 +20,10 @@ const acceptTypes = {
   photo: {
     input: ".jpg,.jpeg,.webp,image/jpeg,image/webp",
     hint: "JPG or WEBP, up to 2 MB",
+  },
+  picture: {
+    input: ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
+    hint: "JPG, PNG or WEBP, up to 2 MB",
   },
   document: { input: ".pdf,application/pdf", hint: "PDF only, up to 2 MB" },
 };

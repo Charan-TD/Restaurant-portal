@@ -32,6 +32,10 @@ export function ReviewStep({ onEdit }: { onEdit: (step: number) => void }) {
                   data.ownerName,
                   data.email,
                   data.restaurantType,
+                  data.riderOwner &&
+                    (data.riderOwner === "Traindhaba"
+                      ? "TrainDhaba riders"
+                      : "Own riders"),
                   data.foodServed?.length
                     ? `Serves ${data.foodServed.join(", ").toLowerCase()}`
                     : "",

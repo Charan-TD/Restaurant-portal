@@ -87,6 +87,8 @@ export const baseApi = createApi({
     "Orders",
     "Customers",
     "Reviews",
+    "GroupOrders",
+    "Riders",
     "MenuItems",
     "AddOns",
     "Categories",

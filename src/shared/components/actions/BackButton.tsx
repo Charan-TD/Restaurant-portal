@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
 import { CommonButton, type CommonButtonProps } from "./CommonButton";
+import { isRedesignedPath } from "./redesignedPaths";
 
 /** Entry screens: there is nowhere sensible to go back to from these. */
 const rootPaths = ["/", "/login", "/dashboard"];
@@ -20,7 +21,7 @@ export function BackButton({
 }: Props) {
   const router = useRouter(),
     pathname = usePathname();
-  if (rootPaths.includes(pathname)) return null;
+  if (rootPaths.includes(pathname) || isRedesignedPath(pathname)) return null;
   return (
     <CommonButton
       color="inherit"

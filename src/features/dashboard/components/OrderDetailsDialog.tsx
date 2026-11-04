@@ -9,20 +9,12 @@ import {
   Typography,
 } from "@mui/material";
 import { formatRupees } from "@/shared/utils/format";
-import { lineLabel, type Order, type OrderStatus } from "../models/order";
+import { lineLabel, stateLabel, type Order } from "../models/order";
 interface Props {
   order: Order;
   open: boolean;
   onClose: () => void;
 }
-const stateLabel: Record<OrderStatus, string> = {
-  New: "New",
-  Preparing: "Preparing",
-  Ready: "Packed",
-  HandedOver: "Out for delivery",
-  Delivered: "Delivered",
-  Rejected: "Rejected",
-};
 const validDate = (iso?: string) =>
   iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso) : undefined;
 const dateTime = (iso?: string) =>
@@ -116,6 +108,11 @@ export function OrderDetailsDialog({ order, open, onClose }: Props) {
     ["Journey date", dateOnly(order.journeyDate)],
     ["Order placed", dateTime(order.placedAt)],
     ["Deliver by", dateTime(order.deliveryBy)],
+    [
+      "Rider",
+      order.rider &&
+        [order.rider.name, order.rider.phone].filter(Boolean).join(" · "),
+    ],
     [
       "Queue time",
       order.queueMinutes ? `${order.queueMinutes} min` : undefined,

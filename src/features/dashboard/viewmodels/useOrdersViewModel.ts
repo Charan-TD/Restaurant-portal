@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
@@ -9,8 +9,12 @@ import {
   useGetOrdersQuery,
   useUpdateOrderMutation,
 } from "../services/orderApi";
-import type { OrderStatus } from "../models/order";
+import type { OrderRider, OrderStatus } from "../models/order";
 import { errorMessage } from "@/shared/utils/errors";
+import { usePickedRiders } from "@/features/riders/viewmodels/usePickedRiders";
+import { useRidersOwner } from "@/features/riders/viewmodels/useRidersOwner";
+/** Where an order's chosen rider is remembered. */
+const riderKey = (id: string) => `order:${id}`;
 /**
  * Works out why the orders API refused a request. The profile endpoint takes
  * the same restaurant login: if it refuses too, the session has expired;
@@ -43,7 +47,9 @@ export function useOrdersViewModel() {
       pollingInterval: 30_000,
     }),
     [updateOrder] = useUpdateOrderMutation(),
-    [checkProfile] = useLazyGetMyRestaurantQuery();
+    [checkProfile] = useLazyGetMyRestaurantQuery(),
+    riders = usePickedRiders(),
+    { trainDhabaRiders } = useRidersOwner();
   // The dashboard and the navbar read the shared order list.
   useEffect(() => {
     if (data) setOrders(data);
@@ -72,20 +78,57 @@ export function useOrdersViewModel() {
       : queryError
         ? errorMessage(queryError)
         : "");
-  async function changeOrder(id: string, state: OrderStatus) {
+  /**
+   * Assigns a rider while the order is being prepared. The API only takes the
+   * rider on handover, so it is remembered here and sent then.
+   */
+  function assignRider(id: string, rider: OrderRider) {
+    if (!rider.id) return;
+    riders.pick(riderKey(id), { ...rider, id: rider.id });
+    toast.success(`${rider.name} assigned to this order.`);
+  }
+  /**
+   * Moves an order on. With the restaurant's own riders, the rider assigned
+   * while preparing is remembered here; the API takes it (and requires it)
+   * on handover. With TrainDhaba riders, accepting starts the rider search on
+   * the server, and the rider updates the order after it is marked ready.
+   */
+  async function changeOrder(
+    id: string,
+    state: OrderStatus,
+    rider?: OrderRider,
+  ) {
     setActionError("");
     setBusyId(id);
     try {
-      if (!DEMO_MODE) await updateOrder({ id, state }).unwrap();
+      if (!DEMO_MODE)
+        await updateOrder({
+          id,
+          state,
+          // The server refuses a rider from restaurants on TrainDhaba riders.
+          riderId:
+            state === "HandedOver" && !trainDhabaRiders ? rider?.id : undefined,
+        }).unwrap();
       setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
+      if (rider?.id) riders.pick(riderKey(id), { ...rider, id: rider.id });
+      if (state === "Delivered" || state === "Rejected")
+        riders.forget(riderKey(id));
       toast.success(
-        state === "Rejected"
-          ? "Order rejected."
-          : state === "Preparing"
-            ? "Order accepted."
-            : state === "Delivered"
-              ? "Order marked as delivered."
-              : "Order updated.",
+        state === "Preparing"
+          ? trainDhabaRiders
+            ? "Order accepted. Searching for a TrainDhaba rider."
+            : "Order accepted. Assign a rider while it is prepared."
+          : state === "Ready"
+            ? rider
+              ? `Order ready. ${rider.name} will pick it up.`
+              : "Order ready for the rider to pick up."
+            : state === "HandedOver" && rider
+              ? `Order picked up by ${rider.name}.`
+              : state === "Rejected"
+                ? "Order rejected."
+                : state === "Delivered"
+                  ? "Order marked as delivered."
+                  : "Order updated.",
       );
     } catch (e) {
       setActionError(errorMessage(e));
@@ -93,5 +136,20 @@ export function useOrdersViewModel() {
       setBusyId(null);
     }
   }
-  return { orders, error, busyId, changeOrder };
+  return {
+    // The rider the server reports wins over the one chosen here.
+    orders: useMemo(
+      () =>
+        orders.map((o) => {
+          const picked = riders.picks[riderKey(o.id)];
+          return o.rider || !picked ? o : { ...o, rider: picked };
+        }),
+      [orders, riders.picks],
+    ),
+    error,
+    busyId,
+    changeOrder,
+    assignRider,
+    trainDhabaRiders,
+  };
 }

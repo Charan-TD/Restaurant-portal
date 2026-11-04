@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import SpaceDashboardOutlined from "@mui/icons-material/SpaceDashboardOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
+import TwoWheelerOutlined from "@mui/icons-material/TwoWheelerOutlined";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import PeopleAltOutlined from "@mui/icons-material/PeopleAltOutlined";
 import InsertChartOutlined from "@mui/icons-material/InsertChartOutlined";
@@ -13,6 +15,8 @@ import type { NavSectionId } from "@/core/constants/navigation";
 export const navIcons: Record<NavSectionId, ReactElement> = {
   dashboard: <SpaceDashboardOutlined fontSize="small" />,
   orders: <ReceiptLongOutlined fontSize="small" />,
+  groupOrders: <GroupsOutlined fontSize="small" />,
+  riders:<TwoWheelerOutlined fontSize="small" />,
   menu: <RestaurantMenuOutlined fontSize="small" />,
   customers: <PeopleAltOutlined fontSize="small" />,
   reports: <InsertChartOutlined fontSize="small" />,

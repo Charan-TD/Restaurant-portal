@@ -73,7 +73,11 @@ export function useMenuItemFormViewModel(id?: string) {
    * files add-ons under a category id, so a category that is not saved yet
    * is created first. Resolves to an error message, or "" when done.
    */
-  const createNewAddOn = async (name: string, price: number) => {
+  const createNewAddOn = async (
+    name: string,
+    price: number,
+    image: File | null,
+  ) => {
     const category = form.getValues("category").trim();
     if (!category) return "Choose the item's category first.";
     try {
@@ -91,6 +95,7 @@ export function useMenuItemFormViewModel(id?: string) {
         name,
         categoryId: found.id,
         price,
+        image,
       }).unwrap();
       form.setValue("addOnIds", [...form.getValues("addOnIds"), saved.id], {
         shouldDirty: true,
@@ -123,6 +128,7 @@ export function useMenuItemFormViewModel(id?: string) {
         setCreated(made);
         toast.success(`${made.name} was added to your menu.`);
         form.reset(emptyMenuItemForm());
+        router.push("/menu/items");
       }
     } catch (e) {
       setError(menuErrorMessage(e));

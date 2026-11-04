@@ -44,6 +44,8 @@ export function clearTokens() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    // The saved riders choice (useRidersOwner) belongs to this account.
+    localStorage.removeItem("td.ridersOwner");
   } catch {}
 }
 api.interceptors.request.use((config) => {

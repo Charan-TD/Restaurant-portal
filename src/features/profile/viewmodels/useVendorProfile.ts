@@ -6,6 +6,7 @@ import { DEMO_MODE } from "@/core/constants/config";
 import { errorMessage } from "@/shared/utils/errors";
 import { useSetRestaurantActiveMutation } from "../services/restaurantApi";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
+import { saveReopenAt, type GoOffline } from "@/features/portal/models/offline";
 const FALLBACK_NAME = "Restaurant Partner";
 /** One letter for the avatar: the first letter of the name, "Ravi Kumar" → "R". */
 export function initialsOf(name: string) {
@@ -58,12 +59,18 @@ export function useVendorProfile() {
     mobile: phone ? `${COUNTRY_CODE} ${phone}` : "",
     city: profile.city?.trim() || city?.trim() || "",
     online,
-    /** Saves the new status; the switch flips back if the server refuses. */
-    setOnline: (next: boolean) => {
+    /**
+     * Saves the new status; the switch flips back if the server refuses.
+     * Going offline says why, and when the restaurant reopens.
+     */
+    setOnline: (next: boolean, offline?: GoOffline) => {
       portal.setOnline(next);
-      if (DEMO_MODE) return;
-      setRestaurantActive(next)
+      const remember = () =>
+        saveReopenAt(next ? null : (offline?.reopenAt ?? null));
+      if (DEMO_MODE) return remember();
+      setRestaurantActive({ active: next, ...offline })
         .unwrap()
+        .then(remember)
         .catch((error) => {
           portal.setOnline(!next);
           toast.error(errorMessage(error));

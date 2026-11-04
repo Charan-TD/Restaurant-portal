@@ -1,6 +1,11 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
 import type { ReviewRow } from "../models/review";
+export interface RatingSummary {
+  total: number;
+  /** Null when nobody has rated yet. */
+  average: number | null;
+}
 type Row = Record<string, unknown>;
 const asRow = (value: unknown): Row =>
   value && typeof value === "object" ? (value as Row) : {};
@@ -66,6 +71,22 @@ export const reviewApi = baseApi.injectEndpoints({
       ),
       providesTags: ["Reviews"],
     }),
+    /** GET /restaurant/reviews/rating-summary: how many 1 to 5 star ratings there are. */
+    getRatingSummary: build.query<RatingSummary, void>({
+      queryFn: flow<void, RatingSummary>(async (_, send) => {
+        const data = asRow(
+            asRow(await send({ url: endpoint(API_PATHS.ratingSummary) })).data,
+          ),
+          counts = asRow(data.rating_counts),
+          total = Number(data.total_ratings) || 0,
+          stars = [1, 2, 3, 4, 5].reduce(
+            (sum, star) => sum + star * (Number(counts[star]) || 0),
+            0,
+          );
+        return { total, average: total ? stars / total : null };
+      }),
+      providesTags: ["Reviews"],
+    }),
   }),
 });
-export const { useGetReviewsQuery } = reviewApi;
+export const { useGetReviewsQuery, useGetRatingSummaryQuery } = reviewApi;

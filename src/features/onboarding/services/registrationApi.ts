@@ -40,22 +40,30 @@ async function createRegistration(
   form: RegistrationForm,
   send: Send,
 ): Promise<string> {
+  // Multipart, so the optional logo and cover picture go in the same request.
+  // List fields are sent as one entry per value.
+  const data = multipart({
+    restaurant_name: form.restaurantName,
+    owner_name: form.ownerName,
+    mobile: `${COUNTRY_CODE}${form.mobile}`,
+    restaurant_type: form.restaurantType
+      ? restaurantTypeValues[form.restaurantType]
+      : "",
+    riders_owner: form.riderOwner,
+    restaurant_email: form.email,
+    restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
+    password: form.password,
+    logo: form.logo,
+    cover: form.coverPhoto,
+  });
+  form.cuisines.forEach((id) => data.append("cusines", id));
+  form.foodServed.forEach((type) =>
+    data.append("food_served", foodTypeValues[type]),
+  );
   const body = await send<{ data: { registrationId: string } }>({
     url: `${endpoint(API_PATHS.register)}/restaurant-details`,
     method: "post",
-    data: {
-      restaurant_name: form.restaurantName,
-      owner_name: form.ownerName,
-      mobile: `${COUNTRY_CODE}${form.mobile}`,
-      restaurant_type: form.restaurantType
-        ? restaurantTypeValues[form.restaurantType]
-        : "",
-      restaurant_email: form.email,
-      cusines: form.cuisines,
-      restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
-      password: form.password,
-      food_served: form.foodServed.map((type) => foodTypeValues[type]),
-    },
+    data,
   });
   return body.data.registrationId;
 }
@@ -232,7 +240,14 @@ const loaders: Record<
       const type = reverse(restaurantTypeValues, row.restaurant_type),
         food = Array.isArray(row.food_served) ? row.food_served : [],
         cuisines = row.cusines ?? row.cuisines;
+      const owner = str(row, "riders_owner").toLowerCase();
       return {
+        riderOwner:
+          owner === "traindhaba"
+            ? "Traindhaba"
+            : owner === "restaurant"
+              ? "restaurant"
+              : "",
         restaurantName: str(row, "restaurant_name", "name"),
         ownerName: str(row, "owner_name"),
         mobile: localNumber(str(row, "mobile")),

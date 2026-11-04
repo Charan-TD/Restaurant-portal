@@ -1,98 +1,37 @@
 "use client";
-import { useState } from "react";
-import NextLink from "next/link";
-import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
-import { useRouter } from "next/navigation";
-import {
-  AppBar,
-  Box,
-  Button,
-  IconButton,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { usePathname } from "next/navigation";
+import { AppBar, Box, IconButton, Toolbar, Tooltip, Typography } from "@mui/material";
 import MenuOutlined from "@mui/icons-material/MenuOutlined";
-import { usePortal } from "@/core/providers/PortalProvider";
-import { DEMO_MODE } from "@/core/constants/config";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { useSearchOrdersQuery } from "@/features/dashboard/services/orderApi";
-import { useSearchCustomersQuery } from "@/features/customers/services/customerApi";
-import { useSearchMenuItemsQuery } from "@/features/menu/services/menuItemApi";
-import { searchablePages } from "@/core/constants/navigation";
-import {
-  UniversalSearch,
-  type SearchOption,
-} from "@/shared/components/navigation/UniversalSearch";
+import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
+import { pageTitleFor } from "@/core/constants/navigation";
+import { tokens } from "@/core/theme/tokens";
+import { GoOfflineDialog } from "./GoOfflineDialog";
 import { NotificationsMenu } from "./NotificationsMenu";
 import { OnlineToggle } from "./OnlineToggle";
-import { ProfileMenu } from "./ProfileMenu";
 import type { PortalShellViewModel } from "../viewmodels/usePortalShellViewModel";
-/** A greeting for the time of day. */
-const wish = (hour = new Date().getHours()) =>
-  hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+/** The white bar on top: page title, the restaurant, the Online switch and alerts. */
 export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
-  const router = useRouter(),
-    { orders } = usePortal(),
-    alerts = vm.notifications;
-  const [typed, setTyped] = useState(""),
-    term = useDebouncedValue(typed.trim()),
-    // Orders, customers and items are searched by the server as the vendor types.
-    active = !DEMO_MODE && term.length >= 2 && typed.trim().length >= 2,
-    foundOrders = useSearchOrdersQuery({ q: term, page: 1 }, { skip: !active }),
-    foundCustomers = useSearchCustomersQuery(term, { skip: !active }),
-    foundItems = useSearchMenuItemsQuery(term, { skip: !active }),
-    searching =
-      typed.trim().length >= 2 &&
-      (typed.trim() !== term ||
-        foundOrders.isFetching ||
-        foundCustomers.isFetching ||
-        foundItems.isFetching);
-  const remote: SearchOption[] = active
-    ? [
-        ...(foundOrders.data?.orders ?? []).slice(0, 5).map((o) => ({
-          label: `${o.id} · ${o.customer ?? o.food}`,
-          href: "/orders/all",
-          group: "Orders",
-          remote: true,
-        })),
-        ...(foundCustomers.data ?? []).slice(0, 5).map((c) => ({
-          label: [c.name, c.phone].filter(Boolean).join(" · ") || "Customer",
-          href: "/customers/list",
-          group: "Customers",
-          remote: true,
-        })),
-        ...(foundItems.data ?? []).slice(0, 5).map((i) => ({
-          label: i.name,
-          href: `/menu/items/${encodeURIComponent(i.id)}`,
-          group: "Menu items",
-          remote: true,
-        })),
-      ]
-    : [];
-  const searchOptions: SearchOption[] = [
-    ...searchablePages,
-    ...(DEMO_MODE
-      ? orders.map((o) => ({
-          label: `${o.id} · ${o.food}`,
-          href: "/orders/all",
-          group: "Orders",
-        }))
-      : []),
-    ...remote,
-  ];
+  const pathname = usePathname(),
+    title = pageTitleFor(pathname),
+    { restaurantName } = vm,
+    { city } = vm.vendor;
   return (
     <AppBar
-      position="static"
+      position="sticky"
       color="inherit"
       elevation={0}
-      sx={{ bgcolor: "transparent" }}
+      sx={{
+        bgcolor: tokens.color.card,
+        borderBottom: `1px solid ${tokens.color.border}`,
+      }}
     >
       <Toolbar
         sx={{
-          minHeight: { xs: 60, md: 64 },
-          gap: { xs: 0.25, sm: 1, md: 2 },
+          minHeight: { xs: 64, md: 72 },
+          gap: 2,
           px: { xs: 1, sm: 3 },
+          py: 1.5,
         }}
       >
         <Tooltip title="Open menu">
@@ -104,49 +43,50 @@ export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
             <MenuOutlined />
           </IconButton>
         </Tooltip>
-        <Box sx={{ display: { xs: "none", md: "block" }, flexShrink: 0 }}>
-          <Typography
-            noWrap
-            sx={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}
-          >
-            {wish()}
+        <Typography
+          component="h1"
+          noWrap
+          sx={{
+            fontSize: 22,
+            lineHeight: "28px",
+            fontWeight: 700,
+            color: tokens.color.text,
+          }}
+        >
+          {title}
+        </Typography>
+        <Box
+          sx={{
+            display: { xs: "none", sm: "flex" },
+            alignItems: "center",
+            gap: 1,
+            minWidth: 0,
+            pl: 2,
+            height: 28,
+            borderLeft: `1px solid ${tokens.color.border}`,
+            fontSize: 14,
+            color: tokens.color.textMuted,
+          }}
+        >
+          <StorefrontOutlined sx={{ fontSize: 18 }} />
+          <Typography noWrap sx={{ fontSize: 14, fontWeight: 600, color: tokens.color.text }}>
+            {restaurantName}
           </Typography>
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </Typography>
+          {city && <Box component="span" sx={{ whiteSpace: "nowrap" }}>· {city}</Box>}
         </Box>
-        <UniversalSearch
-          options={searchOptions}
-          onQuery={setTyped}
-          loading={searching}
-          onSelect={(option) => router.push(option.href)}
+        <Box sx={{ flex: 1 }} />
+        <OnlineToggle
+          online={vm.vendor.online}
+          onChange={vm.toggleOnline}
+          reopenAt={vm.reopenAt}
         />
-        <Box sx={{ display: { xs: "none", sm: "flex" } }}>
-          <OnlineToggle
-            online={vm.vendor.online}
-            onChange={vm.vendor.setOnline}
-            size="small"
-          />
-        </Box>
-        <Tooltip title="Go to your menu items">
-          <Button
-            component={NextLink}
-            href="/menu/items"
-            variant="outlined"
-            size="small"
-            startIcon={<RestaurantMenuOutlined />}
-            sx={{ display: { xs: "none", sm: "inline-flex" }, flexShrink: 0 }}
-          >
-            Items
-          </Button>
-        </Tooltip>
-        <NotificationsMenu vm={alerts} />
-        <ProfileMenu vm={vm} />
+        <GoOfflineDialog
+          open={vm.offlineOpen}
+          inProgress={vm.ordersInProgress}
+          onClose={vm.closeOffline}
+          onConfirm={(offline) => vm.vendor.setOnline(false, offline)}
+        />
+        <NotificationsMenu vm={vm.notifications} />
       </Toolbar>
     </AppBar>
   );

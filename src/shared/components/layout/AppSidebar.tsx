@@ -1,224 +1,156 @@
 "use client";
-import { useState } from "react";
-import Image from "next/image";
-import {
-  Box,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Collapse,
-  Typography,
-} from "@mui/material";
-import ChevronRight from "@mui/icons-material/ChevronRight";
-import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
+import type { ReactElement } from "react";
+import NextLink from "next/link";
+import { Box, ButtonBase, Typography } from "@mui/material";
+import PedalBikeOutlined from "@mui/icons-material/PedalBikeOutlined";
+import AccountBalanceWalletOutlined from "@mui/icons-material/AccountBalanceWalletOutlined";
+import BarChartOutlined from "@mui/icons-material/BarChartOutlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
+import LocalOfferOutlined from "@mui/icons-material/LocalOfferOutlined";
+import RestaurantOutlined from "@mui/icons-material/RestaurantOutlined";
+import ShoppingBagOutlined from "@mui/icons-material/ShoppingBagOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
-import { navbarMenus, type NavSection } from "@/core/constants/navigation";
-import { navIcons } from "../navigation/navIcons";
-export const SIDEBAR_WIDTH = 248;
+import TrainOutlined from "@mui/icons-material/TrainOutlined";
+import {
+  railItemFor,
+  type RailItem,
+  type RailItemId,
+} from "@/core/constants/navigation";
+import { tokens } from "@/core/theme/tokens";
+
+/** Width of the icon rail, and of the logo tile above it. */
+export const SIDEBAR_WIDTH = 88;
+
+const ICON = { fontSize: 22 } as const;
+
+const icons: Record<RailItemId, ReactElement> = {
+  orders: <ShoppingBagOutlined sx={ICON} />,
+  groupOrders: <GroupsOutlined sx={ICON} />,
+  menu: <RestaurantOutlined sx={ICON} />,
+  insights: <BarChartOutlined sx={ICON} />,
+  payments: <AccountBalanceWalletOutlined sx={ICON} />,
+  offers: <LocalOfferOutlined sx={ICON} />,
+  riders: <PedalBikeOutlined sx={ICON} />,
+  profile: <StorefrontOutlined sx={ICON} />,
+};
+
 export interface AppSidebarProps {
-  sections: NavSection[];
+  items: RailItem[];
   pathname: string;
-  restaurantName: string;
+  /** A red count over an item's icon, e.g. orders still to finish. */
+  badges?: Partial<Record<RailItemId, number>>;
   onNavigate: (href: string) => void;
-  onLogout: () => void;
 }
+
+/** The narrow icon rail: logo tile on top, one stacked icon and label per section. */
 export function AppSidebar({
-  sections,
+  items,
   pathname,
-  restaurantName,
+  badges = {},
   onNavigate,
-  onLogout,
 }: AppSidebarProps) {
-  const activeSection = [...sections, ...navbarMenus].find((section) =>
-    section.pages.some((page) => page.href === pathname),
-  )?.id;
-  const [expandedSection, setExpandedSection] = useState<string | undefined>(
-    activeSection,
-  );
-  const itemSx = {
-    borderRadius: "10px",
-    minHeight: 36,
-    px: 1.5,
-    color: "text.secondary",
-    "& .MuiListItemIcon-root": {
-      minWidth: 34,
-      color: "inherit",
-    },
-    "&.Mui-selected, &.Mui-selected:hover": {
-      bgcolor: "rgba(242,106,46,.1)",
-      color: "primary.dark",
-    },
-  };
-  const renderSection = (section: NavSection) => {
-    const selected =
-      section.href === pathname ||
-      section.pages.some((page) => pathname === page.href);
-    const hasPages = section.pages.length > 0;
-    const expanded = expandedSection === section.id;
-    return (
-      <Box key={section.id}>
-        <ListItemButton
-          selected={selected}
-          aria-label={section.label}
-          aria-current={selected && !hasPages ? "page" : undefined}
-          aria-expanded={hasPages ? expanded : undefined}
-          aria-controls={hasPages ? `sidebar-${section.id}-pages` : undefined}
-          onClick={() => {
-            if (hasPages) {
-              setExpandedSection(expanded ? undefined : section.id);
-            } else if (section.href) {
-              onNavigate(section.href);
-            }
-          }}
-          sx={itemSx}
-        >
-          <ListItemIcon>{navIcons[section.id]}</ListItemIcon>
-          <>
-            <ListItemText
-              primary={section.label}
-              slotProps={{
-                primary: { sx: { fontWeight: 600, fontSize: 13 } },
-              }}
-            />
-            {hasPages && (
-              <ChevronRight
-                fontSize="small"
-                sx={{
-                  transform: expanded ? "rotate(90deg)" : "none",
-                  transition: "transform .2s",
-                }}
-              />
-            )}
-          </>
-        </ListItemButton>
-        {hasPages && (
-          <Collapse in={expanded} unmountOnExit>
-            <List
-              id={`sidebar-${section.id}-pages`}
-              aria-label={`${section.label} subpages`}
-              disablePadding
-              sx={{
-                ml: 3,
-                pl: 1,
-                my: 0.5,
-                borderLeft: 1,
-                borderColor: "divider",
-                display: "grid",
-                gap: 0.25,
-              }}
-            >
-              {section.pages.map((page) => (
-                <ListItemButton
-                  key={page.href}
-                  selected={pathname === page.href}
-                  aria-current={pathname === page.href ? "page" : undefined}
-                  onClick={() => onNavigate(page.href)}
-                  sx={{ ...itemSx, minHeight: 32, px: 1.25 }}
-                >
-                  <ListItemText
-                    primary={page.label}
-                    slotProps={{
-                      primary: {
-                        sx: {
-                          fontSize: 12.5,
-                          fontWeight: pathname === page.href ? 600 : 500,
-                        },
-                      },
-                    }}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          </Collapse>
-        )}
-      </Box>
-    );
-  };
+  const active = railItemFor(pathname)?.id;
   return (
     <Box
       sx={{
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        px: 2,
-        py: 1.5,
-        bgcolor: "background.paper",
+        bgcolor: tokens.color.card,
       }}
     >
       <Box
+        component={NextLink}
+        href="/dashboard"
+        aria-label="TrainDhaba home"
         sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          justifyContent: "center",
+          width: SIDEBAR_WIDTH,
+          height: 72,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          bgcolor: "#ee5b00",
+          color: "#fff",
         }}
       >
-        <Image
-          src="/logo.jpg"
-          alt="Train Dhaba logo"
-          width={30}
-          height={30}
-          className="brand-logo"
-          priority
-        />
-        <Typography sx={{ fontWeight: 700, flex: 1, fontSize: 15 }}>
-          Train Dhaba
-        </Typography>
+        <TrainOutlined sx={{ fontSize: 36 }} />
       </Box>
       <Box
-        sx={{
-          my: 1.5,
-          p: 1,
-          borderRadius: "10px",
-          bgcolor: "rgba(242,106,46,.07)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 1,
-        }}
-      >
-        <StorefrontOutlined
-          fontSize="small"
-          sx={{ color: "primary.main", flexShrink: 0 }}
-        />
-        <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>
-          {restaurantName}
-        </Typography>
-      </Box>
-      <List
         component="nav"
         aria-label="Main menu"
-        disablePadding
-        sx={{ display: "grid", gap: 0.25 }}
+        sx={{ display: "grid", alignContent: "start" }}
       >
-        {sections.map(renderSection)}
-      </List>
-      <Divider sx={{ my: 1 }} />
-      <List
-        component="nav"
-        aria-label="Management"
-        disablePadding
-        sx={{ display: "grid", gap: 0.25 }}
-      >
-        {navbarMenus.map(renderSection)}
-      </List>
-      <Box sx={{ flex: 1, minHeight: 8 }} />
-      <Divider sx={{ my: 1 }} />
-      <ListItemButton
-        aria-label="Log out"
-        onClick={onLogout}
-        sx={{ ...itemSx, flexGrow: 0 }}
-      >
-        <ListItemIcon>
-          <LogoutOutlined fontSize="small" />
-        </ListItemIcon>
-        <ListItemText
-          primary="Log out"
-          slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 13 } } }}
-        />
-      </ListItemButton>
+        {items.map((item) => {
+          const selected = active === item.id,
+            count = badges[item.id] ?? 0;
+          return (
+            <ButtonBase
+              key={item.id}
+              aria-label={item.label}
+              aria-current={selected ? "page" : undefined}
+              onClick={() => onNavigate(item.href)}
+              sx={{
+                position: "relative",
+                height: 72,
+                width: "100%",
+                flexDirection: "column",
+                gap: 0.5,
+                color: selected ? tokens.color.primary : tokens.color.textMuted,
+                bgcolor: selected ? tokens.color.primarySubtle : "transparent",
+                "&:hover": {
+                  bgcolor: selected
+                    ? tokens.color.primarySubtle
+                    : tokens.color.sunken,
+                },
+                "&::before": selected
+                  ? {
+                      content: '""',
+                      position: "absolute",
+                      left: 0,
+                      top: 14,
+                      bottom: 14,
+                      width: 3,
+                      borderRadius: "0 3px 3px 0",
+                      bgcolor: tokens.color.primary,
+                    }
+                  : undefined,
+              }}
+            >
+              <Box sx={{ position: "relative", display: "grid" }}>
+                {icons[item.id]}
+                {count > 0 && (
+                  <Box
+                    component="span"
+                    sx={{
+                      position: "absolute",
+                      top: -6,
+                      right: -9,
+                      minWidth: 18,
+                      height: 18,
+                      px: 0.5,
+                      borderRadius: "999px",
+                      fontSize: 11,
+                      lineHeight: "18px",
+                      fontWeight: 700,
+                      textAlign: "center",
+                      color: "#fff",
+                      bgcolor: "#d93025",
+                    }}
+                  >
+                    {count > 99 ? "99+" : count}
+                  </Box>
+                )}
+              </Box>
+              <Typography
+                component="span"
+                sx={{ fontSize: 12, lineHeight: "16px", fontWeight: 500 }}
+              >
+                {item.label}
+              </Typography>
+            </ButtonBase>
+          );
+        })}
+      </Box>
     </Box>
   );
 }

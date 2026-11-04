@@ -1,9 +1,10 @@
-import { MenuItemFormView } from "@/features/menu/views/MenuItemFormView";
+import { MenuItemsView } from "@/features/menu/views/MenuItemsView";
+
 export default async function Page({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <MenuItemFormView id={decodeURIComponent(id)} />;
+  return <MenuItemsView drawer={{ id: decodeURIComponent(id) }} />;
 }

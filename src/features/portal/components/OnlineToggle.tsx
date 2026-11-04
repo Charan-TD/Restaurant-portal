@@ -1,82 +1,83 @@
 "use client";
-import { Box, Switch, Tooltip, Typography } from "@mui/material";
-const ONLINE = "#2e7d32",
-  OFFLINE = "#9aa19c";
-/** Lets the vendor pause or resume taking orders. */
+import { Box, ButtonBase, Tooltip, Typography } from "@mui/material";
+import { tokens } from "@/core/theme/tokens";
+import { reopenLabel } from "../models/offline";
+const OFF = "#c4c4c4";
+/**
+ * Lets the vendor pause or resume taking orders: a 40px green pill saying
+ * Online, with a white knob that sits at the right while on.
+ */
 export function OnlineToggle({
   online,
   onChange,
-  size = "medium",
+  reopenAt,
 }: {
   online: boolean;
   onChange: (online: boolean) => void;
-  size?: "small" | "medium";
+  /** When an offline restaurant comes back online by itself. */
+  reopenAt?: Date | null;
 }) {
+  const back = !online && reopenAt ? reopenLabel(reopenAt) : "";
   return (
-    <Box
-      component="label"
-      sx={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 0.5,
-        pl: 1.5,
-        pr: 0.5,
-        borderRadius: 999,
-        border: 1,
-        borderColor: online ? "rgba(46,125,50,.35)" : "divider",
-        bgcolor: online ? "rgba(46,125,50,.08)" : "transparent",
-        cursor: "pointer",
-        userSelect: "none",
-        transition: "background-color .15s, border-color .15s",
-      }}
-    >
-      <Box
-        aria-hidden
-        sx={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          bgcolor: online ? ONLINE : OFFLINE,
-          boxShadow: online ? `0 0 0 3px rgba(46,125,50,.18)` : "none",
-        }}
-      />
-      <Typography
-        variant="body2"
-        sx={{
-          ml: 0.5,
-          fontWeight: 600,
-          minWidth: 46,
-          color: online ? ONLINE : "text.secondary",
-        }}
-      >
-        {online ? "Online" : "Offline"}
-      </Typography>
-      <Tooltip
-        title={
-          online
-            ? "You are taking orders. Turn off to stop."
+    <Tooltip
+      title={
+        online
+          ? "You are taking orders. Turn off to stop."
+          : back
+            ? `You are not taking orders. You reopen at ${back}, or turn on now.`
             : "You are not taking orders. Turn on to start."
+      }
+    >
+      <ButtonBase
+        role="switch"
+        aria-checked={online}
+        aria-label={
+          online
+            ? "Restaurant is online. Turn off to stop taking orders."
+            : "Restaurant is offline. Turn on to start taking orders."
         }
+        onClick={() => onChange(!online)}
+        sx={{
+          flexShrink: 0,
+          height: 40,
+          boxSizing: "border-box",
+          gap: 1.5,
+          pl: online ? 2 : "6px",
+          pr: online ? "6px" : 2,
+          flexDirection: online ? "row" : "row-reverse",
+          borderRadius: "999px",
+          color: "#fff",
+          bgcolor: online ? tokens.color.success : OFF,
+          transition: "background-color .2s",
+          "&.Mui-focusVisible": {
+            outline: `2px solid ${tokens.color.info}`,
+            outlineOffset: 2,
+          },
+        }}
       >
-        <Switch
-          size={size}
-          checked={online}
-          onChange={(_, checked) => onChange(checked)}
-          slotProps={{
-            input: {
-              "aria-label": online
-                ? "Restaurant is online. Turn off to stop taking orders."
-                : "Restaurant is offline. Turn on to start taking orders.",
-            },
-          }}
+        <Box sx={{ textAlign: "left" }}>
+          <Typography
+            sx={{ fontSize: 15, fontWeight: 600, lineHeight: back ? "16px" : "22px" }}
+          >
+            {online ? "Online" : "Offline"}
+          </Typography>
+          {back && (
+            <Typography sx={{ fontSize: 11, lineHeight: "12px" }}>
+              Back {back}
+            </Typography>
+          )}
+        </Box>
+        <Box
+          aria-hidden
           sx={{
-            "& .MuiSwitch-switchBase.Mui-checked": { color: ONLINE },
-            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-              bgcolor: ONLINE,
-            },
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            bgcolor: "#fff",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
           }}
         />
-      </Tooltip>
-    </Box>
+      </ButtonBase>
+    </Tooltip>
   );
 }

@@ -41,7 +41,7 @@ function Versus({ change }: { change: number | null }) {
     </Typography>
   );
 }
-/** Key numbers for today. The rating shows a dash until the dashboard has a ratings summary. */
+/** Key numbers for today; the rating is the average of all customer reviews. */
 export function TodayOverview({
   overview,
 }: {
@@ -83,9 +83,17 @@ export function TodayOverview({
       <MetricCard
         label="Customer rating"
         hint="Average rating from customer reviews."
-        value="–"
+        value={
+          overview.rating.average === null
+            ? "–"
+            : overview.rating.average.toFixed(1)
+        }
         icon={<StarRounded />}
-        note="Not enough reviews yet"
+        note={
+          overview.rating.count
+            ? `From ${overview.rating.count} ${overview.rating.count === 1 ? "review" : "reviews"}`
+            : "No reviews yet"
+        }
       />
     </Box>
   );

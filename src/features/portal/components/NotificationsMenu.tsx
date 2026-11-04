@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Badge,
   Box,
   Button,
   IconButton,
@@ -12,7 +13,6 @@ import {
   Typography,
 } from "@mui/material";
 import NotificationsNoneOutlined from "@mui/icons-material/NotificationsNoneOutlined";
-import { BlinkBadge } from "@/shared/components/feedback/BlinkBadge";
 import type { NotificationsViewModel } from "@/features/notifications/viewmodels/useNotificationsViewModel";
 export function NotificationsMenu({ vm }: { vm: NotificationsViewModel }) {
   const router = useRouter(),
@@ -27,16 +27,24 @@ export function NotificationsMenu({ vm }: { vm: NotificationsViewModel }) {
           aria-label={label}
           aria-haspopup="dialog"
           onClick={(e) => setAnchor(e.currentTarget)}
-          sx={{
-            border: 1,
-            borderColor: "divider",
-            borderRadius: "10px",
-            bgcolor: "background.paper",
-          }}
+          sx={{ width: 40, height: 40, color: "#1c1c1c" }}
         >
-          <BlinkBadge active={vm.unreadCount > 0}>
-            <NotificationsNoneOutlined fontSize="small" />
-          </BlinkBadge>
+          <Badge
+            badgeContent={vm.unreadCount}
+            max={99}
+            sx={{
+              "& .MuiBadge-badge": {
+                bgcolor: "#d93025",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 700,
+                minWidth: 18,
+                height: 18,
+              },
+            }}
+          >
+            <NotificationsNoneOutlined />
+          </Badge>
         </IconButton>
       </Tooltip>
       <Popover
@@ -127,6 +135,18 @@ export function NotificationsMenu({ vm }: { vm: NotificationsViewModel }) {
             </ListItemButton>
           ))}
         </List>
+        <Box sx={{ p: 1, borderTop: 1, borderColor: "divider" }}>
+          <Button
+            fullWidth
+            size="small"
+            onClick={() => {
+              setAnchor(null);
+              router.push("/notifications");
+            }}
+          >
+            View all notifications
+          </Button>
+        </Box>
       </Popover>
     </>
   );

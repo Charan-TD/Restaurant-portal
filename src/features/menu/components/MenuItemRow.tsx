@@ -1,47 +1,37 @@
 import NextLink from "next/link";
-import {
-  Box,
-  Chip,
-  IconButton,
-  Switch,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, Typography } from "@mui/material";
+import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import EditOutlined from "@mui/icons-material/EditOutlined";
 import DeleteOutline from "@mui/icons-material/DeleteOutlined";
+import { tokens } from "@/core/theme/tokens";
+import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
 import { formatRupees } from "@/shared/utils/format";
 import type { MenuItem } from "../models/menuItem";
 import { MenuItemThumb } from "./MenuItemThumb";
 import { MenuItemStatus } from "./MenuItemStatus";
-import { InfoCell, rowSx } from "./InfoCell";
-
-const squareButton = {
-  width: 40,
-  height: 40,
-  borderRadius: "10px",
-  bgcolor: "#f3f4f2",
-  color: "text.secondary",
-} as const;
 
 function PriceValue({ item }: { item: MenuItem }) {
   if (item.discountedPrice === null) return <>{formatRupees(item.price)}</>;
   return (
     <>
       {formatRupees(item.discountedPrice)}{" "}
-      <Typography
+      <Box
         component="span"
-        variant="caption"
-        color="text.secondary"
-        sx={{ textDecoration: "line-through", fontWeight: 500 }}
+        sx={{
+          fontWeight: 400,
+          fontSize: 13,
+          color: tokens.color.textMuted,
+          textDecoration: "line-through",
+        }}
       >
         {formatRupees(item.price)}
-      </Typography>
+      </Box>
     </>
   );
 }
 
-/** One dish as a row of captioned columns, like the live orders list. */
+/** One dish: picture, name and price, the stock switch, and Edit / Delete. */
 export function MenuItemRow({
   item,
   saving,
@@ -53,112 +43,97 @@ export function MenuItemRow({
   onDelete: () => void;
   onAvailable: (available: boolean) => void;
 }) {
+  const detail = [item.qtyType, item.preparationMinutes ? `${item.preparationMinutes} min` : ""]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Box
-      sx={rowSx(
-        "minmax(220px, 2fr) minmax(110px, 1fr) 120px 100px 120px 190px auto",
-      )}
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 2,
+        px: 2,
+        py: 1.5,
+        bgcolor: tokens.color.card,
+        borderTop: `1px solid ${tokens.color.borderSubtle}`,
+      }}
     >
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
           gap: 1.5,
+          flex: "1 1 260px",
           minWidth: 0,
-          gridColumn: { xs: "1 / -1", lg: "auto" },
         }}
       >
-        <MenuItemThumb images={item.images} name={item.name} size={56} />
+        <Box sx={{ "& .menu-thumb": { borderRadius: "10px" } }}>
+          <MenuItemThumb images={item.images} name={item.name} size={48} />
+        </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800 }} noWrap>
-            {item.name}
-          </Typography>
-          {item.description && (
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {item.description}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            {item.foodType && (
+              <Box sx={{ display: "inline-flex", "& .food-mark": { m: 0 } }}>
+                <FoodTypeMark type={item.foodType} />
+              </Box>
+            )}
+            <Typography sx={{ fontWeight: 600, fontSize: 15 }} noWrap>
+              {item.name}
             </Typography>
-          )}
+          </Box>
+          <Typography sx={{ fontSize: 13, color: tokens.color.textMuted }} noWrap>
+            <Box component="span" sx={{ fontWeight: 700, color: tokens.color.text }}>
+              <PriceValue item={item} />
+            </Box>
+            {detail && ` · ${detail}`}
+          </Typography>
           <MenuItemStatus item={item} />
         </Box>
       </Box>
-      <InfoCell
-        value={
-          [item.category, item.subCategory].filter(Boolean).join(" · ") || "–"
-        }
-        caption="Category"
-      />
-      <InfoCell
-        value={
-          item.foodType ? (
-            <Box
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.75,
-                whiteSpace: "nowrap",
-                "& .food-mark": { m: 0 },
-              }}
-            >
-              <FoodTypeMark type={item.foodType} />
-              {item.foodType}
-            </Box>
-          ) : (
-            "–"
-          )
-        }
-        caption="Food type"
-      />
-      <InfoCell value={`${item.preparationMinutes} min`} caption="Prep time" />
-      <InfoCell strong value={<PriceValue item={item} />} caption="Price" />
-      <InfoCell
-        value={
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Switch
-              size="small"
-              checked={item.available}
-              disabled={saving}
-              onChange={(_, checked) => onAvailable(checked)}
-              slotProps={{
-                input: {
-                  "aria-label": `${item.name} is ${item.available ? "in" : "out of"} stock`,
-                },
-              }}
-            />
-            <Chip
-              size="small"
-              label={item.available ? "In stock" : "Out of stock"}
-              sx={{
-                fontWeight: 700,
-                bgcolor: item.available
-                  ? "rgba(46,125,50,.12)"
-                  : "rgba(211,47,47,.1)",
-                color: item.available ? "success.main" : "error.main",
-              }}
-            />
-          </Box>
-        }
-        caption="Stock"
-      />
-      <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-        <Tooltip title="Edit">
-          <IconButton
-            component={NextLink}
-            href={`/menu/items/${encodeURIComponent(item.id)}`}
-            aria-label={`Edit ${item.name}`}
-            sx={squareButton}
-          >
-            <EditOutlined fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton
-            onClick={onDelete}
-            aria-label={`Delete ${item.name}`}
-            sx={squareButton}
-          >
-            <DeleteOutline fontSize="small" />
-          </IconButton>
-        </Tooltip>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 150 }}>
+        <ToggleSwitch
+          checked={item.available}
+          disabled={saving}
+          onChange={(_, checked) => onAvailable(checked)}
+          slotProps={{
+            input: {
+              "aria-label": `${item.name} is ${item.available ? "in" : "out of"} stock`,
+            },
+          }}
+        />
+        <Typography
+          sx={{
+            fontSize: 13, whiteSpace: "nowrap",
+            color: item.available ? tokens.color.success : tokens.color.textMuted,
+          }}
+        >
+          {item.available ? "In stock" : "Out of stock"}
+        </Typography>
+      </Box>
+      <Box sx={{ display: "flex", gap: 1 }}>
+        <CommonButton
+          variant="outlined"
+          startIcon={<EditOutlined />}
+          LinkComponent={NextLink}
+          href={`/menu/items/${encodeURIComponent(item.id)}`}
+          aria-label={`Edit ${item.name}`}
+        >
+          Edit
+        </CommonButton>
+        <CommonButton
+          variant="outlined"
+          startIcon={<DeleteOutline />}
+          onClick={onDelete}
+          aria-label={`Delete ${item.name}`}
+          sx={{
+            color: `${tokens.color.error} !important`,
+            borderColor: "#f0c4c0 !important",
+            "&:hover": { bgcolor: tokens.color.errorBg },
+          }}
+        >
+          Delete
+        </CommonButton>
       </Box>
     </Box>
   );

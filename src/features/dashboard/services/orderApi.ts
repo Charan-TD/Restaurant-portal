@@ -63,7 +63,9 @@ function toOrder(row: Row): Order {
     first(row.coach) && `Coach ${first(row.coach)}`,
     first(row.seat) && `Seat ${first(row.seat)}`,
   ].filter(Boolean);
-  const user = asRow(row.customer_user ?? row.customer);
+  const user = asRow(row.customer_user ?? row.customer),
+    riderRow = asRow(row.rider ?? row.assigned_rider),
+    riderName = first(riderRow.rider_name, riderRow.name, row.rider_name);
   return {
     // The restaurant API identifies orders by order_number (e.g. ORD-ABCD-123456).
     id: first(row.order_number, row.id) ?? "",
@@ -109,6 +111,13 @@ function toOrder(row: Row): Order {
     ),
     placedAt: first(row.created_at, row.createdAt),
     note: first(row.customer_note, row.note),
+    rider: riderName
+      ? {
+          id: first(riderRow.rider_id, row.assign_rider, row.rider_id),
+          name: riderName,
+          phone: first(riderRow.phone_number, riderRow.phone, row.rider_phone),
+        }
+      : undefined,
   };
 }
 /** Orders still waiting for payment are not the restaurant's to act on yet. */
@@ -220,11 +229,22 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: toOrderDetail,
       providesTags: ["Orders"],
     }),
-    updateOrder: build.mutation<void, { id: string; state: OrderStatus }>({
-      query: ({ id, state }) => ({
+    /**
+     * PATCH /orders/{orderNumber}/status. Moving READY → OUT_FOR_DELIVERY
+     * requires assign_rider: the rider's public code (e.g. RID-A7K9M2) from
+     * GET /restaurant/riders. The endpoint rejects any other field.
+     */
+    updateOrder: build.mutation<
+      void,
+      { id: string; state: OrderStatus; riderId?: string }
+    >({
+      query: ({ id, state, riderId }) => ({
         url: updatePath(id),
         method: "patch",
-        data: { status: toServer[state] },
+        data: {
+          status: toServer[state],
+          ...(riderId && { assign_rider: riderId }),
+        },
       }),
       invalidatesTags: ["Orders"],
     }),

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { usePortal } from "@/core/providers/PortalProvider";
@@ -10,7 +10,11 @@ import {
   useGetRestaurantDetailsQuery,
   useUpdateRestaurantProfileMutation,
 } from "../services/restaurantApi";
-import { profileSchema, type ProfileForm } from "../models/profile";
+import {
+  lockedProfileSchema,
+  profileSchema,
+  type ProfileForm,
+} from "../models/profile";
 import { useVendorProfile } from "./useVendorProfile";
 export function useProfileViewModel() {
   const portal = usePortal(),
@@ -21,7 +25,6 @@ export function useProfileViewModel() {
       { skip: DEMO_MODE },
     ),
     [updateRestaurantProfile] = useUpdateRestaurantProfileMutation(),
-    [editing, setEditing] = useState(false),
     [saved, setSaved] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -31,21 +34,29 @@ export function useProfileViewModel() {
   const current = (): ProfileForm => ({
     name: vendor.nameKnown ? vendor.vendorName : "",
     restaurantName: vendor.restaurantName,
-    email: vendor.email,
     phone: vendor.phone,
     city: vendor.city,
   });
   const form = useForm<ProfileForm>({
-    resolver: zodResolver(profileSchema),
+    resolver: zodResolver(DEMO_MODE ? profileSchema : lockedProfileSchema),
     defaultValues: current(),
   });
-  const startEditing = () => {
+  const resetForm = () => {
     form.reset(current());
     setLogo(null);
     setCover(null);
-    setSaved(false);
-    setEditing(true);
   };
+  // The form is always on screen, so it fills in once the profile has loaded.
+  const { phone, vendorName, restaurantName, city, nameKnown } = vendor;
+  useEffect(() => {
+    if (!form.formState.isDirty)
+      form.reset({
+        name: nameKnown ? vendorName : "",
+        restaurantName,
+        phone,
+        city,
+      });
+  }, [form, phone, vendorName, restaurantName, city, nameKnown]);
   // The phone number, logo and cover save directly; names, documents and the
   // location go through a change request for admin approval.
   const save = form.handleSubmit(async (values) => {
@@ -73,19 +84,21 @@ export function useProfileViewModel() {
       ...(DEMO_MODE && {
         name: values.name.trim(),
         restaurantName: values.restaurantName.trim(),
-        email: values.email.trim(),
         city: values.city.trim() || undefined,
       }),
       phone: values.phone ? `${COUNTRY_CODE}${values.phone}` : undefined,
     }));
-    setEditing(false);
+    form.reset(values);
+    setLogo(null);
+    setCover(null);
     setSaved(true);
   });
   return {
     vendor,
     details,
+    /** Read straight from the profile, so it shows even if it loads late. */
+    email: details?.email || vendor.email,
     form,
-    editing,
     saved,
     error,
     busy,
@@ -94,8 +107,7 @@ export function useProfileViewModel() {
     cover,
     setCover,
     reloadDetails: loadDetails,
-    startEditing,
-    cancel: () => setEditing(false),
+    cancel: resetForm,
     save,
     dismissSaved: () => setSaved(false),
   };

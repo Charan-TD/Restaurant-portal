@@ -100,7 +100,17 @@ export function useLocationRequestViewModel(onSent: () => void) {
       setBusy(false);
     }
   };
+  /** Drops the picked location and goes back to showing the saved one. */
+  const cancel = () => {
+    clearTimeout(timer.current);
+    setValues(EMPTY);
+    setPicked(null);
+    setPin(null);
+    setOptions([]);
+    setError("");
+  };
   return {
+    cancel,
     values,
     picked,
     options,

@@ -13,6 +13,7 @@ import { CommonRadioGroup } from "@/shared/components/form/CommonRadioGroup";
 import { CommonCheckboxGroup } from "@/shared/components/form/CommonCheckboxGroup";
 import { PasswordChecklist } from "./PasswordChecklist";
 import { CuisineField } from "./CuisineField";
+import { RiderOwnerField } from "./RiderOwnerField";
 import { todayIso } from "../models/validation";
 export function RegistrationField({
   definition,
@@ -68,6 +69,15 @@ export function RegistrationField({
         if (definition.type === "cuisines")
           return (
             <CuisineField
+              className={className}
+              label={definition.label}
+              field={field}
+              error={fieldState.error?.message}
+            />
+          );
+        if (definition.type === "riders")
+          return (
+            <RiderOwnerField
               className={className}
               label={definition.label}
               field={field}

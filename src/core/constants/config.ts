@@ -33,6 +33,14 @@ export const API_PATHS = {
   /** A literal {id} segment is replaced with the order number. */
   updateOrder: "/api/v1/restaurant/orders/{id}/status",
   reviews: "/api/v1/restaurant/reviews",
+  ratingSummary: "/api/v1/restaurant/reviews/rating-summary",
+  /** GET lists the restaurant's riders; POST (multipart) adds one. */
+  riders: "/api/v1/restaurant/riders",
+  groupOrders: "/api/v1/restaurant/orders/group-orders",
+  /** A literal {id} segment is replaced with the group order's grp_ord_id. */
+  updateGroupOrder: "/api/v1/restaurant/orders/group-orders/{id}/status",
+  /** Accept or reject an ASSIGNED group order: POST { decision }. */
+  respondGroupOrder: "/api/v1/restaurant/orders/group-orders/{id}/respond",
   // The backend has no notifications endpoint yet.
   notifications: undefined as string | undefined,
 } as const;

@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { usePortal } from "@/core/providers/PortalProvider";
+import { DEMO_MODE } from "@/core/constants/config";
+import { useGetRatingSummaryQuery } from "@/features/customers/services/reviewApi";
 import type { Order } from "../models/order";
 export const RANGES = [7, 14, 30] as const;
 export type RangeDays = (typeof RANGES)[number];
@@ -39,6 +41,10 @@ export function useDashboardViewModel() {
   const portal = usePortal(),
     { orders } = portal,
     [range, setRange] = useState<RangeDays>(7);
+  const { data: summary } = useGetRatingSummaryQuery(undefined, {
+      skip: DEMO_MODE,
+    }),
+    rating = { count: summary?.total ?? 0, average: summary?.average ?? null };
   const ownerName = useWatch({
     control: portal.form.control,
     name: "ownerName",
@@ -75,6 +81,7 @@ export function useDashboardViewModel() {
       month: "long",
     }),
     overview: {
+      rating,
       orders: counted(today).length,
       revenue: counted(today).reduce((s, o) => s + o.amount, 0),
       preparing: count("Preparing"),

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   useWatch,
@@ -17,7 +17,8 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
-  FormControlLabel,
+  ButtonBase,
+  IconButton,
   MenuItem,
   Select,
   Switch,
@@ -27,18 +28,13 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
-import CurrencyRupee from "@mui/icons-material/CurrencyRupee";
-import EnergySavingsLeafOutlined from "@mui/icons-material/EnergySavingsLeafOutlined";
-import EggOutlined from "@mui/icons-material/EggOutlined";
-import SetMealOutlined from "@mui/icons-material/SetMealOutlined";
 import AddOutlined from "@mui/icons-material/AddOutlined";
-import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
-import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import CameraAltOutlined from "@mui/icons-material/CameraAltOutlined";
+import RemoveOutlined from "@mui/icons-material/RemoveOutlined";
 import AddPhotoAlternateOutlined from "@mui/icons-material/AddPhotoAlternateOutlined";
-import { PageHeader } from "@/shared/components/layout/PageHeader";
-import { CommonCard } from "@/shared/components/layout/CommonCard";
+import { tokens } from "@/core/theme/tokens";
+import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { FieldLabel } from "@/shared/components/form/FormField";
@@ -46,23 +42,18 @@ import {
   ITEM_IMAGE_TYPES,
   menuFoodTypes,
   qtyTypes,
-  type MenuFoodType,
   type MenuItemForm,
 } from "../models/menuItem";
 import { formatRupees } from "@/shared/utils/format";
 import { menuImageUrl } from "../services/menuItemApi";
-import type { RestaurantAddOn } from "../services/addOnApi";
+import {
+  ADDON_IMAGE_MAX_BYTES,
+  ADDON_IMAGE_TYPES,
+  type RestaurantAddOn,
+} from "../services/addOnApi";
 import { useMenuItemFormViewModel } from "../viewmodels/useMenuItemFormViewModel";
 type NumberName =
   "price" | "discountedPrice" | "taxRate" | "preparationMinutes";
-const foodStyle: Record<MenuFoodType, { icon: ReactNode; color: string }> = {
-  Veg: {
-    icon: <EnergySavingsLeafOutlined fontSize="small" />,
-    color: "#2e7d32",
-  },
-  Egg: { icon: <EggOutlined fontSize="small" />, color: "#e09b00" },
-  "Non-veg": { icon: <SetMealOutlined fontSize="small" />, color: "#c62828" },
-};
 /** Typed digits only (one decimal point if allowed): no letters, signs or spinner. */
 const clean = (raw: string, decimal?: boolean) =>
   decimal
@@ -74,6 +65,7 @@ function NumberInput({
   label,
   required,
   prefix,
+  suffix,
   placeholder,
   helperText,
   decimal,
@@ -83,6 +75,8 @@ function NumberInput({
   label: string;
   required?: boolean;
   prefix?: string;
+  /** Small grey text at the end of the box, e.g. incl. GST. */
+  suffix?: string;
   placeholder?: string;
   helperText?: string;
   decimal?: boolean;
@@ -101,7 +95,9 @@ function NumberInput({
   const inputId = `menu-${field.name}`;
   return (
     <div>
-      <FieldLabel text={label} required={required} htmlFor={inputId} />
+      {label && (
+        <FieldLabel text={label} required={required} htmlFor={inputId} />
+      )}
       <CommonTextField
         id={inputId}
         value={text}
@@ -117,9 +113,14 @@ function NumberInput({
         helperText={fieldState.error?.message ?? helperText}
         slotProps={{
           htmlInput: { inputMode: decimal ? "decimal" : "numeric" },
-          input: prefix
+          input: prefix || suffix
             ? {
-                startAdornment: (
+                endAdornment: suffix ? (
+                  <Typography sx={{ fontSize: 13, whiteSpace: "nowrap", color: tokens.color.textMuted }}>
+                    {suffix}
+                  </Typography>
+                ) : undefined,
+                startAdornment: prefix ? (
                   <Box
                     sx={{
                       alignSelf: "stretch",
@@ -128,16 +129,16 @@ function NumberInput({
                       px: 1.5,
                       mr: 1.5,
                       ml: -1.75,
-                      bgcolor: "#f3f4f2",
+                      bgcolor: tokens.color.muted,
                       borderRight: 1,
-                      borderColor: "divider",
+                      borderColor: tokens.color.borderInput,
                       borderRadius: "10px 0 0 10px",
                       color: "text.secondary",
                     }}
                   >
                     {prefix}
                   </Box>
-                ),
+                ) : undefined,
               }
             : undefined,
         }}
@@ -156,6 +157,7 @@ function NumberField({
   label: string;
   required?: boolean;
   prefix?: string;
+  suffix?: string;
   placeholder?: string;
   helperText?: string;
   /** Allows one decimal point, e.g. a 2.5 tax rate. */
@@ -171,85 +173,51 @@ function NumberField({
     />
   );
 }
-/** A form block: orange icon tile, title and subtitle, then its fields. */
-function Section({
-  icon,
-  title,
-  subtitle,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        gap: 2,
-        py: 3,
-        "&:not(:first-of-type)": { borderTop: 1, borderColor: "divider" },
-      }}
-    >
-      <Box
-        sx={{
-          width: 32,
-          display: { xs: "none", sm: "flex" },
-          justifyContent: "center",
-          pt: 0.5,
-          color: "primary.main",
-          flexShrink: 0,
-          "& svg": { fontSize: 28 },
-        }}
-      >
-        {icon}
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="h6" component="h2" sx={{ lineHeight: 1.3 }}>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {subtitle}
-        </Typography>
-        <Box
-          sx={{
-            display: "grid",
-            gap: { xs: 2.5, md: "24px 28px" },
-            gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-            alignItems: "start",
-          }}
-        >
-          {children}
-        </Box>
-      </Box>
-    </Box>
-  );
-}
 
+/** Creates an add-on; resolves to an error message, or "" once saved and ticked. */
+type CreateAddOn = (
+  name: string,
+  price: number,
+  image: File | null,
+) => Promise<string>;
 /** Inline box to create an add-on while filling in the item. */
-function NewAddOn({
-  onCreate,
-}: {
-  /** Resolves to an error message, or "" once the add-on is saved and ticked. */
-  onCreate: (name: string, price: number) => Promise<string>;
-}) {
+function NewAddOn({ onCreate }: { onCreate: CreateAddOn }) {
   const [open, setOpen] = useState(false),
     [name, setName] = useState(""),
     [price, setPrice] = useState(""),
+    [image, setImage] = useState<File | null>(null),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [imageError, setImageError] = useState(""),
+    [busy, setBusy] = useState(false),
+    preview = useMemo(() => (image ? URL.createObjectURL(image) : ""), [image]);
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+  const pick = (file: File | undefined) => {
+    if (!file) return;
+    if (!ADDON_IMAGE_TYPES.includes(file.type))
+      return setImageError("Choose a JPG, PNG or WEBP picture.");
+    if (file.size > ADDON_IMAGE_MAX_BYTES)
+      return setImageError("The picture must be smaller than 2 MB.");
+    setImageError("");
+    setImage(file);
+  };
   const close = () => {
     setOpen(false);
     setName("");
     setPrice("");
+    setImage(null);
     setError("");
+    setImageError("");
   };
   const save = async () => {
     if (!name.trim()) return setError("Enter the add-on name.");
     if (price === "") return setError("Enter the price (0 if free).");
     setBusy(true);
-    const problem = await onCreate(name.trim(), Number(price));
+    const problem = await onCreate(name.trim(), Number(price), image);
     setBusy(false);
     if (problem) setError(problem);
     else close();
@@ -261,7 +229,7 @@ function NewAddOn({
           size="small"
           startIcon={<AddOutlined />}
           onClick={() => setOpen(true)}
-          sx={{ minHeight: 0, px: 0.5, fontWeight: 600 }}
+          sx={linkButtonSx}
         >
           Add new add-on
         </Button>
@@ -284,9 +252,47 @@ function NewAddOn({
         border: 1,
         borderColor: "divider",
         borderRadius: "14px",
-        gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr auto" },
+        gridTemplateColumns: { xs: "1fr", sm: "auto 2fr 1fr auto" },
       }}
     >
+      <Tooltip
+        title={
+          imageError ||
+          (image ? "Change picture" : "Add a picture (optional, up to 2 MB)")
+        }
+      >
+        <Box
+          component="label"
+          aria-label="Add-on picture"
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: "10px",
+            display: "grid",
+            placeItems: "center",
+            cursor: busy ? "default" : "pointer",
+            color: imageError ? "error.main" : "text.secondary",
+            bgcolor: "#f3f4f2",
+            border: 1,
+            borderColor: imageError ? "error.main" : "transparent",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            ...(preview && { backgroundImage: `url("${preview}")` }),
+          }}
+        >
+          {!preview && <AddPhotoAlternateOutlined fontSize="small" />}
+          <input
+            hidden
+            type="file"
+            disabled={busy}
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </Box>
+      </Tooltip>
       <CommonTextField
         autoFocus
         value={name}
@@ -340,6 +346,15 @@ function NewAddOn({
           Cancel
         </CommonButton>
       </Box>
+      {imageError && (
+        <Typography
+          variant="caption"
+          color="error"
+          sx={{ gridColumn: "1 / -1", mt: -0.5 }}
+        >
+          {imageError}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -352,7 +367,7 @@ function AddOnsField({
 }: {
   control: Control<MenuItemForm>;
   addOns: RestaurantAddOn[];
-  onCreate: (name: string, price: number) => Promise<string>;
+  onCreate: CreateAddOn;
 }) {
   return (
     <div>
@@ -422,80 +437,16 @@ function AddOnsField({
   );
 }
 
-/** The in / out of stock switch and optional add-ons. */
-function AvailabilityFields({
-  control,
-  addOns,
-  qtyOptions,
-  onCreateAddOn,
-}: {
-  control: Control<MenuItemForm>;
-  qtyOptions: string[];
-  addOns: RestaurantAddOn[];
-  onCreateAddOn: (name: string, price: number) => Promise<string>;
-}) {
-  return (
-    <>
-      <Controller
-        control={control}
-        name="available"
-        render={({ field }) => (
-          <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-            <Tooltip title="Turn off to show this item as out of stock.">
-              <FormControlLabel
-                sx={{
-                  m: 0,
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.25,
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: "10px",
-                }}
-                labelPlacement="start"
-                control={
-                  <Switch
-                    size="small"
-                    checked={field.value ?? true}
-                    onChange={(e) => field.onChange(e.target.checked)}
-                  />
-                }
-                label={
-                  <Typography sx={{ fontWeight: 600, fontSize: 13.5 }}>
-                    Available for orders
-                  </Typography>
-                }
-              />
-            </Tooltip>
-          </Box>
-        )}
-      />
-      <Controller
-        control={control}
-        name="qtyType"
-        render={({ field, fieldState }) => (
-          <div>
-            <FieldLabel text="Sold as" htmlFor="menu-qty-type" />
-            <ChoiceField
-              id="menu-qty-type"
-              value={field.value ?? ""}
-              options={qtyOptions.length ? qtyOptions : [...qtyTypes]}
-              placeholder="e.g. Plate, Half Plate"
-              addLabel="Add new quantity type"
-              newPlaceholder="Type how it is sold, e.g. Family pack"
-              error={!!fieldState.error}
-              helperText={fieldState.error?.message}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-            />
-          </div>
-        )}
-      />
-
-      <AddOnsField control={control} addOns={addOns} onCreate={onCreateAddOn} />
-    </>
-  );
-}
+/** A small blue text button, e.g. Add new category. */
+const linkButtonSx = {
+  mt: 1,
+  minHeight: "0 !important",
+  px: 0.5,
+  py: 0.5,
+  fontWeight: 600,
+  color: `${tokens.color.link} !important`,
+  bgcolor: "transparent !important",
+} as const;
 const filterByText = createFilterOptions<string>();
 /** Dropdown of existing values that also accepts a new one typed in. */
 function ComboField({
@@ -600,7 +551,7 @@ function ChoiceField({
             setAdding(false);
             onChange("");
           }}
-          sx={{ mt: 1, minHeight: 0, px: 0.5, fontWeight: 600 }}
+          sx={linkButtonSx}
         >
           Choose from existing
         </Button>
@@ -626,7 +577,7 @@ function ChoiceField({
             setAdding(true);
             onChange("");
           }}
-          sx={{ minHeight: 0, px: 0.5, fontWeight: 600 }}
+          sx={linkButtonSx}
         >
           {addLabel}
         </Button>
@@ -740,13 +691,9 @@ const fileSize = (bytes: number) =>
   bytes >= 1024 * 1024
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-/**
- * Picture upload: tap or drop a photo, see it large straight away, and
- * replace or remove it. Wrong types or big files are refused on the spot.
- */
-/** The description box and the picture box beside it are this tall. */
-const PICTURE_HEIGHT = 140;
-function PictureDrop({
+
+/** A small square to tap for the dish photo; shows it once chosen. */
+function PhotoTile({
   value,
   currentUrl,
   onChange,
@@ -757,9 +704,7 @@ function PictureDrop({
   onChange: (file: File | null) => void;
   error?: string;
 }) {
-  const input = useRef<HTMLInputElement>(null),
-    [over, setOver] = useState(false),
-    [problem, setProblem] = useState(""),
+  const [problem, setProblem] = useState(""),
     preview = useMemo(
       () => (value ? URL.createObjectURL(value) : null),
       [value],
@@ -773,455 +718,466 @@ function PictureDrop({
   const pick = (file?: File | null) => {
     if (!file) return;
     if (!ITEM_IMAGE_TYPES.includes(file.type))
-      return setProblem("Please choose a JPG or WEBP picture.");
+      return setProblem("Choose a JPG or WEBP picture.");
     if (file.size > MAX_PICTURE_BYTES)
       return setProblem(
-        `That picture is ${fileSize(file.size)}. Please keep it under 2 MB.`,
+        `That picture is ${fileSize(file.size)}. Keep it under 2 MB.`,
       );
     setProblem("");
     onChange(file);
   };
   const shown = preview ?? currentUrl ?? null,
     message = problem || error;
-  const chooser = (
-    <input
-      ref={input}
-      hidden
-      aria-label="Dish picture"
-      type="file"
-      accept={`${ITEM_IMAGE_TYPES.join(",")},.jpg,.jpeg,.webp`}
-      onChange={(e) => {
-        pick(e.target.files?.[0]);
-        e.target.value = "";
-      }}
-    />
-  );
   return (
-    <Box>
-      <FieldLabel text="Dish picture" />
-      {shown ? (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            height: PICTURE_HEIGHT,
-            p: 1.5,
-            border: 1,
-            borderColor: "divider",
-            borderRadius: "14px",
-            bgcolor: "#fcfcfb",
+    <Box sx={{ width: 88, flexShrink: 0 }}>
+      <Box
+        component="label"
+        aria-label="Dish photo"
+        sx={{
+          width: 88,
+          height: 88,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.25,
+          cursor: "pointer",
+          fontSize: 13,
+          color: tokens.color.text,
+          borderRadius: tokens.radius.input,
+          border: `1.5px dashed ${message ? tokens.color.error : tokens.color.dashed}`,
+          bgcolor: tokens.color.sunken,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          ...(shown && { backgroundImage: `url("${shown}")` }),
+        }}
+      >
+        {!shown && (
+          <>
+            <CameraAltOutlined sx={{ color: tokens.color.textMuted }} />
+            Photo
+          </>
+        )}
+        <input
+          hidden
+          type="file"
+          accept={`${ITEM_IMAGE_TYPES.join(",")},.jpg,.jpeg,.webp`}
+          onChange={(e) => {
+            pick(e.target.files?.[0]);
+            e.target.value = "";
           }}
-        >
-          <Box
-            component="img"
-            src={shown}
-            alt="Dish preview"
-            sx={{
-              width: 110,
-              height: "100%",
-              flexShrink: 0,
-              objectFit: "cover",
-              borderRadius: "12px",
-              display: "block",
-            }}
-          />
-          <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700 }}>
-              {value ? "Looks good!" : "Current picture"}
-            </Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ overflowWrap: "anywhere", mb: 2 }}
-            >
-              {value
-                ? `${value.name} · ${fileSize(value.size)}`
-                : "This is what customers see now."}
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
-              <CommonButton
-                size="small"
-                variant="outlined"
-                startIcon={<FileUploadOutlined />}
-                onClick={() => input.current?.click()}
-              >
-                {value ? "Change picture" : "Replace picture"}
-              </CommonButton>
-              {value && (
-                <CommonButton
-                  size="small"
-                  color="inherit"
-                  startIcon={<CloseOutlined />}
-                  onClick={() => {
-                    setProblem("");
-                    onChange(null);
-                  }}
-                >
-                  Remove
-                </CommonButton>
-              )}
-            </Box>
-          </Box>
-          {chooser}
-        </Box>
-      ) : (
-        <Box
-          role="button"
-          tabIndex={0}
-          aria-label="Add a dish picture"
-          onClick={() => input.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              input.current?.click();
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setOver(true);
-          }}
-          onDragLeave={() => setOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setOver(false);
-            pick(e.dataTransfer.files?.[0]);
-          }}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 1,
-            px: 2,
-            height: PICTURE_HEIGHT,
-            textAlign: "center",
-            cursor: "pointer",
-            border: "2px dashed",
-            borderColor:
-              over || message
-                ? message
-                  ? "error.main"
-                  : "primary.main"
-                : "#d9ded9",
-            bgcolor: over ? "rgba(242,106,46,.06)" : "#fcfcfb",
-            borderRadius: "14px",
-            transition: "border-color .15s, background-color .15s",
-            "&:hover, &:focus-visible": {
-              borderColor: "primary.main",
-              bgcolor: "rgba(242,106,46,.04)",
-              outline: "none",
-            },
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              placeItems: "center",
-              color: "primary.main",
-            }}
-          >
-            <AddPhotoAlternateOutlined sx={{ fontSize: 34 }} />
-          </Box>
-          <Typography sx={{ fontWeight: 700 }}>
-            {over ? "Drop it here" : "Add a photo of your dish"}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Drag &amp; drop, or{" "}
-            <Box
-              component="span"
-              sx={{ color: "primary.main", fontWeight: 600 }}
-            >
-              browse your files
-            </Box>
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            JPG or WEBP, up to 2 MB. A bright, close-up photo sells best.
-          </Typography>
-          {chooser}
-        </Box>
+        />
+      </Box>
+      {message && (
+        <FormHelperText error sx={{ mx: 0 }}>
+          {message}
+        </FormHelperText>
       )}
-      {message && <FormHelperText error>{message}</FormHelperText>}
     </Box>
   );
 }
+
+const PREP_STEP = 5;
+const SECTION_TITLE = { fontSize: 16, fontWeight: 700, mb: 1.5 } as const;
+
 export function MenuItemFormView({ id }: { id?: string }) {
   const vm = useMenuItemFormViewModel(id),
-    { control, setValue } = vm.form;
+    { control, setValue } = vm.form,
+    offer = useWatch({ control, name: "discountedPrice" }),
+    [discountOpen, setDiscountOpen] = useState(false),
+    description = useWatch({ control, name: "description" });
   return (
-    <>
-      <PageHeader
-        eyebrow="Menu"
-        title={vm.editing ? vm.item?.name || "Edit item" : "Add a menu item"}
-        subtitle={
-          vm.editing
-            ? "Change the price, photo or details of this dish."
-            : "Create a new dish customers can order."
-        }
-      />
-      {vm.editing && vm.item?.adminAvailable === false && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          <strong>This item was disabled by TrainDhaba.</strong> Reason:{" "}
-          {vm.item.adminInactiveReason || "No reason was given."} Customers
-          cannot order it until it is enabled again.
-        </Alert>
-      )}
-      {vm.loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
-          <CircularProgress aria-label="Loading menu item" />
-        </Box>
-      ) : vm.loadError ? (
-        <Alert
-          severity="error"
-          action={
-            <CommonButton color="inherit" size="small" onClick={vm.cancel}>
-              Back to menu
-            </CommonButton>
-          }
-        >
-          {vm.loadError}
-        </Alert>
-      ) : (
-        <CommonCard className="profile-card">
-          <form noValidate onSubmit={vm.submit}>
-            <Section
-              icon={<DescriptionOutlined />}
-              title="Basic details"
-              subtitle="Name, description and food type."
-            >
-              <Controller
-                control={control}
-                name="name"
-                render={({ field, fieldState }) => (
-                  <div>
-                    <FieldLabel text="Item name" required htmlFor="menu-name" />
-                    <CommonTextField
-                      {...field}
-                      id="menu-name"
-                      placeholder="e.g. Paneer Butter Masala"
-                      error={!!fieldState.error}
-                      helperText={fieldState.error?.message}
-                      slotProps={{ htmlInput: { maxLength: 255 } }}
+    <Box
+      component="form"
+      noValidate
+      onSubmit={vm.submit}
+      sx={{ display: "flex", flexDirection: "column", height: "100%" }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          px: 3,
+          py: 2,
+          borderBottom: `1px solid ${tokens.color.borderSubtle}`,
+        }}
+      >
+        <IconButton aria-label="Close" onClick={vm.cancel} edge="start">
+          <CloseOutlined />
+        </IconButton>
+        <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
+          {vm.editing ? vm.item?.name || "Edit item" : "New item"}
+        </Typography>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: "auto", px: 3, py: 3 }}>
+        {vm.editing && vm.item?.adminAvailable === false && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            <strong>This item was disabled by TrainDhaba.</strong> Reason:{" "}
+            {vm.item.adminInactiveReason || "No reason was given."} Customers
+            cannot order it until it is enabled again.
+          </Alert>
+        )}
+        {vm.loading ? (
+          <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
+            <CircularProgress aria-label="Loading menu item" />
+          </Box>
+        ) : vm.loadError ? (
+          <Alert
+            severity="error"
+            action={
+              <CommonButton color="inherit" size="small" onClick={vm.cancel}>
+                Back to menu
+              </CommonButton>
+            }
+          >
+            {vm.loadError}
+          </Alert>
+        ) : (
+          <Box sx={{ display: "grid", gap: 3.5 }}>
+            <Box>
+              <Typography sx={SECTION_TITLE}>Dish</Typography>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                <Controller
+                  control={control}
+                  name="images.0"
+                  render={({ field, fieldState }) => (
+                    <PhotoTile
+                      value={field.value ?? null}
+                      currentUrl={
+                        vm.editing && vm.item?.images[0]
+                          ? menuImageUrl(vm.item.images[0])
+                          : null
+                      }
+                      onChange={field.onChange}
+                      error={fieldState.error?.message}
                     />
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="foodType"
-                render={({ field, fieldState }) => (
-                  <div>
-                    <FieldLabel text="Food type" required />
-                    <ToggleButtonGroup
-                      exclusive
-                      value={field.value}
-                      onChange={(_, value) => value && field.onChange(value)}
-                      sx={{ flexWrap: "wrap", gap: 1.5 }}
-                    >
-                      {menuFoodTypes.map((type) => (
-                        <ToggleButton
-                          key={type}
-                          value={type}
-                          sx={{
-                            px: 3,
-                            gap: 1,
-                            fontWeight: 600,
-                            color: "text.primary",
-                            border: "1px solid #d9ded9 !important",
-                            borderRadius: "10px !important",
-                            "& svg": { color: foodStyle[type].color },
-                            "&.Mui-selected, &.Mui-selected:hover": {
-                              bgcolor: `${foodStyle[type].color}14`,
-                              borderColor: `${foodStyle[type].color} !important`,
-                            },
-                          }}
-                        >
-                          {foodStyle[type].icon}
-                          {type}
-                        </ToggleButton>
-                      ))}
-                    </ToggleButtonGroup>
-                    {fieldState.error && (
-                      <FormHelperText error>
-                        {fieldState.error.message}
-                      </FormHelperText>
+                  )}
+                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Controller
+                    control={control}
+                    name="name"
+                    render={({ field, fieldState }) => (
+                      <div>
+                        <FieldLabel text="Dish name" required htmlFor="menu-name" />
+                        <CommonTextField
+                          {...field}
+                          id="menu-name"
+                          placeholder="e.g. Chicken 65 Biryani"
+                          error={!!fieldState.error}
+                          helperText={fieldState.error?.message}
+                          slotProps={{ htmlInput: { maxLength: 255 } }}
+                        />
+                      </div>
                     )}
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="category"
-                render={({ field, fieldState }) => (
-                  <div>
-                    <FieldLabel
-                      text="Category"
-                      required
-                      htmlFor="menu-category"
-                    />
-                    <ChoiceField
-                      id="menu-category"
-                      value={field.value}
-                      options={vm.categories}
-                      placeholder="e.g. Biryani"
-                      addLabel="Add new category"
-                      newPlaceholder="Type the new category"
-                      error={!!fieldState.error}
-                      helperText={fieldState.error?.message}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                    />
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="subCategory"
-                render={({ field, fieldState }) => (
-                  <div>
-                    <FieldLabel text="Sub category" htmlFor="menu-sub" />
-                    <ChoiceField
-                      id="menu-sub"
-                      value={field.value}
-                      options={vm.subCategories}
-                      placeholder="e.g. Chicken Biryani"
-                      addLabel="Add new subcategory"
-                      newPlaceholder="Type the new subcategory"
-                      error={!!fieldState.error}
-                      helperText={fieldState.error?.message}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                    />
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="description"
-                render={({ field, fieldState }) => (
-                  <Box>
-                    <FieldLabel text="Description" htmlFor="menu-description" />
-                    <CommonTextField
-                      {...field}
-                      id="menu-description"
-                      placeholder="Describe your dish, ingredients, taste, etc..."
-                      multiline
-                      rows={4}
-                      sx={{
-                        "& .MuiInputBase-root": {
-                          height: PICTURE_HEIGHT,
-                          alignItems: "flex-start",
-                        },
-                        "& textarea": { height: "100% !important" },
-                      }}
-                      error={!!fieldState.error}
-                      helperText={fieldState.error?.message}
-                      slotProps={{ htmlInput: { maxLength: 500 } }}
-                    />
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", textAlign: "right", mt: 0.5 }}
-                    >
-                      {field.value.length}/500
-                    </Typography>
-                  </Box>
-                )}
-              />
-              <Controller
-                control={control}
-                name="images.0"
-                render={({ field, fieldState }) => (
-                  <PictureDrop
-                    value={field.value ?? null}
-                    currentUrl={
-                      vm.editing && vm.item?.images[0]
-                        ? menuImageUrl(vm.item.images[0])
-                        : null
-                    }
-                    onChange={field.onChange}
-                    error={fieldState.error?.message}
                   />
-                )}
-              />
-            </Section>
-            <Section
-              icon={<Inventory2Outlined />}
-              title="Availability"
-              subtitle="Whether it is in stock, how it is sold and which add-ons go with it."
-            >
-              <AvailabilityFields
-                control={control}
-                addOns={vm.addOns}
-                qtyOptions={vm.qtyOptions}
-                onCreateAddOn={vm.createAddOn}
-              />
-            </Section>
-            <Section
-              icon={<CurrencyRupee />}
-              title="Pricing & preparation"
-              subtitle="Price, discount and how long it takes to make."
-            >
+                </Box>
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <Controller
+                  control={control}
+                  name="description"
+                  render={({ field, fieldState }) => (
+                    <div>
+                      <FieldLabel text="Description (optional)" htmlFor="menu-description" />
+                      <CommonTextField
+                        {...field}
+                        id="menu-description"
+                        placeholder="Ingredients, taste, how much it serves"
+                        multiline
+                        minRows={3}
+                        error={!!fieldState.error}
+                        helperText={
+                          fieldState.error?.message ?? `${description.length}/500`
+                        }
+                        slotProps={{ htmlInput: { maxLength: 500 } }}
+                      />
+                    </div>
+                  )}
+                />
+              </Box>
+            </Box>
+            <Box>
+              <Typography sx={SECTION_TITLE}>Price</Typography>
               <NumberField
                 control={control}
                 name="price"
-                label="Price"
+                label=""
                 required
                 prefix="₹"
-                placeholder="e.g. 120"
+                suffix="incl. GST"
+                placeholder="e.g. 299"
               />
-              <NumberField
-                control={control}
-                name="discountedPrice"
-                label="Offer price"
-                prefix="₹"
-                placeholder="e.g. 99"
-                helperText="Optional. Shown instead of the price."
-              />
-              <DiscountField control={control} setValue={setValue} />
-              <NumberField
-                control={control}
-                name="preparationMinutes"
-                label="Preparation time (minutes)"
-                required
-                placeholder="15"
-              />
-            </Section>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 1.5,
-                pt: 3,
-                borderTop: 1,
-                borderColor: "divider",
-              }}
-            >
-              <Box sx={{ flex: 1 }} />
-              <CommonButton
-                variant="outlined"
-                color="inherit"
-                onClick={vm.cancel}
-                disabled={vm.submitting}
-              >
-                Cancel
-              </CommonButton>
-              <CommonButton
-                type="submit"
-                variant="contained"
-                disabled={vm.submitting}
-              >
-                {vm.submitting
-                  ? "Saving…"
-                  : vm.editing
-                    ? "Save changes"
-                    : "Add item"}
-              </CommonButton>
+              {discountOpen || offer != null ? (
+                <Box sx={{ mt: 1.5 }}>
+                  <DiscountField control={control} setValue={setValue} />
+                </Box>
+              ) : (
+                <ButtonBase
+                  onClick={() => setDiscountOpen(true)}
+                  sx={{
+                    mt: 1.25,
+                    gap: 0.5,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: tokens.color.link,
+                  }}
+                >
+                  <AddOutlined sx={{ fontSize: 18 }} />
+                  Add discount
+                </ButtonBase>
+              )}
             </Box>
-          </form>
-        </CommonCard>
-      )}
-    </>
+            <Box>
+              <Typography sx={SECTION_TITLE}>Menu section</Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  alignItems: "start",
+                }}
+              >
+                <Controller
+                  control={control}
+                  name="category"
+                  render={({ field, fieldState }) => (
+                    <div>
+                      <FieldLabel text="Category" required htmlFor="menu-category" />
+                      <ChoiceField
+                        id="menu-category"
+                        value={field.value}
+                        options={vm.categories}
+                        placeholder="e.g. Biryani"
+                        addLabel="Add new category"
+                        newPlaceholder="Type the new category"
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    </div>
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="subCategory"
+                  render={({ field, fieldState }) => (
+                    <div>
+                      <FieldLabel text="Sub-category" htmlFor="menu-sub" />
+                      <ChoiceField
+                        id="menu-sub"
+                        value={field.value}
+                        options={vm.subCategories}
+                        placeholder="e.g. Non-veg biryani"
+                        addLabel="Add new sub-category"
+                        newPlaceholder="Type the new sub-category"
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    </div>
+                  )}
+                />
+              </Box>
+            </Box>
+            <Controller
+              control={control}
+              name="foodType"
+              render={({ field, fieldState }) => (
+                <Box>
+                  <Typography sx={SECTION_TITLE}>Food type</Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    value={field.value}
+                    onChange={(_, value) => value && field.onChange(value)}
+                    sx={{
+                      gap: 1.5,
+                      "& .MuiToggleButton-root": {
+                        gap: 1,
+                        height: 44,
+                        fontWeight: 600,
+                        textTransform: "none",
+                        color: tokens.color.text,
+                        border: `1.5px solid ${tokens.color.borderInput} !important`,
+                        borderRadius: `${tokens.radius.input} !important`,
+                        "& .food-mark": { m: 0 },
+                        "&.Mui-selected, &.Mui-selected:hover": {
+                          bgcolor: tokens.color.card,
+                          borderColor: `${tokens.color.borderStrong} !important`,
+                        },
+                      },
+                    }}
+                  >
+                    {menuFoodTypes.map((type) => (
+                      <ToggleButton key={type} value={type}>
+                        <FoodTypeMark type={type} />
+                        {type}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                  {fieldState.error && (
+                    <FormHelperText error>{fieldState.error.message}</FormHelperText>
+                  )}
+                </Box>
+              )}
+            />
+            <Controller
+              control={control}
+              name="preparationMinutes"
+              render={({ field, fieldState }) => {
+                const minutes = field.value ?? 15,
+                  set = (next: number) =>
+                    field.onChange(Math.min(240, Math.max(PREP_STEP, next)));
+                return (
+                  <Box>
+                    <Typography sx={SECTION_TITLE}>Prep time</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          height: 44,
+                          borderRadius: tokens.radius.input,
+                          border: `1.5px solid ${tokens.color.borderInput}`,
+                        }}
+                      >
+                        <IconButton
+                          aria-label="Less prep time"
+                          onClick={() => set(minutes - PREP_STEP)}
+                        >
+                          <RemoveOutlined fontSize="small" />
+                        </IconButton>
+                        <Typography
+                          sx={{ minWidth: 64, textAlign: "center", fontWeight: 600 }}
+                        >
+                          {minutes} min
+                        </Typography>
+                        <IconButton
+                          aria-label="More prep time"
+                          onClick={() => set(minutes + PREP_STEP)}
+                        >
+                          <AddOutlined fontSize="small" />
+                        </IconButton>
+                      </Box>
+                      <Typography
+                        sx={{ flex: 1, fontSize: 13, color: tokens.color.textMuted }}
+                      >
+                        Time to cook and pack one order. We use it to tell the
+                        rider when to pick up.
+                      </Typography>
+                    </Box>
+                    {fieldState.error && (
+                      <FormHelperText error>{fieldState.error.message}</FormHelperText>
+                    )}
+                  </Box>
+                );
+              }}
+            />
+            <Controller
+              control={control}
+              name="available"
+              render={({ field }) => (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    py: 1.5,
+                    borderTop: `1px solid ${tokens.color.borderSubtle}`,
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: 15 }}>
+                      Available now
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, color: tokens.color.textMuted }}>
+                      Passengers can order this dish right away
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={field.value ?? true}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#fff" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        bgcolor: tokens.color.success,
+                        opacity: 1,
+                      },
+                    }}
+                  />
+                </Box>
+              )}
+            />
+            <Box>
+              <Typography sx={{ ...SECTION_TITLE, mb: 0.25 }}>
+                Quantity and add-ons
+              </Typography>
+              <Typography
+                sx={{ mb: 1.5, fontSize: 13, color: tokens.color.textMuted }}
+              >
+                How the dish is sold, and extras passengers can add
+              </Typography>
+              <Box sx={{ display: "grid", gap: 2.5 }}>
+                <Controller
+                  control={control}
+                  name="qtyType"
+                  render={({ field, fieldState }) => (
+                    <div>
+                      <FieldLabel text="Sold as" htmlFor="menu-qty-type" />
+                      <ChoiceField
+                        id="menu-qty-type"
+                        value={field.value ?? ""}
+                        options={vm.qtyOptions.length ? vm.qtyOptions : [...qtyTypes]}
+                        placeholder="e.g. Plate, Half Plate"
+                        addLabel="Add new quantity type"
+                        newPlaceholder="Type how it is sold, e.g. Family pack"
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    </div>
+                  )}
+                />
+                <AddOnsField
+                  control={control}
+                  addOns={vm.addOns}
+                  onCreate={vm.createAddOn}
+                />
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Box>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1.5,
+          px: 3,
+          py: 2,
+          borderTop: `1px solid ${tokens.color.borderSubtle}`,
+        }}
+      >
+        <CommonButton variant="text" onClick={vm.cancel} disabled={vm.submitting}>
+          Cancel
+        </CommonButton>
+        <CommonButton
+          type="submit"
+          variant="contained"
+          disabled={vm.submitting || vm.loading || !!vm.loadError}
+          sx={{ flex: 1 }}
+        >
+          {vm.submitting
+            ? "Saving…"
+            : vm.editing
+              ? "Save changes"
+              : "Add to menu"}
+        </CommonButton>
+      </Box>
+    </Box>
   );
 }

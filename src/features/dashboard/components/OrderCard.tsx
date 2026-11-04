@@ -1,18 +1,42 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import { Box, Chip, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { ItemsSummary } from "@/shared/components/feedback/ItemsSummary";
 import { Hint } from "@/shared/components/feedback/Hint";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useGetOrderQuery } from "../services/orderApi";
 import { formatRupees } from "@/shared/utils/format";
-import { lineLabel, type Order, type OrderStatus } from "../models/order";
+import {
+  lineLabel,
+  stateLabel,
+  type Order,
+  type OrderRider,
+  type OrderStatus,
+} from "../models/order";
+import { AssignRiderDialog } from "@/features/riders/components/AssignRiderDialog";
+import { PreparingAction } from "@/features/riders/components/PreparingAction";
+import {
+  DeliveryStatus,
+  trainDhabaNote,
+} from "@/features/riders/components/DeliveryStatus";
 import { OrderDetailsDialog } from "./OrderDetailsDialog";
 interface Props {
   order: Order;
   busy?: boolean;
-  onChange?: (id: string, status: OrderStatus) => Promise<void>;
+  onChange?: (
+    id: string,
+    status: OrderStatus,
+    rider?: OrderRider,
+  ) => Promise<void>;
+  /** Assigns the rider while the order is being prepared. */
+  onAssignRider?: (id: string, rider: OrderRider) => void;
+  /**
+   * Set when TrainDhaba's riders deliver for this restaurant: the rider
+   * search starts on accepting, and once the order is ready the rider
+   * updates it (picked up, delivered) from the rider app.
+   */
+  trainDhabaRiders?: boolean;
   /** Show the order's status instead of its action buttons, with the date it was placed. */
   readOnly?: boolean;
 }
@@ -32,14 +56,6 @@ const time = (iso?: string) =>
         minute: "2-digit",
       })
     : "–";
-const stateLabel: Record<OrderStatus, string> = {
-  New: "New",
-  Preparing: "Preparing",
-  Ready: "Packed",
-  HandedOver: "Out for delivery",
-  Delivered: "Delivered",
-  Rejected: "Rejected",
-};
 /** Column template shared by the heading row and every order row. */
 export const orderGrid =
   "minmax(84px, 0.7fr) minmax(84px, 0.7fr) minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(170px, 2fr) minmax(130px, 1.3fr) minmax(80px, 0.7fr) minmax(190px, 1fr)";
@@ -103,7 +119,14 @@ function Cell({
   );
 }
 /** One order as a row: id, time, customer, items, amount and its next action. */
-export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
+export function OrderCard({
+  order: listed,
+  busy,
+  onChange,
+  onAssignRider,
+  trainDhabaRiders,
+  readOnly,
+}: Props) {
   // The list response has no items, so they come from the order's own endpoint.
   const { data: detail } = useGetOrderQuery(listed.id, {
       skip: DEMO_MODE || listed.items.length > 0,
@@ -124,10 +147,26 @@ export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
           deliveryBy: detail.deliveryBy ?? listed.deliveryBy,
           pnr: detail.pnr ?? listed.pnr,
           note: detail.note ?? listed.note,
+          rider: detail.rider ?? listed.rider,
         }
       : listed;
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const act = (status: OrderStatus) => void onChange?.(order.id, status);
+  const [detailsOpen, setDetailsOpen] = useState(false),
+    // What the rider dialog is open for: assigning while preparing, or a
+    // handover with no rider known (e.g. the order was packed on another device).
+    [assignFor, setAssignFor] = useState<"Preparing" | "HandedOver" | null>(
+      null,
+    );
+  const act = (status: OrderStatus) => void onChange?.(order.id, status),
+    riderLine = order.rider && (
+      <Typography
+        noWrap
+        color="text.secondary"
+        title={order.rider.phone}
+        sx={{ fontSize: 12.5 }}
+      >
+        Rider: {order.rider.name}
+      </Typography>
+    );
   return (
     <Box
       sx={{
@@ -242,6 +281,25 @@ export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
       />
+      <AssignRiderDialog
+        open={!!assignFor}
+        orderLabel={orderNumber(order.id)}
+        confirmLabel={
+          assignFor === "Preparing" ? "Assign rider" : "Assign and mark picked up"
+        }
+        busy={busy}
+        onClose={() => setAssignFor(null)}
+        onAssign={(rider) => {
+          const picked = {
+            id: rider.id,
+            name: rider.name,
+            phone: rider.phone,
+          };
+          if (assignFor === "Preparing") onAssignRider?.(order.id, picked);
+          else if (assignFor) void onChange?.(order.id, assignFor, picked);
+          setAssignFor(null);
+        }}
+      />
       <Box
         sx={{
           display: "flex",
@@ -253,8 +311,7 @@ export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
         {readOnly ||
         order.state === "Delivered" ||
         order.state === "Rejected" ? (
-          <Chip
-            size="small"
+          <DeliveryStatus
             label={stateLabel[order.state]}
             color={
               order.state === "Delivered"
@@ -263,7 +320,7 @@ export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
                   ? "error"
                   : "default"
             }
-            variant="outlined"
+            rider={order.state === "Rejected" ? undefined : order.rider}
           />
         ) : order.state === "New" ? (
           <>
@@ -289,38 +346,62 @@ export function OrderCard({ order: listed, busy, onChange, readOnly }: Props) {
             </Hint>
           </>
         ) : order.state === "Preparing" ? (
-          <Hint title="The food is packed and ready for the rider">
-            <CommonButton
-              sx={{ flex: 1 }}
-              disabled={busy}
-              variant="contained"
-              onClick={() => act("Ready")}
-            >
-              Mark as packed
-            </CommonButton>
-          </Hint>
+          <PreparingAction
+            rider={order.rider}
+            busy={busy}
+            onAssign={() => setAssignFor("Preparing")}
+            onReady={() =>
+              void onChange?.(
+                order.id,
+                "Ready",
+                trainDhabaRiders ? undefined : order.rider,
+              )
+            }
+            trainDhabaRiders={trainDhabaRiders}
+          />
+        ) : trainDhabaRiders ? (
+          // The TrainDhaba rider updates the order from here on.
+          <DeliveryStatus
+            label={
+              order.state === "Ready" ? "Awaiting pickup" : "Out for delivery"
+            }
+            color="info"
+            rider={order.rider}
+            note={trainDhabaNote(
+              order.state === "Ready" ? "ready" : "pickedUp",
+              order.rider,
+            )}
+          />
         ) : order.state === "Ready" ? (
-          <Hint title="The rider has collected this order">
-            <CommonButton
-              sx={{ flex: 1 }}
-              disabled={busy}
-              variant="contained"
-              onClick={() => act("HandedOver")}
-            >
-              Handed to the rider
-            </CommonButton>
-          </Hint>
+          <Box sx={{ flex: 1, display: "grid", gap: 0.5 }}>
+            <Hint title="The rider has picked up this order">
+              <CommonButton
+                disabled={busy}
+                variant="contained"
+                onClick={() =>
+                  order.rider?.id
+                    ? void onChange?.(order.id, "HandedOver", order.rider)
+                    : setAssignFor("HandedOver")
+                }
+              >
+                Picked up by rider
+              </CommonButton>
+            </Hint>
+            {riderLine}
+          </Box>
         ) : (
-          <Hint title="The order reached the customer">
-            <CommonButton
-              sx={{ flex: 1 }}
-              disabled={busy}
-              variant="contained"
-              onClick={() => act("Delivered")}
-            >
-              Mark as delivered
-            </CommonButton>
-          </Hint>
+          <Box sx={{ flex: 1, display: "grid", gap: 0.5 }}>
+            <Hint title="The rider delivered the order to the customer">
+              <CommonButton
+                disabled={busy}
+                variant="contained"
+                onClick={() => act("Delivered")}
+              >
+                Mark as delivered
+              </CommonButton>
+            </Hint>
+            {riderLine}
+          </Box>
         )}
       </Box>
     </Box>

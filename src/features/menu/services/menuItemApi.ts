@@ -359,6 +359,43 @@ async function addMenuCategories(
     },
   });
 }
+/**
+ * GET /menu-items/categories/admin: the categories the admin created, offered
+ * to every restaurant as recommendations. Ones the restaurant has already
+ * added also come back in its own list, so the caller filters those out.
+ */
+async function listRecommendedCategories(
+  send: Send,
+): Promise<CategoryOption[]> {
+  if (DEMO_MODE) return [];
+  const data = await send({
+    url: `${endpoint(API_PATHS.menuItems)}/categories/admin`,
+  });
+  const rows = (data as { data?: unknown })?.data ?? data,
+    seen = new Set<string>(),
+    out: CategoryOption[] = [];
+  for (const r of Array.isArray(rows)
+    ? (rows as Record<string, unknown>[])
+    : []) {
+    const id = String(r.category_id ?? ""),
+      name = String(r.category_name ?? "").trim();
+    if (!id || !name || r.is_active === false || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name });
+  }
+  return out;
+}
+/** POST /menu-items/categories/admin/{id}/select: adds an admin category to this restaurant's own. */
+async function selectRecommendedCategory(
+  id: string,
+  send: Send,
+): Promise<void> {
+  if (DEMO_MODE) return;
+  await send({
+    url: `${endpoint(API_PATHS.menuItems)}/categories/admin/${encodeURIComponent(id)}/select`,
+    method: "post",
+  });
+}
 const ID_LIKE = /^(CAT|SUB)\d+$/i;
 /**
  * Items carry a category id: a sub category's id when one was given, else the
@@ -537,6 +574,14 @@ export const menuItemApi = baseApi.injectEndpoints({
       queryFn: flow(addMenuCategories),
       invalidatesTags: ["Categories", "MenuItems"],
     }),
+    listRecommendedCategories: build.query<CategoryOption[], void>({
+      queryFn: flow((_: void, send: Send) => listRecommendedCategories(send)),
+      providesTags: ["Categories"],
+    }),
+    selectRecommendedCategory: build.mutation<void, string>({
+      queryFn: flow(selectRecommendedCategory),
+      invalidatesTags: ["Categories", "MenuItems"],
+    }),
     listCategoryNames: build.query<
       { categories: string[]; subCategories: string[] },
       void
@@ -559,5 +604,7 @@ export const {
   useListMenuCategoriesQuery,
   useLazyListMenuCategoriesQuery,
   useAddMenuCategoriesMutation,
+  useListRecommendedCategoriesQuery,
+  useSelectRecommendedCategoryMutation,
   useListCategoryNamesQuery,
 } = menuItemApi;

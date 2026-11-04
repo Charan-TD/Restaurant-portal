@@ -1,4 +1,5 @@
-import { MenuItemFormView } from "@/features/menu/views/MenuItemFormView";
+import { MenuItemsView } from "@/features/menu/views/MenuItemsView";
+
 export default function Page() {
-  return <MenuItemFormView />;
+  return <MenuItemsView drawer={{}} />;
 }

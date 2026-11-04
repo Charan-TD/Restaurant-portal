@@ -33,8 +33,8 @@ const filters: { label: string; value: OrderFilter }[] = [
 ];
 const moreFilters: { label: string; value: OrderFilter }[] = [
   { label: "New", value: "New" },
-  { label: "Packed", value: "Ready" },
-  { label: "With rider", value: "HandedOver" },
+  { label: "Ready", value: "Ready" },
+  { label: "Out for delivery", value: "HandedOver" },
   { label: "Cancelled", value: "Rejected" },
   { label: "Failed", value: "FAILED" },
 ];

@@ -16,12 +16,12 @@ const tabs: { label: string; states: OrderStatus[]; empty: string }[] = [
     empty: "Nothing is being prepared.",
   },
   {
-    label: "Packed Orders",
+    label: "Ready",
     states: ["Ready"],
-    empty: "No packed orders waiting.",
+    empty: "No orders waiting for a rider.",
   },
   {
-    label: "Order status",
+    label: "Delivery status",
     states: ["HandedOver", "Delivered"],
     empty: "No orders to update yet.",
   },
@@ -30,7 +30,7 @@ const tabs: { label: string; states: OrderStatus[]; empty: string }[] = [
 const pendingFirst = (a: Order, b: Order) =>
   Number(a.state === "Delivered") - Number(b.state === "Delivered") ||
   (Date.parse(b.placedAt ?? "") || 0) - (Date.parse(a.placedAt ?? "") || 0);
-/** Accept or reject new orders, then follow them through preparing, packed and delivery. */
+/** Accept or reject new orders, then follow them through preparing, ready and delivery. */
 export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
   const vm = useOrdersViewModel(),
     [tab, setTab] = useState(0),
@@ -58,8 +58,9 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
             Live orders
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Accept, prepare and pack orders, then update their status until
-            delivered.
+            {vm.trainDhabaRiders
+              ? "Accept and prepare orders, then mark them ready. The TrainDhaba rider updates pickup and delivery."
+              : "Accept and prepare orders, assign a rider, then update their status until delivered."}
           </Typography>
         </div>
         {showViewAll && (
@@ -135,6 +136,8 @@ export function LiveOrders({ showViewAll = false }: { showViewAll?: boolean }) {
                   order={order}
                   busy={vm.busyId === order.id}
                   onChange={vm.changeOrder}
+                  onAssignRider={vm.assignRider}
+                  trainDhabaRiders={vm.trainDhabaRiders}
                 />
               ))}
             </Box>

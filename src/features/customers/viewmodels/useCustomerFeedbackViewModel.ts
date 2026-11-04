@@ -5,7 +5,10 @@ import { errorMessage } from "@/shared/utils/errors";
 import { PAGE_SIZE } from "../components/ListFooter";
 import type { DateRange } from "../components/CustomerToolbar";
 import type { ReviewRow } from "../models/review";
-import { useGetReviewsQuery } from "../services/reviewApi";
+import {
+  useGetRatingSummaryQuery,
+  useGetReviewsQuery,
+} from "../services/reviewApi";
 export type ReviewFilter = "rating" | "latest" | "low";
 const sorters: Record<ReviewFilter, (a: ReviewRow, b: ReviewRow) => number> = {
   rating: (a, b) => b.rating - a.rating,
@@ -19,6 +22,9 @@ export function useCustomerFeedbackViewModel() {
       isLoading: loading,
       error: queryError,
     } = useGetReviewsQuery(undefined, { skip: DEMO_MODE }),
+    { data: summary } = useGetRatingSummaryQuery(undefined, {
+      skip: DEMO_MODE,
+    }),
     error = queryError ? errorMessage(queryError) : "",
     reviews = useMemo(() => data ?? [], [data]),
     [search, setSearch] = useState(""),
@@ -40,10 +46,9 @@ export function useCustomerFeedbackViewModel() {
   return {
     loading,
     error,
-    total: reviews.length,
-    average: reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : null,
+    // Counted by the server over every rating, not just the reviews loaded.
+    total: summary?.total ?? reviews.length,
+    average: summary ? summary.average : null,
     shown,
     rows: shown.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
     page: current,

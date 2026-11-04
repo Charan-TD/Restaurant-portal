@@ -1,9 +1,11 @@
 import { z } from "zod";
-import type {
-  FoodType,
-  ItemType,
-  RegistrationForm,
-  RestaurantType,
+import {
+  riderOwners,
+  type FoodType,
+  type ItemType,
+  type RegistrationForm,
+  type RestaurantType,
+  type RiderOwner,
 } from "./registration";
 const required = z.string().trim().min(1, "This field is required.");
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
@@ -16,10 +18,12 @@ const isFile = (value: unknown, types: string[]): value is File =>
 const isPdf = (value: unknown) => isFile(value, ["application/pdf"]);
 const PDF_MESSAGE = "Upload a PDF file (up to 2 MB).";
 const upload = z.custom<File>(isPdf, PDF_MESSAGE);
+// The restaurant photo and logo: whatever the server takes, JPG, PNG or WEBP.
 // Typed File | null to match the form's empty state; null is allowed.
-const optionalUpload = z.custom<File | null>(
-  (value) => value === null || isPdf(value),
-  PDF_MESSAGE,
+const optionalPicture = z.custom<File | null>(
+  (value) =>
+    value === null || isFile(value, ["image/jpeg", "image/png", "image/webp"]),
+  "Upload a JPG, PNG or WEBP image (up to 2 MB).",
 );
 // Menu item pictures belong to the hidden menu step and stay images.
 const photo = z.custom<File | null>(
@@ -94,6 +98,10 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
     foodServed: z
       .array(z.custom<FoodType>((v) => FOOD_TYPES.includes(v as FoodType)))
       .min(1, "Select at least one type of food you serve."),
+    riderOwner: oneOf<RiderOwner>(
+      riderOwners,
+      "Choose who delivers your orders to the train.",
+    ),
     email: z.string().email("Enter a valid email."),
     cuisines: z.array(required).min(1, "Choose at least one cuisine."),
     customerContact: phone,
@@ -156,8 +164,8 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
       businessProof: upload,
     }),
     bankProof: upload,
-    coverPhoto: optionalUpload,
-    logo: optionalUpload,
+    coverPhoto: optionalPicture,
+    logo: optionalPicture,
     hours: z
       .array(
         z.object({

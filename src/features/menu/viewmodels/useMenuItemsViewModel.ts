@@ -15,6 +15,8 @@ import {
   useDeleteMenuItemMutation,
   useListMenuCategoriesQuery,
   useListMenuItemsQuery,
+  useListRecommendedCategoriesQuery,
+  useSelectRecommendedCategoryMutation,
   useSearchMenuItemsQuery,
   useSetMenuItemAvailableMutation,
 } from "../services/menuItemApi";
@@ -38,6 +40,9 @@ export function useMenuItemsViewModel() {
     [deleteAddOn, { isLoading: deletingAddOn }] = useDeleteAddOnMutation(),
     [addCategories, { isLoading: savingCategory }] =
       useAddMenuCategoriesMutation(),
+    recommendedQuery = useListRecommendedCategoriesQuery(),
+    [selectRecommended, { isLoading: addingRecommended }] =
+      useSelectRecommendedCategoryMutation(),
     [setStock] = useSetMenuItemAvailableMutation(),
     [deleteItem, { isLoading: deleting }] = useDeleteMenuItemMutation();
   const items = itemsQuery.data ?? NO_ITEMS,
@@ -84,6 +89,24 @@ export function useMenuItemsViewModel() {
     () => buildCategoryTree(serverCategories, items),
     [serverCategories, items],
   );
+  // Admin categories this restaurant has not added to its own yet.
+  const recommended = useMemo(() => {
+    const mine = new Set(serverCategories.categories.map((c) => c.id));
+    return (recommendedQuery.data ?? []).filter((c) => !mine.has(c.id));
+  }, [recommendedQuery.data, serverCategories]);
+  const addRecommended = async (
+    category: { id: string; name: string },
+  ): Promise<boolean> => {
+    setActionError("");
+    try {
+      await selectRecommended(category.id).unwrap();
+      toast.success(`${category.name} added to your categories.`);
+      return true;
+    } catch (e) {
+      setActionError(menuErrorMessage(e));
+      return false;
+    }
+  };
   const setAvailable = async (item: MenuItem, available: boolean) => {
     setActionError("");
     setSaving((ids) => [...ids, item.id]);
@@ -182,6 +205,9 @@ export function useMenuItemsViewModel() {
     addOnCategories: serverCategories.categories,
     addCategory,
     savingCategory,
+    recommended,
+    addRecommended,
+    addingRecommended,
     saveAddOn,
     removeAddOn,
     savingAddOn,

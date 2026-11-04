@@ -1,6 +1,8 @@
 export type NavSectionId =
   | "dashboard"
   | "orders"
+  | "groupOrders"
+  | "riders"
   | "menu"
   | "customers"
   | "reports"
@@ -35,13 +37,22 @@ export const sidebarSections: NavSection[] = [
     ],
   },
   {
+    id: "groupOrders",
+    label: "Group orders",
+    href: "/group-orders",
+    pages: [],
+  },
+  // Hidden for restaurants whose orders TrainDhaba's riders deliver (AppShell).
+  { id: "riders", label: "Riders", href: "/riders", pages: [] },
+  {
     id: "menu",
     label: "Menu",
     pages: [
       {
         label: "Items",
         href: "/menu/items",
-        description: "Your dishes, add-ons and categories, with prices and stock.",
+        description:
+          "Your dishes, add-ons and categories, with prices and stock.",
       },
       {
         label: "Add items",
@@ -57,7 +68,8 @@ export const sidebarSections: NavSection[] = [
       {
         label: "All customers",
         href: "/customers/list",
-        description: "People who have ordered from you, and how much they have spent.",
+        description:
+          "People who have ordered from you, and how much they have spent.",
       },
       {
         label: "Customer feedback",
@@ -89,43 +101,8 @@ export const sidebarSections: NavSection[] = [
   },
 ];
 export const navbarMenus: NavSection[] = [
-  {
-    id: "payments",
-    label: "Payments",
-    pages: [
-      {
-        label: "Earnings",
-        href: "/payments/earnings",
-        description: "What you have earned after commission and taxes.",
-      },
-      {
-        label: "Settlements",
-        href: "/payments/settlements",
-        description: "Payouts sent to your bank account.",
-      },
-      {
-        label: "Transactions",
-        href: "/payments/transactions",
-        description: "Every payment, refund and adjustment.",
-      },
-    ],
-  },
-  {
-    id: "offers",
-    label: "Offers",
-    pages: [
-      {
-        label: "Coupons",
-        href: "/offers/coupons",
-        description: "Coupon codes customers can apply at checkout.",
-      },
-      {
-        label: "Discounts",
-        href: "/offers/discounts",
-        description: "Automatic discounts on items or order value.",
-      },
-    ],
-  },
+  { id: "payments", label: "Payments", href: "/payments", pages: [] },
+  { id: "offers", label: "Offers", href: "/offers", pages: [] },
   {
     id: "settings",
     label: "Settings",
@@ -143,6 +120,96 @@ export const navbarMenus: NavSection[] = [
     ],
   },
 ];
+export type RailItemId =
+  | "orders"
+  | "groupOrders"
+  | "menu"
+  | "insights"
+  | "payments"
+  | "offers"
+  | "riders"
+  | "profile";
+export interface RailItem {
+  id: RailItemId;
+  label: string;
+  href: string;
+  /** The item is active on any path that starts with one of these. */
+  paths: string[];
+  /** The page title shown in the top bar on those paths. */
+  title: string;
+}
+/** The icon rail down the left of the portal, top to bottom. */
+export const railItems: RailItem[] = [
+  {
+    id: "orders",
+    label: "Orders",
+    href: "/dashboard",
+    paths: ["/dashboard", "/orders"],
+    title: "Orders",
+  },
+  {
+    id: "groupOrders",
+    label: "Group",
+    href: "/group-orders",
+    paths: ["/group-orders"],
+    title: "Group orders",
+  },
+  {
+    id: "menu",
+    label: "Menu",
+    href: "/menu/items",
+    paths: ["/menu"],
+    title: "Menu",
+  },
+  {
+    id: "insights",
+    label: "Insights",
+    href: "/insights",
+    paths: ["/insights", "/reports", "/customers"],
+    title: "Insights",
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    href: "/payments",
+    paths: ["/payments"],
+    title: "Payments",
+  },
+  {
+    id: "offers",
+    label: "Offers",
+    href: "/offers",
+    paths: ["/offers"],
+    title: "Offers",
+  },
+  // Hidden for restaurants whose orders TrainDhaba's riders deliver (AppShell).
+  {
+    id: "riders",
+    label: "Riders",
+    href: "/riders",
+    paths: ["/riders"],
+    title: "Riders",
+  },
+  {
+    id: "profile",
+    label: "Profile",
+    href: "/profile",
+    paths: ["/profile", "/settings"],
+    title: "Profile",
+  },
+];
+const startsWith = (pathname: string, path: string) =>
+  pathname === path || pathname.startsWith(`${path}/`);
+export function railItemFor(pathname: string) {
+  return railItems.find((item) =>
+    item.paths.some((path) => startsWith(pathname, path)),
+  );
+}
+/** The title for the top bar; pages that are not on the rail name themselves. */
+export function pageTitleFor(pathname: string) {
+  if (startsWith(pathname, "/notifications")) return "Notifications";
+  return railItemFor(pathname)?.title ?? "";
+}
 const allSections = [...sidebarSections, ...navbarMenus];
 export function findNavPage(href: string) {
   for (const section of allSections) {

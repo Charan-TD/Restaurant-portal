@@ -16,6 +16,7 @@ const FIELD_LABELS: Record<string, string> = {
   rest_name: "Restaurant name",
   owner_name: "Owner name",
   restaurant_type: "Restaurant type",
+  riders_owner: "Delivery riders",
   fssai_number: "FSSAI number",
   fssai_expiry_date: "FSSAI expiry",
   fssai: "FSSAI certificate",

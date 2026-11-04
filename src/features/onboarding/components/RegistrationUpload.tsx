@@ -6,7 +6,7 @@ interface Props {
   name: FieldPath<RegistrationForm>;
   label: string;
   optional?: boolean;
-  accept?: "image" | "document";
+  accept?: "image" | "picture" | "document";
 }
 export function RegistrationUpload({ name, label, optional, accept }: Props) {
   const { control } = useFormContext<RegistrationForm>();

@@ -103,7 +103,7 @@ export const emptyMenuItemForm = (): MenuItemForm => ({
   price: null,
   discountedPrice: null,
   taxRate: 0,
-  preparationMinutes: null,
+  preparationMinutes: 15,
   quantity: 0,
   lowStockThreshold: 0,
   addOnIds: [],

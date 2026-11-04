@@ -41,7 +41,12 @@ async function getMyRestaurant(send: Send): Promise<RestaurantSummary> {
       restaurant?.phone,
       restaurant?.mobile,
     ),
-    email: first(restaurant?.email, restaurant?.owner_email),
+    email: first(
+      restaurant?.email,
+      restaurant?.owner_email,
+      asRow(restaurant?.owner).email,
+      asRow(restaurant?.user).email,
+    ),
     active: ownerActive(restaurant?.owner_restaurant_status),
   };
 }
@@ -52,12 +57,26 @@ const ownerActive = (value: unknown) => {
 /**
  * PATCH /restaurant/profile/status: the owner switches the restaurant ACTIVE
  * (online) or INACTIVE (offline). Takes effect at once, no approval needed.
+ * Going offline also sends why (reason) and when the restaurant reopens
+ * (remind_at, a future ISO time); the endpoint rejects any other field.
  */
-async function setRestaurantActive(active: boolean, send: Send) {
+export interface RestaurantStatusChange {
+  active: boolean;
+  reason?: string;
+  reopenAt?: Date;
+}
+async function setRestaurantActive(
+  { active, reason, reopenAt }: RestaurantStatusChange,
+  send: Send,
+) {
   await send({
     url: `${endpoint(API_PATHS.restaurantMe)}/status`,
     method: "patch",
-    data: { owner_restaurant_status: active ? "ACTIVE" : "INACTIVE" },
+    data: {
+      owner_restaurant_status: active ? "ACTIVE" : "INACTIVE",
+      ...(!active && reason && { reason }),
+      ...(!active && reopenAt && { remind_at: reopenAt.toISOString() }),
+    },
   });
 }
 const profilePath = (page: string) =>
@@ -86,6 +105,8 @@ export interface ProfileChangeInput {
   rest_name?: string;
   owner_name?: string;
   restaurant_type?: string;
+  /** Who delivers the orders: "Traindhaba" or "restaurant". */
+  riders_owner?: string;
   gst?: string;
   gst_document?: File | null;
   pan_number?: string;
@@ -113,7 +134,12 @@ export interface ProfileChangeRequest {
   fields: string[];
   reason?: string;
 }
-const DETAIL_FIELDS = ["rest_name", "owner_name", "restaurant_type"],
+const DETAIL_FIELDS = [
+    "rest_name",
+    "owner_name",
+    "restaurant_type",
+    "riders_owner",
+  ],
   LOCATION_FIELDS = [
     "house_no",
     "landmark",
@@ -172,6 +198,7 @@ const FIELD_KEYS = [
   "rest_name",
   "owner_name",
   "restaurant_type",
+  "riders_owner",
   "fssai_number",
   "fssai_expiry_date",
   "fssai",
@@ -403,7 +430,13 @@ async function getRestaurantDetails(send: Send): Promise<RestaurantDetails> {
         return value && (cuisineNames.get(value) ?? value);
       })
       .filter((c): c is string => !!c),
-    email: first(row.email, row.restaurant_email, row.owner_email),
+    email: first(
+      row.email,
+      row.restaurant_email,
+      row.owner_email,
+      asRow(row.owner).email,
+      asRow(row.user).email,
+    ),
     mobile: first(row.mobile, row.owner_mobile, row.phone),
     contact: first(row.restaurant_contact),
     fssai: first(row.fssai_number, row.fssai),
@@ -462,6 +495,38 @@ async function replaceBankAccount(input: BankAccountInput, send: Send) {
     data: body,
   });
 }
+/** Who delivers the restaurant's orders: TrainDhaba's riders or its own. */
+export type RidersOwner = "Traindhaba" | "restaurant";
+const toRidersOwner = (value: string | undefined): RidersOwner | null =>
+  value?.toLowerCase() === "traindhaba"
+    ? "Traindhaba"
+    : value?.toLowerCase() === "restaurant"
+      ? "restaurant"
+      : null;
+/**
+ * riders_owner, chosen at registration. It is read from GET
+ * /restaurant/profile (the restaurant record carries it). If the profile
+ * leaves it out, GET /restaurant/riders tells: it answers 403 to restaurants
+ * whose riders TrainDhaba manages, and lists the riders for the others.
+ * The profile does carry it, so the slower riders list is only a fallback.
+ */
+async function getRidersOwner(send: Send): Promise<RidersOwner | null> {
+  try {
+    const row = await fetchRestaurantRow(send),
+      owner = toRidersOwner(
+        first(row.riders_owner, asRow(row.restaurant_details).riders_owner),
+      );
+    if (owner) return owner;
+  } catch {
+    // Fall through to the riders list.
+  }
+  try {
+    await send({ url: endpoint(API_PATHS.riders) });
+    return "restaurant";
+  } catch (e) {
+    return (e as { status?: number })?.status === 403 ? "Traindhaba" : null;
+  }
+}
 
 export const restaurantApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -473,6 +538,10 @@ export const restaurantApi = baseApi.injectEndpoints({
       queryFn: flow((_: void, send: Send) => getRestaurantDetails(send)),
       providesTags: ["Profile"],
     }),
+    getRidersOwner: build.query<RidersOwner | null, void>({
+      queryFn: flow((_: void, send: Send) => getRidersOwner(send)),
+      providesTags: ["Profile"],
+    }),
     getWorkingHours: build.query<WorkingDay[], void>({
       queryFn: flow((_: void, send: Send) => getWorkingHours(send)),
       providesTags: ["Hours"],
@@ -481,7 +550,7 @@ export const restaurantApi = baseApi.injectEndpoints({
       queryFn: flow((_: void, send: Send) => getProfileChangeRequests(send)),
       providesTags: ["ChangeRequests"],
     }),
-    setRestaurantActive: build.mutation<void, boolean>({
+    setRestaurantActive: build.mutation<void, RestaurantStatusChange>({
       queryFn: flow(setRestaurantActive),
     }),
     updateRestaurantProfile: build.mutation<
@@ -514,6 +583,7 @@ export const restaurantApi = baseApi.injectEndpoints({
 export const {
   useLazyGetMyRestaurantQuery,
   useGetRestaurantDetailsQuery,
+  useGetRidersOwnerQuery,
   useGetWorkingHoursQuery,
   useGetProfileChangeRequestsQuery,
   useSetRestaurantActiveMutation,

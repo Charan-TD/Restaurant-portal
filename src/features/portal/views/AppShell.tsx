@@ -3,35 +3,40 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Box, Drawer, ThemeProvider } from "@mui/material";
 import { portalTheme } from "@/core/theme/theme";
-import { sidebarSections } from "@/core/constants/navigation";
+import { tokens } from "@/core/theme/tokens";
+import { railItems } from "@/core/constants/navigation";
 import {
   AppSidebar,
   SIDEBAR_WIDTH,
 } from "@/shared/components/layout/AppSidebar";
 import { BackButton } from "@/shared/components/actions/BackButton";
+import { isRedesignedPath } from "@/shared/components/actions/redesignedPaths";
+import { useRidersOwner } from "@/features/riders/viewmodels/useRidersOwner";
 import { AppNavbar } from "../components/AppNavbar";
 import { usePortalShellViewModel } from "../viewmodels/usePortalShellViewModel";
 const paperSx = {
   width: SIDEBAR_WIDTH,
   boxSizing: "border-box",
-  borderRight: 1,
-  borderColor: "divider",
+  borderRight: `1px solid ${tokens.color.border}`,
 } as const;
 export function AppShell({ children }: { children: ReactNode }) {
   const vm = usePortalShellViewModel(),
     pathname = usePathname(),
-    router = useRouter();
+    router = useRouter(),
+    { ownRiders } = useRidersOwner(),
+    // Only restaurants with their own riders manage riders; for TrainDhaba's
+    // riders (or until the server says which) the section stays hidden.
+    items = ownRiders ? railItems : railItems.filter((i) => i.id !== "riders");
   if (!vm.authenticated) return null; // Redirecting to /login.
   const sidebar = (
     <AppSidebar
-      sections={sidebarSections}
+      items={items}
       pathname={pathname}
-      restaurantName={vm.restaurantName}
+      badges={{ orders: vm.ordersInProgress }}
       onNavigate={(href) => {
         vm.closeMobile();
         router.push(href);
       }}
-      onLogout={vm.logout}
     />
   );
   return (
@@ -40,7 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         sx={{
           display: "flex",
           minHeight: "100vh",
-          bgcolor: "background.default",
+          bgcolor: tokens.color.page,
         }}
       >
         <Box
@@ -57,10 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ModalProps={{ keepMounted: true }}
             sx={{
               display: { xs: "block", md: "none" },
-              "& .MuiDrawer-paper": {
-                ...paperSx,
-                overflowX: "hidden",
-              },
+              "& .MuiDrawer-paper": { ...paperSx, overflowX: "hidden" },
             }}
           >
             {sidebar}
@@ -70,10 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             open
             sx={{
               display: { xs: "none", md: "block" },
-              "& .MuiDrawer-paper": {
-                ...paperSx,
-                overflowX: "hidden",
-              },
+              "& .MuiDrawer-paper": { ...paperSx, overflowX: "hidden" },
             }}
           >
             {sidebar}
@@ -94,10 +93,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             sx={{
               flex: 1,
               width: "100%",
-              maxWidth: 1680,
-              mx: "auto",
-              px: { xs: 2, sm: 2.5, md: 3 },
-              py: { xs: 2.5, md: 3 },
+              // The redesigned screens place their own margins.
+              ...(isRedesignedPath(pathname)
+                ? {}
+                : { px: { xs: 2, md: 3 }, py: { xs: 2.5, md: 3 } }),
             }}
           >
             <BackButton />
