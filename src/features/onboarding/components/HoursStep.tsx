@@ -86,18 +86,16 @@ function SlotRow({
       sx={{
         display: "grid",
         gridTemplateColumns: same
-          ? "minmax(0, 1fr) minmax(0, 1fr) 36px"
+          ? "minmax(0, 1fr) auto minmax(0, 1fr) 36px"
           : "minmax(0, 1fr) auto minmax(0, 1fr) 36px",
-        columnGap: same ? 1.5 : 1,
+        columnGap: 1,
         alignItems: "start",
       }}
     >
       <TimeField compact={!same} label={`${label} opens`} placeholder="Open time" title="Open time" value={start} onChange={onStart} error={errorStart} />
-      {!same && (
-        <Typography sx={{ height, lineHeight: `${height}px`, fontSize: 12, color: tokens.color.textMuted }}>
-          to
-        </Typography>
-      )}
+      <Typography aria-hidden sx={{ height, lineHeight: `${height}px`, fontSize: 30, fontWeight: 300, color: tokens.color.textMuted }}>
+        -
+      </Typography>
       <TimeField compact={!same} label={`${label} closes`} placeholder="Close time" title="Close time" value={end} onChange={onEnd} error={errorEnd} />
       <Box sx={{ height, display: "grid", placeItems: "center" }}>
         {onRemove && (
@@ -110,7 +108,7 @@ function SlotRow({
               height: 32,
               borderRadius: "50%",
               color: tokens.color.textMuted,
-              "&:hover": { color: tokens.color.error, bgcolor: tokens.color.errorBg },
+              "&:hover": { color: tokens.color.text, bgcolor: tokens.color.muted },
             }}
           >
             <CloseOutlined sx={{ fontSize: 18 }} />
@@ -148,6 +146,10 @@ export function HoursStep() {
       reference.length === 1 &&
       reference[0].start === ALL_DAY.start &&
       reference[0].end === ALL_DAY.end;
+  // "Copy <day> to all": the first open day whose slots are all filled in.
+  const copySource = days.find(
+    (d) => d.open && d.shifts.length > 0 && d.shifts.every((s) => s.start && s.end),
+  );
   const slotError = (i: number, j: number, key: "start" | "end") =>
     errors?.[i]?.shifts?.[j]?.[key]?.message;
   return (
@@ -251,16 +253,16 @@ export function HoursStep() {
                 Turn a day off to mark it closed
               </Typography>
             </Box>
-            <ButtonBase
-              onClick={() => {
-                const source = days.find((d) => d.open);
-                if (source)
-                  write(days.map((d) => (d.open ? { ...d, shifts: source.shifts } : d)));
-              }}
-              sx={{ fontSize: 14, fontWeight: 600, color: tokens.color.link }}
-            >
-              Copy {days.find((d) => d.open)?.day ?? "Monday"} to all open days
-            </ButtonBase>
+            {copySource && (
+              <ButtonBase
+                onClick={() =>
+                  write(days.map((d) => (d.open ? { ...d, shifts: copySource.shifts } : d)))
+                }
+                sx={{ fontSize: 14, fontWeight: 600, color: tokens.color.link }}
+              >
+                Copy {copySource.day} to all open days
+              </ButtonBase>
+            )}
             </Box>
           <Box sx={{ border: `1px solid ${tokens.color.border}`, borderRadius: "12px", overflow: "hidden" }}>
             {days.map((day, i) => (

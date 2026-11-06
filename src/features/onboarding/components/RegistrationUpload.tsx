@@ -1,9 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
-import { Controller, useFormContext, useWatch, type FieldPath } from "react-hook-form";
+import { Controller, useFormContext, type FieldPath } from "react-hook-form";
 import { Box, ButtonBase, FormHelperText, Typography } from "@mui/material";
-import CameraAltOutlined from "@mui/icons-material/CameraAltOutlined";
-import InsertPhotoOutlined from "@mui/icons-material/InsertPhotoOutlined";
 import ImageOutlined from "@mui/icons-material/ImageOutlined";
 import InsertDriveFileOutlined from "@mui/icons-material/InsertDriveFileOutlined";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
@@ -69,15 +67,6 @@ export function RegistrationUpload({
   note,
 }: Props) {
   const { control } = useFormContext<RegistrationForm>(),
-    restaurant = useWatch({ control, name: "restaurantName" }),
-    // "Kitchen Bowl" → KB; a photo icon until a name is typed
-    initial =
-      (restaurant ?? "")
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((word) => word.charAt(0).toUpperCase())
-        .join(""),
     saved = !!useSavedFiles()[savedAs[name]],
     logoPreview = usePreview("logo"),
     coverPreview = usePreview("cover");
@@ -112,53 +101,38 @@ export function RegistrationUpload({
         let body: ReactNode;
         if (variant === "logo")
           body = (
-            <Box sx={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
-              <Box
-                sx={{
-                  width: 120,
-                  height: 120,
-                  overflow: "hidden",
-                  display: "grid",
-                  placeItems: "center",
-                  borderRadius: "16px",
-                  fontSize: 28,
-                  fontWeight: 800,
-                  bgcolor: tokens.color.muted,
-                  border: `1.5px solid ${error ? tokens.color.error : "transparent"}`,
-                }}
-              >
-                {file || logoPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={file ? URL.createObjectURL(file) : logoPreview}
-                    alt="Logo preview"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : initial ? (
-                  initial
-                ) : (
-                  <InsertPhotoOutlined sx={{ fontSize: 44, color: tokens.color.textSubtle }} />
-                )}
-              </Box>
-              <ButtonBase
-                component="label"
-                aria-label={`${label}: choose a picture`}
-                sx={{
-                  position: "absolute",
-                  right: -6,
-                  bottom: -6,
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  bgcolor: tokens.color.card,
-                  border: `1px solid ${tokens.color.border}`,
-                  boxShadow: tokens.shadow.card,
-                }}
-              >
-                <CameraAltOutlined sx={{ fontSize: 16 }} />
-                {input}
-              </ButtonBase>
-            </Box>
+            <ButtonBase
+              component="label"
+              aria-label={`${label}: choose a picture`}
+              sx={{
+                width: 145,
+                minHeight: 120,
+                flexShrink: 0,
+                flexDirection: "column",
+                gap: 0.5,
+                overflow: "hidden",
+                textAlign: "center",
+                borderRadius: "12px",
+                bgcolor: tokens.color.sunken,
+                border: `1.5px dashed ${error ? tokens.color.error : tokens.color.dashed}`,
+                ...(file || logoPreview
+                  ? {
+                      backgroundImage: `url(${file ? URL.createObjectURL(file) : logoPreview})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      border: `1.5px solid ${error ? tokens.color.error : tokens.color.border}`,
+                      "& .MuiTypography-root, & .MuiSvgIcon-root": { display: "none" },
+                    }
+                  : {}),
+              }}
+            >
+              <FileUploadOutlined sx={{ color: tokens.color.text }} />
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Upload logo</Typography>
+              <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+                JPG or PNG
+              </Typography>
+              {input}
+            </ButtonBase>
           );
         else if (variant === "row")
           body = (

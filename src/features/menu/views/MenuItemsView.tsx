@@ -20,6 +20,7 @@ import CheckBoxOutlineBlank from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBox from "@mui/icons-material/CheckBox";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import SearchOutlined from "@mui/icons-material/SearchOutlined";
+import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import { cardSx, tokens, tokenScopeSx } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
@@ -29,6 +30,7 @@ import { EditCategoryDrawer } from "../components/EditCategoryDrawer";
 import type { MenuItem } from "../models/menuItem";
 import { MenuItemRow } from "../components/MenuItemRow";
 import { AddOnsPanel } from "../components/AddOnsPanel";
+import { MenuImportDialog } from "../components/MenuImportDialog";
 import { RecommendedMenu } from "../components/RecommendedMenu";
 import { CategoryRail } from "../components/CategoryRail";
 import { useMenuItemsViewModel } from "../viewmodels/useMenuItemsViewModel";
@@ -67,6 +69,7 @@ export function MenuItemsView({
     [subPicked, setSubPicked] = useState<string | null>(null),
     [outOnly, setOutOnly] = useState(false),
     [editing, setEditing] = useState(false),
+    [importing, setImporting] = useState(false),
     total = vm.items.length,
     outCount = total - vm.availableCount,
     // The first category is open until another is chosen.
@@ -212,6 +215,13 @@ export function MenuItemsView({
                 />
                 <Box sx={{ flex: 1 }} />
                 <CommonButton
+                  variant="outlined"
+                  startIcon={<UploadFileOutlined />}
+                  onClick={() => setImporting(true)}
+                >
+                  Import Excel
+                </CommonButton>
+                <CommonButton
                   variant="contained"
                   startIcon={<AddOutlined />}
                   href="/menu/add"
@@ -337,6 +347,7 @@ export function MenuItemsView({
           )}
         </Box>
       </Box>
+      <MenuImportDialog open={importing} onClose={() => setImporting(false)} />
       {editing && category && (
         <EditCategoryDrawer
           key={category.name}

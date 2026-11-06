@@ -287,6 +287,8 @@ Shown only when the restaurant uses its own riders (`useRidersOwner`, saved as `
 - **Interactions:** search; "Show out of stock only"; Recommended dropdown (add TrainDhaba's suggested categories); Add category / sub-category; Edit category drawer (rename, switch sub-categories on/off, add); Category on/off switch; in-stock toggle per dish (optimistic update with rollback); Edit dish; Delete (button in the edit drawer footer, confirm dialog); Add-ons tab.
 - **Form fields (`MenuItemForm`):** photo (JPG/WEBP, ≤ 2 MB, one image), name (required, ≤ 255), description (≤ 500), price (required, whole rupees, > 0), discount, category (required), sub-category, food type (Veg, Non-veg, Egg), prep time (5-minute steps, 5–240), available now, quantities, add-ons.
 - **Validation:** `menuItemFormSchema` in `models/menuItem.ts`, covered by `tests/menuItem.test.mjs`.
+- **Quantities:** any number of rows, each a quantity name (from `GET /menu-items/qty-types`, new names are created first with `POST /restaurant-qty-types`) and its own price. Saved as `qty_types: [{ qty_type, price }]` (JSON body, or a JSON string in multipart); `[]` clears them on an edit. The dish list shows the price range and the names. Dishes saved with the old single `qty_type` show it as one row at the dish price.
+- **Import from Excel:** the "Import Excel" button opens `MenuImportDialog`, which uses the server: `GET /menu-items/excel-template` (download), `POST /menu-items/excel-preview` (checks the file, saves nothing) and `POST /menu-items/excel-import` (all rows checked first, saved in one transaction). Limits: `.xlsx`, 5 MB, 500 rows, columns exactly as in the template. A workbook with any bad row imports nothing; the server returns the row errors (HTTP 400, shown in the dialog). New categories, sub-categories and quantity types are created by the import. Code: `useMenuImportViewModel.ts`, `menuItemApi.ts`.
 - **States:** loading spinner, empty ("No menu items yet"), filter-empty text, API error messages via `menuErrorMessage`, success toast on save.
 
 ### 5.10 Customers (`/customers/list`, `/customers/feedback`)
@@ -444,7 +446,8 @@ function multipart(fields, files) {
 Client-side zod mirrors backend validators (the menu schema comment cites `validators/menu-item.validator.js`). **TBC:** the backend validator rules beyond those mirrored.
 
 ### 7.11 Known contract gaps
-- Menu item with **several quantities and prices**: not yet in the API client; only `qty_type` and `total_price` are sent. **TBC:** field name.
+- **Backend bug (database types):** on the latest backend, migration `20261106_menu_item_qty_type_prices.sql` created `qty_type_id` as `uuid` in `restaurant_menu_item_qty_types`, `cart_items` and `order_items`, but `food_qty_type.qty_type_id` is `varchar` (`QTY001`). Listing menu items then fails with `operator does not exist: character varying = uuid`. Fix on the backend: make those columns `varchar` and the cart code compare as text.
+- **Registration step 1 edit:** needs `PUT /registration/{id}/restaurant-details`, which the backend does not have yet; a ready patch is in `docs/backend-patches/registration-restaurant-details-put.patch`.
 - Notifications and Offers have no endpoint.
 
 ---
@@ -574,7 +577,8 @@ Component tests, integration tests and end-to-end tests: **none in the repo**. *
 Authentication (OTP, password recovery); multi-step registration with documents, bank, map location and hours; approval status; dashboard and order management with kitchen ticket printing; group orders; riders; menu (categories, sub-categories, recommended categories, dishes, add-ons, stock, discount); customers and feedback; profile, change requests, working hours and password; online/offline status; legal pages; CI and Netlify configuration.
 
 ### 15.2 Pending or partial
-- Menu: **multiple quantities with prices per item** (UI built, only the first quantity name is saved; needs the backend field).
+- Menu: the backend database bug in §7.11 must be fixed before the item list works with quantity options.
+- Registration: editing the saved restaurant details (step 1) works in the portal and needs the backend route in §7.11.
 - Menu step and Review step of onboarding are disabled.
 - Offers: UI/model only. Notifications: no backend endpoint. Payments: endpoint TBC.
 - Out-of-stock "Back at <time>" messaging (design shows it) is not wired.

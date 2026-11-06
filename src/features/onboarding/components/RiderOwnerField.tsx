@@ -69,20 +69,25 @@ export function RiderOwnerField({
                 p: 1.75,
                 textAlign: "left",
                 borderRadius: "12px",
-                bgcolor: tokens.color.card,
-                border: `${selected ? 2 : 1.5}px solid ${
+                bgcolor: selected ? tokens.color.primarySubtle : tokens.color.card,
+                border: `2px solid ${
                   selected
-                    ? tokens.color.borderStrong
+                    ? tokens.color.primary
                     : error
                       ? tokens.color.error
                       : tokens.color.border
                 }`,
+                transition: "background-color .2s ease, border-color .2s ease",
+                "& .radio": {
+                  transition: "color .2s ease, transform .2s ease",
+                  transform: selected ? "scale(1.08)" : "none",
+                },
               }}
             >
               {selected ? (
-                <RadioButtonChecked sx={{ color: tokens.color.primary }} />
+                <RadioButtonChecked className="radio" sx={{ color: tokens.color.primary }} />
               ) : (
-                <RadioButtonUnchecked sx={{ color: tokens.color.borderInput }} />
+                <RadioButtonUnchecked className="radio" sx={{ color: tokens.color.borderInput }} />
               )}
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -98,12 +103,12 @@ export function RiderOwnerField({
                         fontSize: 10,
                         lineHeight: "16px",
                         fontWeight: 700,
-                        letterSpacing: "0.4px",
-                        color: tokens.color.success,
-                        bgcolor: tokens.color.successBg,
+                        color: tokens.color.primary,
+                        bgcolor: tokens.color.primarySubtle,
+                        border: `1px solid ${tokens.color.primarySubtleBorder}`,
                       }}
                     >
-                      RECOMMENDED
+                      ★ Recommended
                     </Box>
                   )}
                 </Box>

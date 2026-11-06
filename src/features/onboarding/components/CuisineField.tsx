@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import type { ControllerRenderProps } from "react-hook-form";
 import {
   Autocomplete,
@@ -54,8 +53,7 @@ export function CuisineField({
   field: ControllerRenderProps<RegistrationForm>;
   error?: string;
 }) {
-  const vm = useCuisinesViewModel(),
-    [focused, setFocused] = useState(false);
+  const vm = useCuisinesViewModel();
   const ids = Array.isArray(field.value) ? (field.value as string[]) : [];
   const selected = vm.cuisines.filter((cuisine) => ids.includes(cuisine.id));
   return (
@@ -73,15 +71,23 @@ export function CuisineField({
         popupIcon={<KeyboardArrowDownRounded />}
         getOptionDisabled={(option) => selected.length >= MAX && !ids.includes(option.id)}
         onChange={(_, value) => field.onChange(value.slice(0, MAX).map((v) => v.id))}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false);
-          field.onBlur();
+        onBlur={field.onBlur}
+        slotProps={{
+          // The same panel as the Restaurant type menu: a small gap under the
+          // field, rounded corners and the same shadow.
+          paper: { sx: { mt: 0.5, borderRadius: "12px", boxShadow: 8 } },
+          listbox: { sx: { py: 1 } },
+        }}
+        sx={{
+          // One line, always the same height: extra picks show as "+n".
+          "& .MuiOutlinedInput-root": { flexWrap: "nowrap", overflow: "hidden" },
+          "& .MuiAutocomplete-input": { minWidth: 40 },
+          "& .MuiChip-root": { maxWidth: 110, flexShrink: 0 },
         }}
         noOptionsText={vm.error || "No matching cuisine"}
         renderValue={(value, getItemProps) => {
-          // Two chips and "+1" while resting; every chip while choosing.
-          const visible = focused ? value : value.slice(0, SHOWN);
+          // Two chips and "+1" for the rest, so the field never grows.
+          const visible = value.slice(0, SHOWN);
           return (
             <>
               {visible.map((option, index) => {
@@ -91,7 +97,7 @@ export function CuisineField({
                 );
               })}
               {value.length > visible.length && (
-                <span style={{ fontSize: 13, color: tokens.color.textMuted }}>
+                <span style={{ fontSize: 13, color: tokens.color.textMuted, flexShrink: 0, marginLeft: 4 }}>
                   +{value.length - visible.length}
                 </span>
               )}

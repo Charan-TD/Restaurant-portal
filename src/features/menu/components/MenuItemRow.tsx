@@ -11,6 +11,13 @@ import { MenuItemThumb } from "./MenuItemThumb";
 import { MenuItemStatus } from "./MenuItemStatus";
 
 function PriceValue({ item }: { item: MenuItem }) {
+  // A dish with quantity options shows the range of their prices.
+  if (item.quantities.length > 0) {
+    const prices = item.quantities.map((q) => q.price),
+      low = Math.min(...prices),
+      high = Math.max(...prices);
+    return <>{low === high ? formatRupees(low) : `${formatRupees(low)} – ${formatRupees(high)}`}</>;
+  }
   if (item.discountedPrice === null) return <>{formatRupees(item.price)}</>;
   return (
     <>
@@ -40,7 +47,9 @@ export function MenuItemRow({
   saving: boolean;
   onAvailable: (available: boolean) => void;
 }) {
-  const detail = [item.qtyType, item.preparationMinutes ? `${item.preparationMinutes} min` : ""]
+  const detail = [
+    ...(item.quantities.length ? item.quantities.map((q) => q.name) : [item.qtyType]),
+    item.preparationMinutes ? `${item.preparationMinutes} min` : ""]
     .filter(Boolean)
     .join(" · ");
   return (

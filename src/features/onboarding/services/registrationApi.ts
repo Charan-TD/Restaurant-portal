@@ -94,6 +94,51 @@ async function createRegistration(
   });
   return body.data.registrationId;
 }
+/**
+ * PUT /registration/{id}/restaurant-details: edits the details saved in step 1.
+ * The mobile number is never sent (it was verified by OTP and cannot change);
+ * the password only when the vendor typed a new one; the pictures only when
+ * new ones were chosen.
+ */
+async function updateRegistrationDetails(
+  id: string,
+  form: RegistrationForm,
+  send: Send,
+) {
+  const data = multipart({
+    restaurant_name: form.restaurantName,
+    owner_name: form.ownerName,
+    restaurant_type: form.restaurantType
+      ? restaurantTypeValues[form.restaurantType]
+      : "",
+    riders_owner: form.riderOwner,
+    restaurant_email: form.email,
+    restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
+    password: form.password,
+    logo: form.logo,
+    cover: form.coverPhoto,
+  });
+  form.cuisines.forEach((cuisine) => data.append("cusines", cuisine));
+  form.foodServed.forEach((type) =>
+    data.append("food_served", foodTypeValues[type]),
+  );
+  try {
+    await send({
+      url: stepPath(id, "restaurant-details"),
+      method: "put",
+      data,
+    });
+  } catch (e) {
+    // The server may not take edits to this step yet.
+    const status = (e as { status?: number })?.status,
+      message = String((e as { message?: string })?.message ?? "");
+    if (status === 405 || (status === 404 && !/registration/i.test(message)))
+      throw new Error(
+        "Editing the restaurant details is not available yet. Please contact TrainDhaba support.",
+      );
+    throw e;
+  }
+}
 const savers: Partial<
   Record<
     StepId,
@@ -178,7 +223,7 @@ const savers: Partial<
 };
 /**
  * Saves one step and returns the registration id to use for the next steps.
- * The details step has no update endpoint, so it is sent only once.
+ * The details step is created once, then edited with PUT.
  */
 async function saveRegistrationStep(
   {
@@ -189,8 +234,13 @@ async function saveRegistrationStep(
   send: Send,
 ): Promise<string | null> {
   if (DEMO_MODE) return registrationId;
-  if (step === "details")
-    return registrationId ?? (await createRegistration(form, send));
+  if (step === "details") {
+    if (registrationId) {
+      await updateRegistrationDetails(registrationId, form, send);
+      return registrationId;
+    }
+    return createRegistration(form, send);
+  }
   const save = savers[step];
   if (!save) return registrationId;
   if (!registrationId)

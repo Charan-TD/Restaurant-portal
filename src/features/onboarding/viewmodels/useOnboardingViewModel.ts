@@ -15,6 +15,7 @@ import {
   useSaveRegistrationStepMutation,
 } from "../services/registrationApi";
 import { useRestoreRegistration } from "./useRestoreRegistration";
+import { requestDevicePosition } from "../services/locationService";
 import { errorMessage } from "@/shared/utils/errors";
 import { verifiedPhone } from "@/features/auth/services/verifiedPhone";
 import type { RegistrationForm } from "../models/registration";
@@ -83,6 +84,12 @@ export function useOnboardingViewModel() {
     if (form.getValues("mobile") !== phone)
       form.setValue("mobile", phone, { shouldValidate: false });
   }, [form, router]);
+  // The first step asks the browser for the device's location, so the location
+  // step can open on the map already pointing at where the vendor is.
+  const onFirstStep = portal.currentStep === 0;
+  useEffect(() => {
+    if (onFirstStep) void requestDevicePosition();
+  }, [onFirstStep]);
   // Reading this keeps the form's "changed" marks up to date.
   const changed = portal.form.formState.dirtyFields;
   const isChanged = (name: string) =>
@@ -118,9 +125,19 @@ export function useOnboardingViewModel() {
     portal.setCurrentStep(step);
     setError("");
   };
-  // The details step has no update endpoint: once saved it cannot be changed.
-  const detailsLocked =
-    !!portal.registrationId && portal.completed.includes(stepIndex("details"));
+  // Once the details are saved, the password is not asked for again: it is
+  // only checked and sent when the vendor types a new one.
+  const keepPassword = () =>
+    !!portal.registrationId &&
+    portal.completed.includes(stepIndex("details")) &&
+    !portal.form.getValues("password") &&
+    !portal.form.getValues("confirmPassword");
+  const fieldsOf = (step: StepId) =>
+    step === "details" && keepPassword()
+      ? stepFields.details.filter(
+          (name) => name !== "password" && name !== "confirmPassword",
+        )
+      : stepFields[step];
   /** Once every step is saved the vendor reviews and submits; before that, on to the next step. */
   const moveOn = (finished: number) => {
     if (steps.every((_, i) => i === finished || portal.completed.includes(i)))
@@ -144,7 +161,7 @@ export function useOnboardingViewModel() {
     // and no save: its files are on the server, not in this browser.
     if (
       portal.completed.includes(portal.currentStep) &&
-      !stepFields[id].some(isChanged) &&
+      !fieldsOf(id).some(isChanged) &&
       (!isLast || steps.every((_, i) => portal.completed.includes(i)))
     ) {
       moveOn(portal.currentStep);
@@ -157,8 +174,8 @@ export function useOnboardingViewModel() {
     );
     const valid = await portal.form.trigger(
       isLast
-        ? [...pending.flatMap((s) => stepFields[s.id]), ...stepFields[id]]
-        : stepFields[id],
+        ? [...pending.flatMap((s) => fieldsOf(s.id)), ...fieldsOf(id)]
+        : fieldsOf(id),
       { shouldFocus: true },
     );
     if (!valid) {
@@ -180,6 +197,7 @@ export function useOnboardingViewModel() {
       const check = matchChecks[stepId];
       if (
         check &&
+        !(stepId === "details" && keepPassword()) &&
         portal.form.getValues(check.field) !==
           portal.form.getValues(check.confirm)
       ) {
@@ -241,7 +259,6 @@ export function useOnboardingViewModel() {
     busy,
     restoring,
     restored: restore.restored,
-    detailsLocked,
     dismissRestored: restore.dismissRestored,
   };
 }

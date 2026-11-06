@@ -1,19 +1,21 @@
 "use client";
+import { useEffect } from "react";
 import { Controller } from "react-hook-form";
 import {
   Alert,
   Autocomplete,
   Box,
   CircularProgress,
+  ButtonBase,
   FormHelperText,
-  Typography,
 } from "@mui/material";
 import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import MyLocationOutlined from "@mui/icons-material/MyLocationOutlined";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
+import { requestDevicePosition } from "../services/locationService";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import { TextField } from "@mui/material";
-import { searchFieldSx } from "@/core/theme/tokens";
+import { searchFieldSx, tokens } from "@/core/theme/tokens";
 import { FormField } from "@/shared/components/form/FormField";
 import { useLocationSearchViewModel } from "../viewmodels/useLocationSearchViewModel";
 import { LocationMap } from "./LocationMap";
@@ -27,6 +29,42 @@ export function LocationSearch() {
       () => undefined,
       { enableHighAccuracy: true, timeout: 10_000 },
     );
+  // The first step already asked for the device's location: start the pin there.
+  useEffect(() => {
+    let cancelled = false;
+    void requestDevicePosition().then((position) => {
+      if (cancelled || !position) return;
+      // Skip when an address was loaded or picked in the meantime.
+      if (vm.form.getValues("latitude") != null) return;
+      void vm.placePin(position.latitude, position.longitude);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only when the step opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const onMap = (
+    <ButtonBase
+      onClick={useMyLocation}
+      sx={{
+        position: "absolute",
+        right: 12,
+        bottom: 12,
+        gap: 0.75,
+        height: 36,
+        px: 1.5,
+        fontSize: 13,
+        fontWeight: 600,
+        borderRadius: "10px",
+        bgcolor: tokens.color.card,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+      }}
+    >
+      <MyLocationOutlined sx={{ fontSize: 18, color: tokens.color.primary }} />
+      Use my location
+    </ButtonBase>
+  );
   const locate = (
     <CommonButton
       variant="outlined"
@@ -76,16 +114,24 @@ export function LocationSearch() {
               <TextField
                 {...params}
                 fullWidth
-                sx={searchFieldSx}
+                sx={{
+                  ...searchFieldSx,
+                  // Only the stroke turns primary; nothing is filled.
+                  "&& .MuiOutlinedInput-root.Mui-focused": {
+                    bgcolor: tokens.color.card,
+                    boxShadow: "none",
+                  },
+                  "&& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                    borderColor: tokens.color.primary,
+                  },
+                }}
                 placeholder="Search by restaurant name, area or street"
                 name={field.name}
                 inputRef={field.ref}
                 error={!!fieldState.error}
                 helperText={
                   fieldState.error?.message ||
-                  (pinned
-                    ? "Not quite right? Drag the pin on the map below."
-                    : "Pick your location to see it on the map.")
+                  (pinned ? undefined : "Pick your location to see it on the map.")
                 }
                 slotProps={{
                   // Keep Autocomplete's own label/input props (they carry the
@@ -122,35 +168,16 @@ export function LocationSearch() {
           <Box className="full">
             {pinned ? (
               <>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    gap: 1,
-                    mb: 1.5,
-                  }}
-                >
-                  <Typography variant="subtitle2">
-                    Drag the pin to your entrance
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    aria-live="polite"
-                  >
-                    {vm.resolving
-                      ? "Updating address…"
-                      : `${vm.latitude!.toFixed(6)}, ${vm.longitude!.toFixed(6)}`}
-                  </Typography>
-                </Box>
                 <LocationMap
                   latitude={vm.latitude!}
                   longitude={vm.longitude!}
                   onMove={(lat, lng) => void vm.placePin(lat, lng)}
+                  overlay={
+                    <>
+                      {onMap}
+                    </>
+                  }
                 />
-                <Box sx={{ mt: 1.5 }}>{locate}</Box>
                 {vm.pinError && (
                   <Alert severity="warning" sx={{ mt: 1.5 }}>
                     {vm.pinError}

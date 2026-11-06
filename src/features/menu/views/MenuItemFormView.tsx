@@ -494,7 +494,7 @@ function AddOnsField({
 
 /**
  * The ways the dish is sold, as rows of quantity name and price, e.g. 500 g at
- * ₹299 and 1 kg at ₹549. Any number of rows; × removes one.
+ * ₹299 and 1 kg at ₹549. Any number of rows, each with its own price; × removes one.
  */
 function QuantitiesField({
   control,
@@ -507,8 +507,11 @@ function QuantitiesField({
     <Controller
       control={control}
       name="quantities"
-      render={({ field }) => {
+      render={({ field, fieldState }) => {
         const rows = field.value ?? [],
+          errors = (fieldState.error ?? []) as unknown as
+            | { name?: { message?: string }; price?: { message?: string } }[]
+            | undefined,
           update = (i: number, change: Partial<QuantityRow>) =>
             field.onChange(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
         return (
@@ -520,68 +523,80 @@ function QuantitiesField({
               Add sizes if the dish comes in more than one portion
             </Typography>
             <Box sx={{ display: "grid", gap: 1.25 }}>
-              {rows.map((row, i) => (
-                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <ComboField
-                      id={`menu-quantity-${i}`}
-                      value={row.name}
-                      options={options.filter(
-                        (o) =>
-                          o === row.name ||
-                          !rows.some((r) => r.name.toLowerCase() === o.toLowerCase()),
-                      )}
-                      placeholder="e.g. 500 g"
-                      error={false}
-                      onChange={(name) => update(i, { name })}
-                      onBlur={field.onBlur}
-                    />
+              {rows.map((row, i) => {
+                const nameError = errors?.[i]?.name?.message,
+                  priceError = errors?.[i]?.price?.message;
+                return (
+                  <Box key={i}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <ComboField
+                          id={`menu-quantity-${i}`}
+                          value={row.name}
+                          options={options.filter(
+                            (o) =>
+                              o === row.name ||
+                              !rows.some((r) => r.name.toLowerCase() === o.toLowerCase()),
+                          )}
+                          placeholder="e.g. 500 g"
+                          error={!!nameError}
+                          onChange={(name) => update(i, { name })}
+                          onBlur={field.onBlur}
+                        />
+                      </Box>
+                      <CommonTextField
+                        value={row.price == null ? "" : String(row.price)}
+                        placeholder="Price"
+                        error={!!priceError}
+                        onChange={(e) => {
+                          const next = clean(e.target.value);
+                          update(i, { price: next === "" ? null : Number(next) });
+                        }}
+                        slotProps={{
+                          htmlInput: {
+                            inputMode: "numeric",
+                            "aria-label": `Price for ${row.name || "quantity"}`,
+                          },
+                          input: {
+                            startAdornment: (
+                              <Box
+                                sx={{
+                                  alignSelf: "stretch",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  px: 1.25,
+                                  mr: 1.25,
+                                  ml: -1.75,
+                                  bgcolor: tokens.color.muted,
+                                  borderRight: 1,
+                                  borderColor: tokens.color.borderInput,
+                                  borderRadius: "10px 0 0 10px",
+                                  color: "text.secondary",
+                                }}
+                              >
+                                ₹
+                              </Box>
+                            ),
+                          },
+                        }}
+                        sx={{ width: 120, flexShrink: 0 }}
+                      />
+                      <IconButton
+                        aria-label={`Remove ${row.name || "quantity"}`}
+                        onClick={() => field.onChange(rows.filter((_, j) => j !== i))}
+                        sx={removeSx}
+                      >
+                        <CloseOutlined fontSize="small" />
+                      </IconButton>
+                    </Box>
+                    {(nameError || priceError) && (
+                      <FormHelperText error sx={{ mx: 0 }}>
+                        {nameError || priceError}
+                      </FormHelperText>
+                    )}
                   </Box>
-                  <CommonTextField
-                    value={row.price == null ? "" : String(row.price)}
-                    placeholder="Price"
-                    onChange={(e) => {
-                      const next = clean(e.target.value);
-                      update(i, { price: next === "" ? null : Number(next) });
-                    }}
-                    slotProps={{
-                      htmlInput: {
-                        inputMode: "numeric",
-                        "aria-label": `Price for ${row.name || "quantity"}`,
-                      },
-                      input: {
-                        startAdornment: (
-                          <Box
-                            sx={{
-                              alignSelf: "stretch",
-                              display: "flex",
-                              alignItems: "center",
-                              px: 1.25,
-                              mr: 1.25,
-                              ml: -1.75,
-                              bgcolor: tokens.color.muted,
-                              borderRight: 1,
-                              borderColor: tokens.color.borderInput,
-                              borderRadius: "10px 0 0 10px",
-                              color: "text.secondary",
-                            }}
-                          >
-                            ₹
-                          </Box>
-                        ),
-                      },
-                    }}
-                    sx={{ width: 120, flexShrink: 0 }}
-                  />
-                  <IconButton
-                    aria-label={`Remove ${row.name || "quantity"}`}
-                    onClick={() => field.onChange(rows.filter((_, j) => j !== i))}
-                    sx={removeSx}
-                  >
-                    <CloseOutlined fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
+                );
+              })}
             </Box>
             <Button
               size="small"

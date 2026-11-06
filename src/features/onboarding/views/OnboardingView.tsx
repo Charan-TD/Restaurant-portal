@@ -7,6 +7,7 @@ import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { cardSx, tokens } from "@/core/theme/tokens";
 import {
   steps,
+  stepIndex,
   fieldGroups,
   type StepId,
 } from "@/core/constants/onboarding";
@@ -118,11 +119,11 @@ function StepBody({
         <>
           {locked && (
             <Banner title="Restaurant details are saved">
-              These cannot be changed here any more. To correct something,
-              contact TrainDhaba support.
+              You can still change them. Your mobile number was verified by OTP,
+              so it stays as it is. Leave the password empty to keep it.
             </Banner>
           )}
-          <Box inert={locked} sx={{ opacity: locked ? 0.6 : 1 }}>
+          <Box>
             <Section title="Logo and cover photo">
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
                 <RegistrationUpload
@@ -203,12 +204,14 @@ function StepBody({
               <Field step="bank" name="bankName" />
             </Grid>
           </Section>
-          <Section title="Cancelled cheque *">
+          <Section title="Cancelled cheque">
+            <Typography sx={{ mt: -1, mb: 1.5, fontSize: 13, color: tokens.color.textMuted }}>
+              Must show your name, account number and IFSC
+            </Typography>
             <RegistrationUpload
               name="bankProof"
-              label="Cancelled cheque or passbook page"
-              note="Shows your name, account number and IFSC"
-              variant="row"
+              label="Upload cancelled cheque or passbook"
+              hint="PDF, JPG or PNG · up to 5 MB"
             />
           </Section>
         </>
@@ -283,7 +286,7 @@ export function OnboardingView() {
           </Typography>
         </Box>
         <Box sx={{ p: 3 }}>
-          <StepBody id={id} locked={vm.detailsLocked} onEdit={vm.go} />
+          <StepBody id={id} locked={vm.completed.includes(stepIndex("details")) && !!vm.registrationId} onEdit={vm.go} />
           {vm.error && (
             <ToastAlert severity="error" sx={{ mt: 3 }}>
               {vm.error}

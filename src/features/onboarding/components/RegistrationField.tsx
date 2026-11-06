@@ -23,49 +23,8 @@ import { FormField, prefixAdornment } from "@/shared/components/form/FormField";
 import { CuisineField } from "./CuisineField";
 import { FoodServedField } from "./FoodServedField";
 import { RiderOwnerField } from "./RiderOwnerField";
-import { passwordRules, todayIso } from "../models/validation";
+import { todayIso } from "../models/validation";
 import { useVerifiedPhone } from "@/features/auth/services/verifiedPhone";
-
-/**
- * The password rules as a five-part bar that fills as each one is met, and one
- * line saying what is still needed.
- */
-function PasswordHints({ value, failed }: { value: string; failed: boolean }) {
-  const met = passwordRules.filter((rule) => rule.test(value)),
-    missing = passwordRules.filter((rule) => !rule.test(value)),
-    done = missing.length === 0,
-    color = done ? tokens.color.success : failed ? tokens.color.error : tokens.color.textMuted;
-  return (
-    <Box
-      component="span"
-      title="At least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special character."
-      sx={{ display: "block" }}
-    >
-      <Box component="span" aria-hidden sx={{ display: "flex", gap: 0.5, mt: 0.25, mb: 0.5 }}>
-        {passwordRules.map((rule, i) => (
-          <Box
-            key={rule.short}
-            component="span"
-            sx={{
-              flex: 1,
-              height: 4,
-              borderRadius: 2,
-              bgcolor: i < met.length ? tokens.color.success : tokens.color.border,
-              transition: "background-color .2s",
-            }}
-          />
-        ))}
-      </Box>
-      <Box component="span" sx={{ display: "block", color, fontWeight: done ? 600 : 400 }}>
-        {done
-          ? "✓ Strong password"
-          : value
-            ? `Still needed: ${missing.map((rule) => rule.short.toLowerCase()).join(", ")}`
-            : "8+ characters · uppercase · lowercase · number · symbol"}
-      </Box>
-    </Box>
-  );
-}
 
 const icons = {
   restaurant: <StorefrontOutlined sx={{ fontSize: 20 }} />,
@@ -136,20 +95,13 @@ export function RegistrationField({
           display =
             locked && value.length > 5 ? `${value.slice(0, 5)} ${value.slice(5)}` : value,
           helper =
-            (definition.name === "password" ? (
-              <PasswordHints value={value} failed={!!error} />
-            ) : null) ||
             error ||
             (locked
               ? "Verified with OTP"
               : mismatch
                 ? "These do not match."
                 : matched && definition.matchText
-                  ? (
-                      <Box component="span" sx={{ fontWeight: 600, color: tokens.color.success }}>
-                        {definition.matchText}
-                      </Box>
-                    )
+                  ? definition.matchText
                   : definition.hint),
           start = definition.prefix ? (
             prefixAdornment(definition.prefix)
@@ -164,6 +116,23 @@ export function RegistrationField({
             htmlFor={id}
             required={!definition.optional && !onFirstStep}
             note={definition.labelNote}
+            info={
+              definition.name === "password"
+                ? (
+                    <Box component="span" sx={{ display: "block" }}>
+                      <Box component="span" sx={{ display: "block", mb: 0.5, fontWeight: 700 }}>
+                        Password must have
+                      </Box>
+                      <Box component="span" sx={{ display: "block", color: tokens.color.textMuted }}>
+                        At least 8 characters
+                        <br />1 capital and 1 small letter
+                        <br />1 number
+                        <br />1 symbol, like @ # $
+                      </Box>
+                    </Box>
+                  )
+                : undefined
+            }
           >
             <TextField
               fullWidth
@@ -228,9 +197,6 @@ export function RegistrationField({
                     </InputAdornment>
                   ) : password ? (
                     <InputAdornment position="end" sx={{ gap: 0.5 }}>
-                      {matched && (
-                        <CheckOutlined sx={{ fontSize: 20, color: tokens.color.success }} />
-                      )}
                       <IconButton
                         size="small"
                         edge="end"

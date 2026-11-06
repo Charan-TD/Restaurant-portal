@@ -750,6 +750,10 @@ body {
 }
 
 html {
+  /* The page scrolls, but no scrollbar is drawn (so nothing shifts when a
+     card opens and the page gets taller). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -770,4 +774,8 @@ img,
 svg,
 video {
   max-width: 100%;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }

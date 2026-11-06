@@ -49,7 +49,9 @@ export interface MenuItem {
   lowStockThreshold: number;
   /** Ids of the restaurant add-ons offered with this item. */
   addOnIds: string[];
-  /** How the item is sold, e.g. Plate or Half Plate. */
+  /** The ways the dish is sold, each with its own price (from `qty_types`). */
+  quantities: { name: string; price: number }[];
+  /** The old single "sold as" name; older dishes still carry it. */
   qtyType: string;
   /** The restaurant's own in / out of stock switch. */
   available: boolean;
@@ -94,7 +96,6 @@ export interface MenuItemForm {
   quantity: number | null;
   lowStockThreshold: number | null;
   addOnIds: string[];
-  qtyType: string;
   /** The ways the dish is sold, e.g. 500 g at ₹299 and 1 kg at ₹549. */
   quantities: QuantityRow[];
   available: boolean;
@@ -114,7 +115,6 @@ export const emptyMenuItemForm = (): MenuItemForm => ({
   quantity: 0,
   lowStockThreshold: 0,
   addOnIds: [],
-  qtyType: "",
   quantities: [],
   available: true,
   images: [null],
@@ -157,11 +157,10 @@ export const menuItemFormSchema: z.ZodType<MenuItemForm> = z
     quantity: wholeNumber("stock quantity"),
     lowStockThreshold: wholeNumber("low-stock level"),
     addOnIds: z.array(z.string()),
-    qtyType: z.string(),
     quantities: z.array(
       z.object({
-        name: z.string().trim().max(100, "Keep the quantity name short."),
-        price: z.number().int("Enter whole rupees.").min(0).nullable(),
+        name: z.string().trim().max(255, "Keep the quantity name under 255 characters."),
+        price: z.number().int("Enter whole rupees.").min(0, "The price cannot be negative.").nullable(),
       }),
     ),
     available: z.boolean(),
@@ -185,6 +184,29 @@ export const menuItemFormSchema: z.ZodType<MenuItemForm> = z
         path: ["discountedPrice"],
         message: "The offer price must be lower than the price.",
       });
+    const seen = new Set<string>();
+    data.quantities.forEach((row, i) => {
+      const name = row.name.trim();
+      if (!name)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["quantities", i, "name"],
+          message: "Enter the quantity, e.g. 500 g.",
+        });
+      else if (seen.has(name.toLowerCase()))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["quantities", i, "name"],
+          message: "Each quantity can be added once.",
+        });
+      else seen.add(name.toLowerCase());
+      if (row.price === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["quantities", i, "price"],
+          message: "Enter the price.",
+        });
+    });
   }) as z.ZodType<MenuItemForm>;
 export const toMenuItemForm = (item: MenuItem): MenuItemForm => ({
   foodType: item.foodType ?? "",
@@ -199,8 +221,12 @@ export const toMenuItemForm = (item: MenuItem): MenuItemForm => ({
   quantity: item.quantity,
   lowStockThreshold: item.lowStockThreshold,
   addOnIds: item.addOnIds,
-  qtyType: item.qtyType,
-  quantities: item.qtyType ? [{ name: item.qtyType, price: item.price }] : [],
+  // A dish saved before quantity options existed shows its one type at the dish price.
+  quantities: item.quantities.length
+    ? item.quantities.map((q) => ({ name: q.name, price: q.price }))
+    : item.qtyType
+      ? [{ name: item.qtyType, price: item.price }]
+      : [],
   available: item.available,
   images: [null],
 });
@@ -226,8 +252,11 @@ export function toMenuItemPayload(form: MenuItemForm) {
     tax_rate: form.taxRate ?? 0,
     preparation_time_minutes: form.preparationMinutes ?? 0,
     quantity: form.quantity ?? 0,
-    // Only the first quantity reaches the backend until it takes a list.
-    qty_type: form.quantities[0]?.name.trim() || form.qtyType || undefined,
+    // Quantity options with their own prices; [] clears them on an edit.
+    qty_types: form.quantities.map((q) => ({
+      qty_type: q.name.trim(),
+      price: q.price ?? 0,
+    })),
     addons: form.addOnIds,
     low_stock_threshold: form.lowStockThreshold ?? 0,
     owner_is_available: form.available,
@@ -239,6 +268,7 @@ export function toCreatePayload(form: MenuItemForm) {
   const payload: Record<string, unknown> = { ...toMenuItemPayload(form) };
   for (const key of ["tax_rate", "quantity", "low_stock_threshold"])
     delete payload[key];
+  if (form.quantities.length === 0) delete payload.qty_types;
   return payload;
 }
 /** Price and discount fields, which the server validates together. */
@@ -316,6 +346,13 @@ export function fromMenuItemRow(row: Row): MenuItem {
       (a: unknown): string[] => {
         const id = typeof a === "string" ? a : text((a as Row | null)?.id);
         return id ? [id] : [];
+      },
+    ),
+    quantities: (Array.isArray(row.qty_types) ? row.qty_types : []).flatMap(
+      (q: unknown) => {
+        const o = (q ?? {}) as Row,
+          name = text(o.qty_type) || text(o.qty_type_name);
+        return name ? [{ name, price: number(o.price) }] : [];
       },
     ),
     qtyType: text(row.qty_type),

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Box, useTheme } from "@mui/material";
@@ -19,6 +19,8 @@ interface Props {
   /** Shows the pin without letting it be moved. */
   readOnly?: boolean;
   height?: number;
+  /** Laid over the map, e.g. a "Use my location" button. */
+  overlay?: ReactNode;
 }
 /** Map with a draggable pin for the restaurant's exact position. */
 export function LocationMap({
@@ -27,6 +29,7 @@ export function LocationMap({
   onMove,
   readOnly = false,
   height,
+  overlay,
 }: Props) {
   const theme = useTheme(),
     container = useRef<HTMLDivElement>(null),
@@ -61,7 +64,7 @@ export function LocationMap({
         style: STYLE_URL,
         center,
         zoom: ZOOM,
-        attributionControl: { compact: true },
+        attributionControl: false,
       });
       if (!readOnly)
         created.addControl(
@@ -106,18 +109,22 @@ export function LocationMap({
     map.current?.flyTo({ center: [longitude, latitude], zoom: ZOOM });
   }, [latitude, longitude]);
   return (
-    <Box
-      ref={container}
-      role="region"
-      aria-label="Map. Drag the pin, or tap the map, to set your restaurant's exact location."
-      sx={{
-        height: height ?? { xs: 280, sm: 340 },
-        borderRadius: "12px",
-        overflow: "hidden",
-        border: 1,
-        borderColor: "divider",
-        bgcolor: "action.hover",
-      }}
-    />
+    <Box sx={{ position: "relative" }}>
+      <Box
+        ref={container}
+        role="region"
+        aria-label="Map. Drag the pin, or tap the map, to set your restaurant's exact location."
+        sx={{
+          height: height ?? { xs: 280, sm: 340 },
+          borderRadius: "12px",
+          overflow: "hidden",
+          border: 1,
+          borderColor: "divider",
+          bgcolor: "action.hover",
+        }}
+      />
+      {/* Buttons that sit on the map. */}
+      {overlay}
+    </Box>
   );
 }

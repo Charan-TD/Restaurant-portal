@@ -59,10 +59,16 @@ export function FoodServedField({
                 justifyContent: "flex-start",
                 textAlign: "left",
                 borderRadius: "12px",
-                bgcolor: tokens.color.card,
-                border: `${on ? 2 : 1.5}px solid ${
-                  on ? tokens.color.borderStrong : error ? tokens.color.error : tokens.color.borderInput
+                bgcolor: on ? tokens.color.primarySubtle : tokens.color.card,
+                border: `2px solid ${
+                  on ? tokens.color.primary : error ? tokens.color.error : tokens.color.borderInput
                 }`,
+                transition: "background-color .2s ease, border-color .2s ease",
+                "& .tick": {
+                  opacity: on ? 1 : 0,
+                  transform: on ? "scale(1)" : "scale(0.4)",
+                  transition: "opacity .2s ease, transform .2s ease",
+                },
               }}
             >
               <FoodTypeMark type={type} />
@@ -72,7 +78,7 @@ export function FoodServedField({
                   {notes[type]}
                 </Typography>
               </Box>
-              {on && <CheckOutlined sx={{ fontSize: 18, color: tokens.color.success }} />}
+              <CheckOutlined className="tick" sx={{ fontSize: 18, color: tokens.color.primary }} />
             </ButtonBase>
           );
         })}

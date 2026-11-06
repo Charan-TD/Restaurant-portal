@@ -1,0 +1,156 @@
+diff --git a/backend/repositories/restaurantRegistration.repository.js b/backend/repositories/restaurantRegistration.repository.js
+index 7e68d82..e9f9798 100644
+--- a/backend/repositories/restaurantRegistration.repository.js
++++ b/backend/repositories/restaurantRegistration.repository.js
+@@ -170,6 +170,7 @@ export const updateRegistrationSection = async (
+         "owner_name",
+         "owner_mobile",
+         "restaurant_type",
++        "riders_owner",
+         "restaurant_email",
+         "restaurant_contact",
+         "password_hash",
+diff --git a/backend/routes/restaurantRegistration.routes.js b/backend/routes/restaurantRegistration.routes.js
+index 52e5f0e..2703f48 100644
+--- a/backend/routes/restaurantRegistration.routes.js
++++ b/backend/routes/restaurantRegistration.routes.js
+@@ -16,6 +16,7 @@ import {
+ 
+ import {
+   validateRestaurantDetails,
++  validateRestaurantDetailsUpdate,
+   validateRestaurantLocation,
+   validateBusinessDocuments,
+   validateBankAccount,
+@@ -329,6 +330,51 @@ router.get(
+   getRegistrationSection("restaurant_details")
+ );
+ 
++/**
++ * @swagger
++ * /api/v1/restaurants/registration/{registrationId}/restaurant-details:
++ *   put:
++ *     summary: Edit the saved restaurant details
++ *     description: |
++ *       Updates step 1 of a registration that has not been submitted yet.
++ *       The mobile number cannot be changed. Send multipart/form-data with
++ *       the same fields as the create request except mobile; password is
++ *       optional (send it only to change it); logo and cover replace the
++ *       saved pictures when sent.
++ *     tags:
++ *       - Restaurant Registration
++ *     parameters:
++ *       - in: path
++ *         name: registrationId
++ *         required: true
++ *         schema:
++ *           type: string
++ *           format: uuid
++ *     responses:
++ *       200:
++ *         description: Restaurant details saved successfully
++ *       400:
++ *         description: Validation error
++ *       404:
++ *         description: Restaurant registration not found
++ *       409:
++ *         description: Already submitted, or the email is used by another registration
++ */
++router.put(
++  "/:registrationId/restaurant-details",
++  uploadRestaurantRegistrationImages,
++  validateRestaurantDetailsUpdate,
++  (req, res, next) => {
++    req.params.section = "restaurant_details";
++
++    updateRestaurantRegistrationSectionController(
++      req,
++      res,
++      next
++    );
++  }
++);
++
+ /**
+  * @swagger
+  * /api/v1/restaurants/registration/{registrationId}/location:
+diff --git a/backend/services/restaurantRegistration.service.js b/backend/services/restaurantRegistration.service.js
+index 471a879..2c72f07 100644
+--- a/backend/services/restaurantRegistration.service.js
++++ b/backend/services/restaurantRegistration.service.js
+@@ -537,6 +537,37 @@ export const updateRestaurantRegistrationSection =
+           )?.toLowerCase();
+       }
+ 
++      if (updateData.restaurant_email !== undefined) {
++        const taken = await pool.query(
++          "SELECT id FROM public.restaurants " +
++            "WHERE LOWER(restaurant_email) = LOWER($1) AND id <> $2 LIMIT 1",
++          [updateData.restaurant_email, registrationId]
++        );
++
++        if (taken.rows.length > 0) {
++          throw new AppError(
++            "A restaurant registration already exists for this email",
++            409
++          );
++        }
++      }
++
++      if (files?.logo?.[0]) {
++        updateData.logo_id = await uploadRegistrationImage(
++          registrationId,
++          "logo",
++          files.logo[0]
++        );
++      }
++
++      if (files?.cover?.[0]) {
++        updateData.cover_id = await uploadRegistrationImage(
++          registrationId,
++          "cover",
++          files.cover[0]
++        );
++      }
++
+       if (updateData.owner_name !== undefined) {
+         updateData.owner_name =
+           normalizeString(
+@@ -859,6 +890,7 @@ export const updateRestaurantRegistrationSection =
+         "owner_name",
+         "owner_mobile",
+         "restaurant_type",
++        "riders_owner",
+         "restaurant_email",
+         "restaurant_contact",
+         "password_hash",
+diff --git a/backend/validators/restaurantRegistration.validator.js b/backend/validators/restaurantRegistration.validator.js
+index 8ee36bb..cc51b31 100644
+--- a/backend/validators/restaurantRegistration.validator.js
++++ b/backend/validators/restaurantRegistration.validator.js
+@@ -365,6 +365,25 @@ export const validateRestaurantDetails = (
+ };
+ 
+ 
++/**
++ * PUT /:registrationId/restaurant-details: edit the details saved in step 1.
++ * Same rules as creating, except that the mobile number (verified by OTP) can
++ * never be changed here and a password is only needed when it is being changed.
++ */
++export const validateRestaurantDetailsUpdate = (req, res, next) => {
++  const body = req.body ?? {};
++  const hasPassword = typeof body.password === "string" && body.password !== "";
++  // Placeholders let the creation rules run on everything else.
++  body.mobile = "+910000000000";
++  if (!hasPassword) body.password = "unchanged";
++  validateRestaurantDetails(req, res, (error) => {
++    delete req.body.mobile;
++    if (!hasPassword) delete req.body.password;
++    next(error);
++  });
++};
++
++
+ /* -------------------------------------------------------------------------- */
+ /* Restaurant Location                                                        */
+ /* -------------------------------------------------------------------------- */

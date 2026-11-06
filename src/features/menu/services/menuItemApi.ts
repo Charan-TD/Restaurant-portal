@@ -1,4 +1,5 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
+import { api } from "@/core/api/axios";
 import {
   API_PATHS,
   endpoint,
@@ -8,10 +9,8 @@ import {
 import {
   changedMenuItemPayload,
   fromMenuItemRow,
-  pricingPayload,
   qtyTypes,
   toCreatePayload,
-  toMenuItemForm,
   type MenuItem,
   type MenuItemForm,
 } from "../models/menuItem";
@@ -69,6 +68,7 @@ let demoItems: MenuItem[] = [
     lowStockThreshold: 5,
     addOnIds: [],
     qtyType: "",
+    quantities: [],
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -89,6 +89,7 @@ let demoItems: MenuItem[] = [
     lowStockThreshold: 5,
     addOnIds: [],
     qtyType: "",
+    quantities: [],
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -109,6 +110,7 @@ let demoItems: MenuItem[] = [
     lowStockThreshold: 0,
     addOnIds: [],
     qtyType: "",
+    quantities: [],
     available: false,
     adminAvailable: null,
     adminInactiveReason: "",
@@ -131,7 +133,11 @@ function demoSave(id: string, form: MenuItemForm): MenuItem {
     quantity: form.quantity ?? 0,
     lowStockThreshold: form.lowStockThreshold ?? 0,
     addOnIds: [...form.addOnIds],
-    qtyType: form.quantities[0]?.name.trim() || form.qtyType,
+    qtyType: "",
+    quantities: form.quantities.map((q) => ({
+      name: q.name.trim(),
+      price: q.price ?? 0,
+    })),
     available: form.available,
     adminAvailable: current?.adminAvailable ?? null,
     adminInactiveReason: current?.adminInactiveReason ?? "",
@@ -266,15 +272,13 @@ async function setMenuItemAvailable(
     demoItems = demoItems.map((i) => (i.id === id ? item : i));
     return item;
   }
-  const data = await send({
-    url: itemPath(id),
+  // PATCH /menu-items/{id}/availability changes only this one flag.
+  await send({
+    url: `${itemPath(id)}/availability`,
     method: "patch",
-    data: {
-      ...pricingPayload(toMenuItemForm(current)),
-      owner_is_available: available,
-    },
+    data: { owner_is_available: available },
   });
-  return readItem(data);
+  return { ...current, available };
 }
 async function deleteMenuItem(id: string, send: Send): Promise<void> {
   if (DEMO_MODE) {
@@ -540,6 +544,124 @@ async function createQtyType(name: string, send: Send): Promise<void> {
     if ((e as { status?: number })?.status !== 409) throw e;
   }
 }
+/** One row of the sheet the server could not accept, as it reports it. */
+export interface ExcelRowError {
+  row: number;
+  item: string | null;
+  errors: string[];
+}
+/** The names an import would reuse or create. */
+interface NameSplit {
+  existing: string[];
+  new: string[];
+}
+export interface ExcelPreview {
+  valid: boolean;
+  rows: number;
+  validRows: number;
+  invalidRows: number;
+  categories: NameSplit;
+  subcategories: NameSplit;
+  quantityTypes: NameSplit;
+  errors: ExcelRowError[];
+}
+export interface ExcelImportResult {
+  imported: boolean;
+  created: {
+    items: number;
+    categories: number;
+    subcategories: number;
+    quantityTypes: number;
+  };
+  errors: ExcelRowError[];
+}
+const names = (value: unknown): NameSplit => {
+  const o = (value ?? {}) as Record<string, unknown>,
+    list = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+  return { existing: list(o.existing), new: list(o.new) };
+};
+const rowErrors = (value: unknown): ExcelRowError[] =>
+  (Array.isArray(value) ? value : []).map((e) => {
+    const o = (e ?? {}) as Row;
+    return {
+      row: Number(o.row) || 0,
+      item: typeof o.item === "string" ? o.item : null,
+      errors: Array.isArray(o.errors) ? o.errors.map(String) : [],
+    };
+  });
+const excelBody = (file: File) => {
+  const body = new FormData();
+  body.append("file", file);
+  return body;
+};
+/** POST /menu-items/excel-preview: checks a workbook and saves nothing. */
+async function previewMenuExcel(file: File, send: Send): Promise<ExcelPreview> {
+  const data = await send({
+      url: `${endpoint(API_PATHS.menuItems)}/excel-preview`,
+      method: "post",
+      data: excelBody(file),
+    }),
+    d = ((data as { data?: unknown })?.data ?? data) as Row,
+    s = (d.summary ?? {}) as Row;
+  return {
+    valid: d.valid === true,
+    rows: Number(s.rows) || 0,
+    validRows: Number(s.valid_rows) || 0,
+    invalidRows: Number(s.invalid_rows) || 0,
+    categories: names(s.categories),
+    subcategories: names(s.subcategories),
+    quantityTypes: names(s.quantity_types),
+    errors: rowErrors(d.errors),
+  };
+}
+/**
+ * POST /menu-items/excel-import: all rows are checked first and saved in one
+ * transaction. A workbook with problems comes back as 400 with the row errors
+ * and nothing is saved, which is a normal answer here, not a failure.
+ */
+async function importMenuExcel(file: File, send: Send): Promise<ExcelImportResult> {
+  try {
+    const data = await send({
+        url: `${endpoint(API_PATHS.menuItems)}/excel-import`,
+        method: "post",
+        data: excelBody(file),
+      }),
+      d = ((data as { data?: unknown })?.data ?? data) as Row,
+      c = (d.created ?? {}) as Row;
+    return {
+      imported: d.imported === true,
+      created: {
+        items: Number(c.items) || 0,
+        categories: Number(c.categories) || 0,
+        subcategories: Number(c.subcategories) || 0,
+        quantityTypes: Number(c.quantity_types) || 0,
+      },
+      errors: rowErrors(d.errors),
+    };
+  } catch (e) {
+    const body = (e as { status?: number; data?: { data?: Row } })?.data?.data;
+    if ((e as { status?: number })?.status === 400 && Array.isArray(body?.errors))
+      return {
+        imported: false,
+        created: { items: 0, categories: 0, subcategories: 0, quantityTypes: 0 },
+        errors: rowErrors(body.errors),
+      };
+    throw e;
+  }
+}
+/** GET /menu-items/excel-template: the workbook to fill in, as a file. */
+export async function downloadMenuExcelTemplate(): Promise<void> {
+  if (DEMO_MODE) throw new Error("The template is not available in demo mode.");
+  const response = await api.get(`${endpoint(API_PATHS.menuItems)}/excel-template`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(response.data as Blob),
+    link = document.createElement("a");
+  link.href = url;
+  link.download = "train-dhaba-menu-template.xlsx";
+  link.click();
+  URL.revokeObjectURL(url);
+}
 export const menuItemApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     listMenuItems: build.query<MenuItem[], void>({
@@ -588,6 +710,13 @@ export const menuItemApi = baseApi.injectEndpoints({
           patch.undo();
         }
       },
+    }),
+    previewMenuExcel: build.mutation<ExcelPreview, File>({
+      queryFn: flow(previewMenuExcel),
+    }),
+    importMenuExcel: build.mutation<ExcelImportResult, File>({
+      queryFn: flow(importMenuExcel),
+      invalidatesTags: ["MenuItems", "Categories", "QtyTypes"],
     }),
     deleteMenuItem: build.mutation<void, string>({
       queryFn: flow(deleteMenuItem),
@@ -642,6 +771,8 @@ export const {
   useGetMenuItemQuery,
   useSearchMenuItemsQuery,
   useListQtyTypesQuery,
+  usePreviewMenuExcelMutation,
+  useImportMenuExcelMutation,
   useCreateQtyTypeMutation,
   useCreateMenuItemMutation,
   useUpdateMenuItemMutation,

@@ -51,6 +51,28 @@ export const theme = createTheme({
         arrow: { color: "#26332b" },
       },
     },
+    // One look for the chosen row of every dropdown (the Restaurant type one):
+    // a soft primary tint, a little deeper under the pointer.
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          "&.Mui-selected": { backgroundColor: "rgba(242, 106, 46, 0.08)" },
+          "&.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
+            backgroundColor: "rgba(242, 106, 46, 0.12)",
+          },
+        },
+      },
+    },
+    MuiAutocomplete: {
+      styleOverrides: {
+        option: {
+          '&[aria-selected="true"]': { backgroundColor: "rgba(242, 106, 46, 0.08)" },
+          '&[aria-selected="true"].Mui-focused, &[aria-selected="true"]:hover': {
+            backgroundColor: "rgba(242, 106, 46, 0.12)",
+          },
+        },
+      },
+    },
     MuiTab: { styleOverrides: { root: { textTransform: "none" } } },
     MuiTabs: { styleOverrides: { indicator: { height: 3, borderRadius: 3 } } },
     MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
