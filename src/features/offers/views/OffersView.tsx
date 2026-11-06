@@ -12,6 +12,7 @@ import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
 import LocalOfferOutlined from "@mui/icons-material/LocalOfferOutlined";
 import PercentOutlined from "@mui/icons-material/PercentOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
+import { TimeField } from "@/shared/components/form/TimeField";
 import { cardHeaderSx, cardSx, tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonSelect } from "@/shared/components/form/CommonSelect";
@@ -67,6 +68,14 @@ function RangeField({
     minWidth: 0,
     flex: 1,
   } as const;
+  if (type === "time")
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <TimeField label={`${label} from`} value={from} onChange={onFrom} />
+        <span style={{ color: tokens.color.textSubtle }}>–</span>
+        <TimeField label={`${label} to`} value={to} onChange={onTo} />
+      </Box>
+    );
   return (
     <Box
       sx={{

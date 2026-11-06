@@ -1,40 +1,29 @@
 "use client";
-import type { ReactNode } from "react";
 import type { ControllerRenderProps } from "react-hook-form";
-import {
-  Box,
-  ButtonBase,
-  Chip,
-  FormHelperText,
-  Typography,
-} from "@mui/material";
-import TrainOutlined from "@mui/icons-material/TrainOutlined";
-import TwoWheelerOutlined from "@mui/icons-material/TwoWheelerOutlined";
+import { Box, ButtonBase, FormHelperText, Typography } from "@mui/material";
 import RadioButtonChecked from "@mui/icons-material/RadioButtonChecked";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
+import { tokens } from "@/core/theme/tokens";
 import type { RegistrationForm, RiderOwner } from "../models/registration";
 
 const options: {
   value: RiderOwner;
   title: string;
   description: string;
-  icon: ReactNode;
   recommended?: boolean;
 }[] = [
   {
     value: "Traindhaba",
-    title: "TrainDhaba riders",
+    title: "TrainDhaba rider",
     description:
-      "Our riders collect the order from you and deliver it to the passenger's seat.",
-    icon: <TrainOutlined />,
+      "We send a delivery partner to pick up and hand over at the coach.",
     recommended: true,
   },
   {
     value: "restaurant",
-    title: "Own riders",
+    title: "My own riders",
     description:
-      "Your own delivery staff take each order to the train. You add and assign them in the portal.",
-    icon: <TwoWheelerOutlined />,
+      "Your staff delivers to the coach. Add their name and phone for each order.",
   },
 ];
 
@@ -52,8 +41,9 @@ export function RiderOwnerField({
 }) {
   return (
     <Box className={className} role="radiogroup" aria-label={label}>
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>
-        {label} *
+      <Typography sx={{ fontSize: 16, fontWeight: 700 }}>{label}</Typography>
+      <Typography sx={{ mb: 1.5, fontSize: 13, color: tokens.color.textMuted }}>
+        Who takes the food from your outlet to the passenger&apos;s coach?
       </Typography>
       <Box
         sx={{
@@ -75,69 +65,52 @@ export function RiderOwnerField({
               sx={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: 1.5,
-                p: 2,
+                gap: 1.25,
+                p: 1.75,
                 textAlign: "left",
                 borderRadius: "12px",
-                border: 2,
-                borderColor: selected
-                  ? "primary.main"
-                  : error
-                    ? "error.main"
-                    : "divider",
-                bgcolor: selected ? "rgba(242, 106, 46, 0.06)" : "transparent",
-                transition: "border-color .15s, background-color .15s",
-                "&:hover": { borderColor: "primary.light" },
+                bgcolor: tokens.color.card,
+                border: `${selected ? 2 : 1.5}px solid ${
+                  selected
+                    ? tokens.color.borderStrong
+                    : error
+                      ? tokens.color.error
+                      : tokens.color.border
+                }`,
               }}
             >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  flexShrink: 0,
-                  borderRadius: "10px",
-                  display: "grid",
-                  placeItems: "center",
-                  bgcolor: "#f3f4f2",
-                  color: selected ? "primary.main" : "text.secondary",
-                }}
-              >
-                {option.icon}
-              </Box>
+              {selected ? (
+                <RadioButtonChecked sx={{ color: tokens.color.primary }} />
+              ) : (
+                <RadioButtonUnchecked sx={{ color: tokens.color.borderInput }} />
+              )}
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 700 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
                     {option.title}
                   </Typography>
                   {option.recommended && (
-                    <Chip
-                      size="small"
-                      color="success"
-                      label="Recommended"
-                      sx={{ height: 22, fontWeight: 600 }}
-                    />
+                    <Box
+                      component="span"
+                      sx={{
+                        px: 0.75,
+                        borderRadius: "6px",
+                        fontSize: 10,
+                        lineHeight: "16px",
+                        fontWeight: 700,
+                        letterSpacing: "0.4px",
+                        color: tokens.color.success,
+                        bgcolor: tokens.color.successBg,
+                      }}
+                    >
+                      RECOMMENDED
+                    </Box>
                   )}
                 </Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
-                >
+                <Typography sx={{ mt: 0.25, fontSize: 12, color: tokens.color.textMuted }}>
                   {option.description}
                 </Typography>
               </Box>
-              {selected ? (
-                <RadioButtonChecked color="primary" />
-              ) : (
-                <RadioButtonUnchecked color="disabled" />
-              )}
             </ButtonBase>
           );
         })}

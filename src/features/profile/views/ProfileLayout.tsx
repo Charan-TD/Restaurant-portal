@@ -33,10 +33,10 @@ type SectionId =
   | "hours"
   | "settings";
 
-/** "09:00" → "9:00 AM". */
+/** Times are shown in 24 hours, like 09:00. */
 const clock = (value: string) => {
   const [h, m] = value.split(":").map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
 const rowSx = {

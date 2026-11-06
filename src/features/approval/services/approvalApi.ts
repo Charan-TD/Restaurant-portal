@@ -18,6 +18,10 @@ async function getApproval(
   return {
     status: STATUS[String(review?.status).toLowerCase()] ?? "Under review",
     restaurantName: review?.restaurant_name,
+    submittedAt:
+      typeof review?.submitted_time === "string"
+        ? review.submitted_time
+        : undefined,
     reason: Array.isArray(review?.reasons)
       ? review.reasons.join(" ")
       : undefined,

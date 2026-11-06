@@ -1,6 +1,7 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type { StepId } from "@/core/constants/onboarding";
+import type { SavedFile } from "./registrationExtras";
 import {
   COUNTRY_CODE,
   type FoodType,
@@ -36,6 +37,30 @@ function multipart(fields: Record<string, string | File | null>) {
   });
   return body;
 }
+/** 20 random characters with an upper and lower case letter, a digit and a symbol. */
+function randomPassword() {
+  const pools = [
+      "ABCDEFGHJKLMNPQRSTUVWXYZ",
+      "abcdefghijkmnopqrstuvwxyz",
+      "23456789",
+      "!@#$%^&*",
+    ],
+    all = pools.join(""),
+    pick = (set: string) => {
+      const n = new Uint32Array(1);
+      crypto.getRandomValues(n);
+      return set[n[0] % set.length];
+    };
+  const chars = [...pools.map(pick), ...Array.from({ length: 16 }, () => pick(all))];
+  // Shuffle so the guaranteed characters are not always first.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const n = new Uint32Array(1);
+    crypto.getRandomValues(n);
+    const j = n[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
 async function createRegistration(
   form: RegistrationForm,
   send: Send,
@@ -52,7 +77,9 @@ async function createRegistration(
     riders_owner: form.riderOwner,
     restaurant_email: form.email,
     restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
-    password: form.password,
+    // Sign-in is by OTP, so the vendor is never asked for a password; the
+    // backend still wants one, so it gets a random one nobody needs to know.
+    password: form.password || randomPassword(),
     logo: form.logo,
     cover: form.coverPhoto,
   });
@@ -135,10 +162,13 @@ const savers: Partial<
               is_24_hours: around,
               slots:
                 day.open && !around
-                  ? day.shifts.map((shift) => ({
-                      opening_time: shift.start,
-                      closing_time: shift.end,
-                    }))
+                  ? // The backend wants a day's slots in time order.
+                    [...day.shifts]
+                      .sort((a, b) => a.start.localeCompare(b.start))
+                      .map((shift) => ({
+                        opening_time: shift.start,
+                        closing_time: shift.end,
+                      }))
                   : [],
             },
           ];
@@ -229,13 +259,26 @@ function reverse<T extends string>(values: Record<T, string>, raw: unknown) {
 }
 // The GET responses are not documented; they are read using the same field
 // names the matching save requests send.
+/** The uploaded files a section says it holds, by the id the backend keeps for each. */
+const held = (row: Row, ids: [SavedFile, string][]) =>
+  ids.filter(([, key]) => !!row[key]).map(([file]) => file);
 const loaders: Record<
   string,
-  { step: StepId; path: string; read: (row: Row) => Partial<RegistrationForm> }
+  {
+    step: StepId;
+    path: string;
+    read: (row: Row) => Partial<RegistrationForm>;
+    files?: (row: Row) => SavedFile[];
+  }
 > = {
   restaurant_details: {
     step: "details",
     path: "restaurant-details",
+    files: (row) =>
+      held(row, [
+        ["logo", "logo_id"],
+        ["cover", "cover_id"],
+      ]),
     read: (row) => {
       const type = reverse(restaurantTypeValues, row.restaurant_type),
         food = Array.isArray(row.food_served) ? row.food_served : [],
@@ -285,6 +328,14 @@ const loaders: Record<
   business_documents: {
     step: "documents",
     path: "business-documents",
+    files: (row) =>
+      held(row, [
+        ["fssai", "fssai_document_id"],
+        ["pan", "pan_document_id"],
+        ["gst", "gst_document_id"],
+        ["businessProof", "business_proof_document_id"],
+        ["identity", "aadhaar_document_id"],
+      ]),
     read: (row) => ({
       documentNumbers: {
         gst: str(row, "gst_number"),
@@ -299,6 +350,7 @@ const loaders: Record<
   bank_account: {
     step: "bank",
     path: "bank-account",
+    files: (row) => held(row, [["bankProof", "bank_proof_id"]]),
     read: (row) => {
       const accountNumber = str(row, "account_number");
       return {
@@ -327,10 +379,14 @@ const loaders: Record<
           return {
             day,
             open: saved?.is_open === true,
-            shifts: slots.map((slot) => ({
-              start: str(asRow(slot), "opening_time").slice(0, 5),
-              end: str(asRow(slot), "closing_time").slice(0, 5),
-            })),
+            // A 24-hour day is saved with no slots.
+            shifts:
+              saved?.is_open === true && saved?.is_24_hours === true
+                ? [{ start: "00:00", end: "23:59" }]
+                : slots.map((slot) => ({
+                    start: str(asRow(slot), "opening_time").slice(0, 5),
+                    end: str(asRow(slot), "closing_time").slice(0, 5),
+                  })),
           };
         }),
       };
@@ -340,6 +396,8 @@ const loaders: Record<
 export interface SavedRegistration {
   completed: StepId[];
   values: Partial<RegistrationForm>;
+  /** Files the backend already holds, so they show as uploaded. */
+  files: SavedFile[];
 }
 /**
  * Reads back every section the backend marks as saved, using the progress
@@ -359,19 +417,22 @@ async function loadRegistration(
         const response = await send({
           url: stepPath(registrationId, loader.path),
         });
+        const row = unwrap(response);
         return {
           step: loader.step,
-          values: loader.read(unwrap(response)),
+          values: loader.read(row),
+          files: loader.files?.(row) ?? [],
         };
       } catch {
         // A section that fails to load is still saved; it just stays empty.
-        return { step: loader.step, values: {} };
+        return { step: loader.step, values: {}, files: [] as SavedFile[] };
       }
     }),
   );
   return {
     completed: parts.map((part) => part.step),
     values: Object.assign({}, ...parts.map((part) => part.values)),
+    files: parts.flatMap((part) => part.files),
   };
 }
 

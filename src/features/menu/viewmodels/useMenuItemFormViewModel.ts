@@ -111,13 +111,15 @@ export function useMenuItemFormViewModel(id?: string) {
     setError("");
     setCreated(null);
     try {
-      const sold = (values.qtyType ?? "").trim();
-      if (
-        sold &&
-        qtyQuery.data &&
-        !qtyQuery.data.some((q) => q.toLowerCase() === sold.toLowerCase())
-      )
-        await createQtyType(sold).unwrap();
+      // A quantity name typed in that the server does not know yet is saved first.
+      const known = new Set((qtyQuery.data ?? []).map((q) => q.toLowerCase()));
+      for (const row of values.quantities) {
+        const sold = row.name.trim();
+        if (sold && qtyQuery.data && !known.has(sold.toLowerCase())) {
+          known.add(sold.toLowerCase());
+          await createQtyType(sold).unwrap();
+        }
+      }
       if (id) {
         if (!item) throw new Error("The item is still loading.");
         await updateItem({ id, form: values, original: item }).unwrap();

@@ -134,8 +134,9 @@ export const initialRegistration: RegistrationForm = {
   ].map((day) => ({
     day,
     open: true,
-    shifts: [{ start: "11:00", end: "15:30" }],
+    shifts: [{ start: "", end: "" }],
   })),
   menuItems: [],
-  agreement: false,
+  // Agreed on the sign-in page ("By continuing you agree to the Partner terms").
+  agreement: true,
 };

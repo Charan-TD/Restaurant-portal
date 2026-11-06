@@ -1,69 +1,112 @@
 "use client";
 import { useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
-import { IconButton, InputAdornment } from "@mui/material";
-import Visibility from "@mui/icons-material/VisibilityOutlined";
-import VisibilityOff from "@mui/icons-material/VisibilityOffOutlined";
+import { Box, IconButton, InputAdornment, MenuItem, TextField } from "@mui/material";
+import KeyboardArrowDownRounded from "@mui/icons-material/KeyboardArrowDownRounded";
+import LockOutlined from "@mui/icons-material/LockOutlined";
+import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
+import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
+import CalendarTodayOutlined from "@mui/icons-material/CalendarTodayOutlined";
+import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
+import CheckOutlined from "@mui/icons-material/CheckOutlined";
+import PhoneIphoneOutlined from "@mui/icons-material/PhoneIphoneOutlined";
+import RestaurantOutlined from "@mui/icons-material/RestaurantOutlined";
+import TagOutlined from "@mui/icons-material/TagOutlined";
+import MailOutlined from "@mui/icons-material/MailOutlined";
+import PersonOutline from "@mui/icons-material/PersonOutlineOutlined";
+import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
 import type { RegistrationForm } from "../models/registration";
-import { passwordRules } from "../models/validation";
-import type { FieldDefinition } from "@/core/constants/onboarding";
-import { CommonTextField } from "@/shared/components/form/CommonTextField";
-import { CommonSelect } from "@/shared/components/form/CommonSelect";
-import { CommonRadioGroup } from "@/shared/components/form/CommonRadioGroup";
-import { CommonCheckboxGroup } from "@/shared/components/form/CommonCheckboxGroup";
-import { PasswordChecklist } from "./PasswordChecklist";
+import { fieldGroups, type FieldDefinition } from "@/core/constants/onboarding";
+import { tokens } from "@/core/theme/tokens";
+import { FormField, prefixAdornment } from "@/shared/components/form/FormField";
 import { CuisineField } from "./CuisineField";
+import { FoodServedField } from "./FoodServedField";
 import { RiderOwnerField } from "./RiderOwnerField";
-import { todayIso } from "../models/validation";
+import { passwordRules, todayIso } from "../models/validation";
+import { useVerifiedPhone } from "@/features/auth/services/verifiedPhone";
+
+/**
+ * The password rules as a five-part bar that fills as each one is met, and one
+ * line saying what is still needed.
+ */
+function PasswordHints({ value, failed }: { value: string; failed: boolean }) {
+  const met = passwordRules.filter((rule) => rule.test(value)),
+    missing = passwordRules.filter((rule) => !rule.test(value)),
+    done = missing.length === 0,
+    color = done ? tokens.color.success : failed ? tokens.color.error : tokens.color.textMuted;
+  return (
+    <Box
+      component="span"
+      title="At least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special character."
+      sx={{ display: "block" }}
+    >
+      <Box component="span" aria-hidden sx={{ display: "flex", gap: 0.5, mt: 0.25, mb: 0.5 }}>
+        {passwordRules.map((rule, i) => (
+          <Box
+            key={rule.short}
+            component="span"
+            sx={{
+              flex: 1,
+              height: 4,
+              borderRadius: 2,
+              bgcolor: i < met.length ? tokens.color.success : tokens.color.border,
+              transition: "background-color .2s",
+            }}
+          />
+        ))}
+      </Box>
+      <Box component="span" sx={{ display: "block", color, fontWeight: done ? 600 : 400 }}>
+        {done
+          ? "✓ Strong password"
+          : value
+            ? `Still needed: ${missing.map((rule) => rule.short.toLowerCase()).join(", ")}`
+            : "8+ characters · uppercase · lowercase · number · symbol"}
+      </Box>
+    </Box>
+  );
+}
+
+const icons = {
+  restaurant: <StorefrontOutlined sx={{ fontSize: 20 }} />,
+  owner: <PersonOutline sx={{ fontSize: 20 }} />,
+  email: <MailOutlined sx={{ fontSize: 20 }} />,
+  dining: <RestaurantOutlined sx={{ fontSize: 20 }} />,
+  phone: <PhoneIphoneOutlined sx={{ fontSize: 20 }} />,
+  hash: <TagOutlined sx={{ fontSize: 20 }} />,
+  calendar: <CalendarTodayOutlined sx={{ fontSize: 20 }} />,
+  bank: <AccountBalanceOutlined sx={{ fontSize: 20 }} />,
+  lock: <LockOutlined sx={{ fontSize: 20 }} />,
+};
+
+/** One registration field, with its label above it as the design shows. */
 export function RegistrationField({
   definition,
 }: {
   definition: FieldDefinition;
 }) {
-  const { control } = useFormContext<RegistrationForm>();
-  const [showPassword, setShowPassword] = useState(false);
-  const other = useWatch({
-    control,
-    name: definition.matches ?? definition.name,
-  });
+  const { control } = useFormContext<RegistrationForm>(),
+    verified = useVerifiedPhone(),
+    [shown, setShown] = useState(false),
+    // The first step has no red stars, as its design shows.
+    onFirstStep = !!fieldGroups.details?.includes(definition),
+    // The mobile number was verified by OTP at sign-in, so it cannot change.
+    locked = definition.name === "mobile" && !!verified,
+    other = useWatch({ control, name: definition.matches ?? definition.name });
   return (
     <Controller
       control={control}
       name={definition.name}
       render={({ field, fieldState }) => {
-        const className = definition.fullWidth ? "full" : undefined;
-        if (definition.type === "radio")
-          return (
-            <CommonRadioGroup
-              className={className}
-              label={definition.label}
-              name={field.name}
-              required
-              value={typeof field.value === "string" ? field.value : ""}
-              options={definition.options || []}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              error={!!fieldState.error}
-              helperText={fieldState.error?.message}
-            />
-          );
+        const className = definition.fullWidth ? "full" : undefined,
+          error = fieldState.error?.message;
         if (definition.type === "checkboxes")
           return (
-            <CommonCheckboxGroup
+            <FoodServedField
               className={className}
               label={definition.label}
-              name={field.name}
-              required
-              value={
-                Array.isArray(field.value) ? (field.value as string[]) : []
-              }
-              options={definition.options || []}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              error={!!fieldState.error}
-              helperText={
-                fieldState.error?.message || "Select all that you serve."
-              }
+              field={field}
+              error={error}
             />
           );
         if (definition.type === "cuisines")
@@ -72,7 +115,7 @@ export function RegistrationField({
               className={className}
               label={definition.label}
               field={field}
-              error={fieldState.error?.message}
+              error={error}
             />
           );
         if (definition.type === "riders")
@@ -81,106 +124,160 @@ export function RegistrationField({
               className={className}
               label={definition.label}
               field={field}
-              error={fieldState.error?.message}
+              error={error}
             />
           );
-        const value = typeof field.value === "string" ? field.value : "";
-        const mismatch =
-          !!definition.matches && value !== "" && value !== other;
-        const matched = !!definition.matches && value !== "" && value === other;
-        const isPassword = definition.type === "password";
-        const props = {
-          label: definition.label,
-          required: true,
-          name: field.name,
-          inputRef: field.ref,
-          value,
-          onBlur: field.onBlur,
-          onChange: (
-            e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-          ) => {
-            const next = definition.sanitize
-              ? definition.sanitize(e.target.value)
-              : e.target.value;
-            field.onChange(
-              definition.maxLength ? next.slice(0, definition.maxLength) : next,
-            );
-          },
-          error: !!fieldState.error || mismatch,
-          helperText:
-            fieldState.error?.message ||
-            (mismatch
-              ? `${definition.label.replace(/^Confirm /, "").replace(/^./, (c) => c.toUpperCase())}s do not match.`
-              : matched
-                ? "✓ Matches"
-                : undefined),
-        };
-        if (definition.type === "select")
-          return (
-            <CommonSelect
-              {...props}
-              className={className}
-              options={definition.options || []}
-            />
-          );
-        const input = (
-          <CommonTextField
-            {...props}
-            className={isPassword ? undefined : className}
-            inputPrefix={definition.prefix}
-            type={
-              isPassword
-                ? showPassword
-                  ? "text"
-                  : "password"
-                : definition.type === "tel"
-                  ? "tel"
-                  : definition.type || "text"
-            }
-            multiline={definition.multiline}
-            minRows={definition.multiline ? 3 : undefined}
-            slotProps={{
-              // A date input shows its own dd-mm-yyyy hint, so keep the label up.
-              inputLabel:
-                definition.type === "date" ? { shrink: true } : undefined,
-              formHelperText: matched
-                ? { sx: { color: "success.main" } }
-                : undefined,
-              htmlInput: {
-                maxLength: definition.maxLength,
-                min:
-                  definition.name === "documentNumbers.fssaiExpiry"
-                    ? todayIso()
-                    : undefined,
-                inputMode: definition.inputMode,
-                autoComplete: isPassword ? "new-password" : undefined,
-              },
-              input: {
-                endAdornment: isPassword ? (
-                  <InputAdornment position="end">
-                    <IconButton
-                      edge="end"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                      onClick={() => setShowPassword((v) => !v)}
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ) : undefined,
-              },
-            }}
-          />
+        const value = typeof field.value === "string" ? field.value : "",
+          matched = !!definition.matches && value !== "" && value === other,
+          mismatch = !!definition.matches && value !== "" && value !== other,
+          id = `reg-${field.name}`,
+          password = definition.type === "password",
+          // The verified number reads like 98450 22331.
+          display =
+            locked && value.length > 5 ? `${value.slice(0, 5)} ${value.slice(5)}` : value,
+          helper =
+            (definition.name === "password" ? (
+              <PasswordHints value={value} failed={!!error} />
+            ) : null) ||
+            error ||
+            (locked
+              ? "Verified with OTP"
+              : mismatch
+                ? "These do not match."
+                : matched && definition.matchText
+                  ? (
+                      <Box component="span" sx={{ fontWeight: 600, color: tokens.color.success }}>
+                        {definition.matchText}
+                      </Box>
+                    )
+                  : definition.hint),
+          start = definition.prefix ? (
+            prefixAdornment(definition.prefix)
+          ) : definition.icon ? (
+            <InputAdornment position="start" sx={{ color: tokens.color.textSubtle }}>
+              {icons[definition.icon]}
+            </InputAdornment>
+          ) : undefined;
+        return (
+          <FormField
+            label={definition.label}
+            htmlFor={id}
+            required={!definition.optional && !onFirstStep}
+            note={definition.labelNote}
+          >
+            <TextField
+              fullWidth
+              select={definition.type === "select"}
+              disabled={locked}
+              id={id}
+              name={field.name}
+              inputRef={field.ref}
+              value={display}
+              placeholder={definition.placeholder}
+              type={
+                definition.type === "date" || definition.type === "email"
+                  ? definition.type
+                  : password
+                    ? shown
+                      ? "text"
+                      : "password"
+                    : definition.type === "tel"
+                    ? "tel"
+                    : "text"
+              }
+              onBlur={field.onBlur}
+              onChange={(e) => {
+                const next = definition.sanitize
+                  ? definition.sanitize(e.target.value)
+                  : e.target.value;
+                field.onChange(
+                  definition.maxLength
+                    ? next.slice(0, definition.maxLength)
+                    : next,
+                );
+              }}
+              error={!!error || mismatch}
+              helperText={helper}
+              slotProps={{
+                htmlInput: {
+                  maxLength: definition.maxLength,
+                  min:
+                    definition.name === "documentNumbers.fssaiExpiry"
+                      ? todayIso()
+                      : undefined,
+                  inputMode: definition.inputMode,
+                  onClick:
+                    definition.type === "date"
+                      ? (e: { currentTarget: HTMLInputElement }) => {
+                          try {
+                            e.currentTarget.showPicker();
+                          } catch {
+                            // Typing the date still works.
+                          }
+                        }
+                      : undefined,
+                  "aria-label": definition.label,
+                },
+                select: { displayEmpty: true, IconComponent: KeyboardArrowDownRounded },
+                input: {
+                  readOnly: locked,
+                  startAdornment: start,
+                  endAdornment: definition.type === "date" ? (
+                    <InputAdornment position="end" sx={{ color: tokens.color.success }}>
+                      <CalendarMonthOutlined sx={{ fontSize: 20 }} />
+                    </InputAdornment>
+                  ) : password ? (
+                    <InputAdornment position="end" sx={{ gap: 0.5 }}>
+                      {matched && (
+                        <CheckOutlined sx={{ fontSize: 20, color: tokens.color.success }} />
+                      )}
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        aria-label={shown ? "Hide password" : "Show password"}
+                        onClick={() => setShown((v) => !v)}
+                      >
+                        {shown ? (
+                          <VisibilityOffOutlined sx={{ fontSize: 20 }} />
+                        ) : (
+                          <VisibilityOutlined sx={{ fontSize: 20 }} />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ) : matched ? (
+                    <InputAdornment position="end">
+                      <CheckOutlined sx={{ fontSize: 20, color: tokens.color.success }} />
+                    </InputAdornment>
+                  ) : undefined,
+                  sx: {
+                    ...(locked ? { bgcolor: tokens.color.sunken } : {}),
+                    ...(definition.type === "date"
+                      ? {
+                          cursor: "pointer",
+                          "& input": { cursor: "pointer" },
+                          "& input::-webkit-calendar-picker-indicator": { display: "none" },
+                        }
+                      : {}),
+                  },
+                },
+                formHelperText: { sx: { mx: 0 } },
+              }}
+            >
+              {definition.type === "select" && [
+                <MenuItem key="" value="" disabled>
+                  <Box component="span" sx={{ color: tokens.color.textSubtle }}>
+                    {definition.placeholder ?? "Select"}
+                  </Box>
+                </MenuItem>,
+                ...(definition.options ?? []).map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                )),
+              ]}
+            </TextField>
+          </FormField>
         );
-        if (isPassword && !definition.matches)
-          return (
-            <div className={className}>
-              {input}
-              <PasswordChecklist value={value} rules={passwordRules} />
-            </div>
-          );
-        return input;
       }}
     />
   );

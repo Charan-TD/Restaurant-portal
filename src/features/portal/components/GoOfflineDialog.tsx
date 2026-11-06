@@ -14,6 +14,7 @@ import {
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { DEMO_MODE } from "@/core/constants/config";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
+import { TimeField } from "@/shared/components/form/TimeField";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import {
   DEFAULT_OPENS,
@@ -179,18 +180,10 @@ export function GoOfflineDialog({
           ))}
         </Box>
         {choice === "pick" && (
-          <CommonTextField
-            type="time"
-            fullWidth
-            size="small"
-            label="Reopen at"
-            value={picked}
-            onChange={(e) => setPicked(e.target.value)}
-            error={submitted && !reopenAt}
-            helperText={submitted && !reopenAt ? "Pick a time." : undefined}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ mt: 1.5 }}
-          />
+          <Box sx={{ mt: 1.5 }}>
+            <Typography sx={{ mb: 0.5, fontSize: 13, fontWeight: 600 }}>Reopen at</Typography>
+            <TimeField compact width={170} label="Reopen at" value={picked} onChange={setPicked} error={submitted && !reopenAt ? "Pick a time." : undefined} />
+          </Box>
         )}
         {inProgress > 0 && (
           <Box

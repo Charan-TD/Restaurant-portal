@@ -1,9 +1,15 @@
 "use client";
-import { Autocomplete, Box, CircularProgress, Typography } from "@mui/material";
+import {
+  Autocomplete,
+  Box,
+  CircularProgress,
+  TextField,
+  Typography,
+} from "@mui/material";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { tokens } from "@/core/theme/tokens";
+import { searchFieldSx, tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { FormField } from "@/shared/components/form/FormField";
@@ -102,10 +108,11 @@ export function LocationPane({
               </li>
             )}
             renderInput={(params) => (
-              <CommonTextField
+              <TextField
                 {...params}
+                fullWidth
+                sx={searchFieldSx}
                 placeholder="Search a new area, street or locality to request a change"
-                inputPrefix={<SearchOutlined fontSize="small" />}
                 slotProps={{
                   ...params.slotProps,
                   htmlInput: {
@@ -114,6 +121,12 @@ export function LocationPane({
                   },
                   input: {
                     ...params.slotProps.input,
+                    startAdornment: (
+                      <SearchOutlined
+                        className="search-icon"
+                        sx={{ fontSize: 20, mr: 1 }}
+                      />
+                    ),
                     endAdornment: (
                       <>
                         {vm.loading && <CircularProgress size={18} />}

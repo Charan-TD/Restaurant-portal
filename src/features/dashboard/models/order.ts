@@ -18,6 +18,14 @@ export const stateLabel: Record<OrderStatus, string> = {
 export interface OrderLine {
   name: string;
   quantity: number;
+  /** Price of the line, when the API sends one. */
+  price?: number;
+  /** The menu section, e.g. "Main course". */
+  category?: string;
+  /** Veg, Non-veg or Egg, when the API sends it. */
+  type?: string;
+  /** What the passenger asked for on this dish. */
+  note?: string;
 }
 
 /** "Chicken Biryani", or "2 × Chicken Biryani" when more than one is ordered. */
@@ -66,6 +74,14 @@ export interface Order {
   note?: string;
   /** Who is taking the order to the passenger, once it is handed over. */
   rider?: OrderRider;
+  /** PAID, when the payment is known. */
+  paymentStatus?: string;
+  /** When the order was accepted (preparation started). */
+  acceptedAt?: string;
+  /** Minutes the kitchen has to prepare it. */
+  prepMinutes?: number;
+  /** The code the rider quotes at pickup. */
+  pickupOtp?: string;
 }
 
 export interface OrderRider {

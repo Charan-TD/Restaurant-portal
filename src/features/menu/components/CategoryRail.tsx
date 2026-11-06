@@ -96,8 +96,8 @@ function NameBox({
 
 /**
  * The categories on the left of the menu: each with its item count, the open
- * one showing its sub categories. Also holds the recommended categories from
- * TrainDhaba and the way into add-ons.
+ * one showing its sub categories. Also holds
+ * the way into add-ons.
  */
 export function CategoryRail({
   categories,
@@ -107,9 +107,6 @@ export function CategoryRail({
   onSelectSub,
   saving,
   onAdd,
-  recommended,
-  addingRecommended,
-  onAddRecommended,
   addOnsCount,
   addOnsActive,
   onOpenAddOns,
@@ -122,9 +119,6 @@ export function CategoryRail({
   saving: boolean;
   /** Saves a category, or sub categories under it. Resolves true when saved. */
   onAdd: (category: string, subcategories?: string[]) => Promise<boolean>;
-  recommended: { id: string; name: string }[];
-  addingRecommended: boolean;
-  onAddRecommended: (category: { id: string; name: string }) => Promise<boolean>;
   addOnsCount: number;
   addOnsActive: boolean;
   onOpenAddOns: () => void;
@@ -174,8 +168,13 @@ export function CategoryRail({
                   },
                 }}
               >
-                <Box component="span" sx={{ flex: 1 }}>
+                <Box component="span" sx={{ flex: 1, opacity: category.active ? 1 : 0.55 }}>
                   {category.name}
+                  {!category.active && (
+                    <Box component="span" sx={{ ml: 1, fontSize: 11, fontWeight: 600, color: tokens.color.textMuted }}>
+                      Off
+                    </Box>
+                  )}
                 </Box>
                 <Count value={category.items.length} />
                 {open ? (
@@ -292,36 +291,6 @@ export function CategoryRail({
           </ButtonBase>
         )}
       </Box>
-      {recommended.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-            Recommended categories
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.color.textMuted, mb: 1 }}>
-            Suggested by TrainDhaba. Add the ones you sell.
-          </Typography>
-          <Box sx={{ display: "grid", gap: 0.75 }}>
-            {recommended.map((category) => (
-              <Box
-                key={category.id}
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
-              >
-                <Typography sx={{ flex: 1, fontSize: 14 }} noWrap>
-                  {category.name}
-                </Typography>
-                <CommonButton
-                  variant="outlined"
-                  startIcon={<AddOutlined />}
-                  disabled={addingRecommended}
-                  onClick={() => void onAddRecommended(category)}
-                >
-                  Add
-                </CommonButton>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      )}
       <Box
         sx={{
           mt: 3,

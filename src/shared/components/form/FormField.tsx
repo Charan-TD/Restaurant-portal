@@ -5,10 +5,13 @@ export function FieldLabel({
   text,
   required,
   htmlFor,
+  note,
 }: {
   text: string;
   required?: boolean;
   htmlFor?: string;
+  /** A muted line after the label. */
+  note?: string;
 }) {
   return (
     <Typography
@@ -18,6 +21,9 @@ export function FieldLabel({
     >
       {text}
       {required && <span style={{ color: "#d32f2f" }}> *</span>}
+      {note && (
+        <span style={{ fontWeight: 400, color: "#6b7280" }}> · {note}</span>
+      )}
     </Typography>
   );
 }
@@ -26,16 +32,18 @@ export function FormField({
   label,
   required,
   htmlFor,
+  note,
   children,
 }: {
   label: string;
   required?: boolean;
   htmlFor?: string;
+  note?: string;
   children: ReactNode;
 }) {
   return (
     <Box sx={{ minWidth: 0 }}>
-      <FieldLabel text={label} required={required} htmlFor={htmlFor} />
+      <FieldLabel text={label} required={required} htmlFor={htmlFor} note={note} />
       {children}
     </Box>
   );

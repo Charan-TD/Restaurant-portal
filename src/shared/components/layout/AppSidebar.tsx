@@ -10,7 +10,7 @@ import LocalOfferOutlined from "@mui/icons-material/LocalOfferOutlined";
 import RestaurantOutlined from "@mui/icons-material/RestaurantOutlined";
 import ShoppingBagOutlined from "@mui/icons-material/ShoppingBagOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
-import TrainOutlined from "@mui/icons-material/TrainOutlined";
+import { BrandLogo } from "./BrandLogo";
 import {
   railItemFor,
   type RailItem,
@@ -69,11 +69,11 @@ export function AppSidebar({
           flexShrink: 0,
           display: "grid",
           placeItems: "center",
-          bgcolor: "#ee5b00",
-          color: "#fff",
+          bgcolor: tokens.color.card,
+          borderBottom: `1px solid ${tokens.color.borderSubtle}`,
         }}
       >
-        <TrainOutlined sx={{ fontSize: 36 }} />
+        <BrandLogo size={56} />
       </Box>
       <Box
         component="nav"

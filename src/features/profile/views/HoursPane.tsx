@@ -5,7 +5,7 @@ import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
-import { CommonTextField } from "@/shared/components/form/CommonTextField";
+import { TimeField } from "@/shared/components/form/TimeField";
 import { useWorkingHoursViewModel } from "../viewmodels/useWorkingHoursViewModel";
 import { PaneFooter, SubHeading } from "./PaneParts";
 import { PaneHeading } from "./PaneHeading";
@@ -26,22 +26,9 @@ function TimeRange({
   const bad = end <= start;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-      <CommonTextField
-        type="time"
-        value={start}
-        onChange={(e) => onStart(e.target.value)}
-        slotProps={{ htmlInput: { "aria-label": `${label} opens` } }}
-        sx={{ width: 150, "& .MuiOutlinedInput-root": { minHeight: 44 } }}
-      />
+      <TimeField label={`${label} opens`} value={start} onChange={onStart} width={150} />
       <Typography sx={{ color: tokens.color.textMuted }}>–</Typography>
-      <CommonTextField
-        type="time"
-        value={end}
-        error={bad}
-        onChange={(e) => onEnd(e.target.value)}
-        slotProps={{ htmlInput: { "aria-label": `${label} closes` } }}
-        sx={{ width: 150, "& .MuiOutlinedInput-root": { minHeight: 44 } }}
-      />
+      <TimeField label={`${label} closes`} value={end} error={bad ? " " : undefined} onChange={onEnd} width={150} />
       {bad && (
         <Typography sx={{ fontSize: 12, color: tokens.color.error }}>
           Close after opening

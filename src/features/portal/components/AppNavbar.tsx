@@ -75,7 +75,15 @@ export function AppNavbar({ vm }: { vm: PortalShellViewModel }) {
           {city && <Box component="span" sx={{ whiteSpace: "nowrap" }}>· {city}</Box>}
         </Box>
         <Box sx={{ flex: 1 }} />
+        {!vm.vendor.online && !vm.setup.ready && !vm.setup.loading && (
+          <Typography
+            sx={{ display: { xs: "none", md: "block" }, fontSize: 14, color: tokens.color.textMuted }}
+          >
+            Finish setup to go online
+          </Typography>
+        )}
         <OnlineToggle
+          locked={!vm.vendor.online && !vm.setup.ready}
           online={vm.vendor.online}
           onChange={vm.toggleOnline}
           reopenAt={vm.reopenAt}

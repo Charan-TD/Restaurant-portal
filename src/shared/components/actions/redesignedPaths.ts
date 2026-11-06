@@ -15,4 +15,7 @@ const redesignedPaths = [
 ];
 
 export const isRedesignedPath = (pathname: string) =>
+  // The orders workspace places its own margins; the old all-orders list does not.
+  pathname === "/orders" ||
+  pathname === "/dashboard" ||
   redesignedPaths.some((path) => pathname.startsWith(path));

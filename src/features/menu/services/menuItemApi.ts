@@ -131,7 +131,7 @@ function demoSave(id: string, form: MenuItemForm): MenuItem {
     quantity: form.quantity ?? 0,
     lowStockThreshold: form.lowStockThreshold ?? 0,
     addOnIds: [...form.addOnIds],
-    qtyType: form.qtyType,
+    qtyType: form.quantities[0]?.name.trim() || form.qtyType,
     available: form.available,
     adminAvailable: current?.adminAvailable ?? null,
     adminInactiveReason: current?.adminInactiveReason ?? "",
@@ -288,6 +288,10 @@ export interface CategoryOption {
   name: string;
   /** For a sub category: the id of the category it belongs to. */
   parentId?: string;
+  /** The status the server sends for this restaurant, when it sends one. */
+  active?: boolean;
+  /** Created by this restaurant; admin categories cannot be renamed. */
+  owned?: boolean;
 }
 export interface MenuCategories {
   categories: CategoryOption[];
@@ -331,14 +335,48 @@ async function fetchMenuCategories(send: Send): Promise<MenuCategories> {
     const id = String(r.category_id ?? ""),
       name = String(r.category_name ?? "").trim(),
       parent = String(r.parent_id ?? "");
-    if (!id || !name || r.is_active === false || seen.has(id)) continue;
+    // Switched-off categories stay in the list, so they can be switched on again.
+    if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    const sub = Number(r.level) === 2 || /^SUB/i.test(id);
+    const sub = Number(r.level) === 2 || /^SUB/i.test(id),
+      flag = r.cat_is_active ?? r.is_active,
+      extra = {
+        active: typeof flag === "boolean" ? flag : undefined,
+        owned: r.created_by !== "admin",
+      };
     (sub ? subCategories : categories).push(
-      sub ? { id, name, parentId: parent } : { id, name },
+      sub ? { id, name, parentId: parent, ...extra } : { id, name, ...extra },
     );
   }
   return { categories, subCategories };
+}
+/**
+ * PATCH /menu-items/categories/{id}/status: switches a category, its sub
+ * categories and this restaurant's items in them on or off. Other restaurants
+ * that use the same category are not affected.
+ */
+async function setCategoryActive(
+  { id, active }: { id: string; active: boolean },
+  send: Send,
+): Promise<void> {
+  if (DEMO_MODE) return;
+  await send({
+    url: `${endpoint(API_PATHS.menuItems)}/categories/${encodeURIComponent(id)}/status`,
+    method: "patch",
+    data: { cat_is_active: active },
+  });
+}
+/** PATCH /menu-items/categories/{id}: renames a category this restaurant created. */
+async function renameCategory(
+  { id, name }: { id: string; name: string },
+  send: Send,
+): Promise<void> {
+  if (DEMO_MODE) return;
+  await send({
+    url: `${endpoint(API_PATHS.menuItems)}/categories/${encodeURIComponent(id)}`,
+    method: "patch",
+    data: { name: name.trim() },
+  });
 }
 /** POST /menu-items/categories: saves categories, each with optional sub categories. */
 async function addMenuCategories(
@@ -574,6 +612,14 @@ export const menuItemApi = baseApi.injectEndpoints({
       queryFn: flow(addMenuCategories),
       invalidatesTags: ["Categories", "MenuItems"],
     }),
+    setCategoryActive: build.mutation<void, { id: string; active: boolean }>({
+      queryFn: flow(setCategoryActive),
+      invalidatesTags: ["Categories", "MenuItems"],
+    }),
+    renameCategory: build.mutation<void, { id: string; name: string }>({
+      queryFn: flow(renameCategory),
+      invalidatesTags: ["Categories", "MenuItems"],
+    }),
     listRecommendedCategories: build.query<CategoryOption[], void>({
       queryFn: flow((_: void, send: Send) => listRecommendedCategories(send)),
       providesTags: ["Categories"],
@@ -604,6 +650,8 @@ export const {
   useListMenuCategoriesQuery,
   useLazyListMenuCategoriesQuery,
   useAddMenuCategoriesMutation,
+  useSetCategoryActiveMutation,
+  useRenameCategoryMutation,
   useListRecommendedCategoriesQuery,
   useSelectRecommendedCategoryMutation,
   useListCategoryNamesQuery,

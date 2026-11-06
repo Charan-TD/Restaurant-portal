@@ -55,11 +55,12 @@ export function reopenTime(
   const today = at(now, picked);
   return today > now ? today : at(tomorrow, picked);
 }
-/** "1:31 PM", or "tomorrow, 9:00 AM" when it is not today. */
+/** "13:31", or "tomorrow, 09:00" when it is not today. */
 export function reopenLabel(date: Date, now = new Date()) {
   const time = date.toLocaleTimeString("en-IN", {
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
   return date.toDateString() === now.toDateString()
     ? time

@@ -54,6 +54,7 @@ const time = (iso?: string) =>
     ? new Date(iso).toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       })
     : "–";
 /** Column template shared by the heading row and every order row. */

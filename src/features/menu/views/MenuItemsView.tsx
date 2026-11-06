@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddOutlined from "@mui/icons-material/AddOutlined";
+import EditOutlined from "@mui/icons-material/EditOutlined";
 import CheckBoxOutlineBlank from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBox from "@mui/icons-material/CheckBox";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
@@ -22,10 +23,13 @@ import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import { cardSx, tokens, tokenScopeSx } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
+import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import { ScreenSurface } from "@/shared/components/layout/ScreenSurface";
+import { EditCategoryDrawer } from "../components/EditCategoryDrawer";
 import type { MenuItem } from "../models/menuItem";
 import { MenuItemRow } from "../components/MenuItemRow";
 import { AddOnsPanel } from "../components/AddOnsPanel";
+import { RecommendedMenu } from "../components/RecommendedMenu";
 import { CategoryRail } from "../components/CategoryRail";
 import { useMenuItemsViewModel } from "../viewmodels/useMenuItemsViewModel";
 import { MenuItemFormView } from "./MenuItemFormView";
@@ -62,6 +66,7 @@ export function MenuItemsView({
     [picked, setPicked] = useState<string | null>(null),
     [subPicked, setSubPicked] = useState<string | null>(null),
     [outOnly, setOutOnly] = useState(false),
+    [editing, setEditing] = useState(false),
     total = vm.items.length,
     outCount = total - vm.availableCount,
     // The first category is open until another is chosen.
@@ -109,7 +114,6 @@ export function MenuItemsView({
         key={item.id}
         item={item}
         saving={vm.isSaving(item.id)}
-        onDelete={() => vm.askDelete(item)}
         onAvailable={(available) => void vm.setAvailable(item, available)}
       />
     ));
@@ -135,9 +139,6 @@ export function MenuItemsView({
           onSelectSub={setSubPicked}
           saving={vm.savingCategory}
           onAdd={vm.addCategory}
-          recommended={vm.recommended}
-          addingRecommended={vm.addingRecommended}
-          onAddRecommended={vm.addRecommended}
           addOnsCount={vm.addOns.length}
           addOnsActive={vm.tab === "addons"}
           onOpenAddOns={() => vm.setTab("addons")}
@@ -204,6 +205,11 @@ export function MenuItemsView({
                     {outCount}
                   </Box>
                 </ButtonBase>
+                <RecommendedMenu
+                  categories={vm.recommendedAll}
+                  busy={vm.addingRecommended}
+                  onAdd={vm.addRecommended}
+                />
                 <Box sx={{ flex: 1 }} />
                 <CommonButton
                   variant="contained"
@@ -236,6 +242,31 @@ export function MenuItemsView({
                     >
                       {summary}
                     </Typography>
+                    {!broad && category && (
+                      <>
+                        <ButtonBase
+                          onClick={() => setEditing(true)}
+                          sx={{ gap: 0.5, fontSize: 14, fontWeight: 600, color: tokens.color.link }}
+                        >
+                          <EditOutlined sx={{ fontSize: 16 }} />
+                          Edit
+                        </ButtonBase>
+                        {category.id && (
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <ToggleSwitch
+                              checked={category.active}
+                              onChange={(e) =>
+                                void vm.setCategoryActive(category.id!, e.target.checked, category.name)
+                              }
+                              slotProps={{ input: { "aria-label": `${category.name} on` } }}
+                            />
+                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: category.active ? tokens.color.success : tokens.color.textMuted }}>
+                              {category.active ? "Category on" : "Category off"}
+                            </Typography>
+                          </Box>
+                        )}
+                      </>
+                    )}
                   </Box>
                   {total === 0 ? (
                     <Box
@@ -306,6 +337,23 @@ export function MenuItemsView({
           )}
         </Box>
       </Box>
+      {editing && category && (
+        <EditCategoryDrawer
+          key={category.name}
+          category={category}
+          onClose={() => setEditing(false)}
+          onSave={async ({ rename, subRenames, switches, added }) => {
+            // Each change is its own request; stop at the first one that fails.
+            for (const r of [...(rename ? [rename] : []), ...subRenames])
+              if (!(await vm.renameCategory(r.id, r.name))) return false;
+            for (const s of switches)
+              if (!(await vm.setCategoryActive(s.id, s.active, s.name))) return false;
+            if (added.length && !(await vm.addCategory(rename?.name ?? category.name, added)))
+              return false;
+            return true;
+          }}
+        />
+      )}
       <Drawer
         anchor="right"
         open={!!drawer}
@@ -320,7 +368,15 @@ export function MenuItemsView({
           },
         }}
       >
-        {drawer && <MenuItemFormView id={drawer.id} />}
+        {drawer && (
+          <MenuItemFormView
+            id={drawer.id}
+            onDelete={(item) => {
+              const found = vm.items.find((i) => i.id === item.id);
+              if (found) vm.askDelete(found);
+            }}
+          />
+        )}
       </Drawer>
       <Dialog open={!!vm.pendingDelete} onClose={vm.cancelDelete}>
         <DialogTitle>Delete {vm.pendingDelete?.name}?</DialogTitle>

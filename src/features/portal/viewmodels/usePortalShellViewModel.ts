@@ -5,6 +5,7 @@ import { usePortal } from "@/core/providers/PortalProvider";
 import { useLogoutMutation } from "@/features/auth/services/authApi";
 import { useNotificationsViewModel } from "@/features/notifications/viewmodels/useNotificationsViewModel";
 import { useVendorProfile } from "@/features/profile/viewmodels/useVendorProfile";
+import { useGoLiveSetup } from "./useGoLiveSetup";
 import { savedReopenAt } from "../models/offline";
 export function usePortalShellViewModel() {
   const [logoutRequest] = useLogoutMutation(),
@@ -12,6 +13,7 @@ export function usePortalShellViewModel() {
     router = useRouter(),
     vendor = useVendorProfile(),
     notifications = useNotificationsViewModel(),
+    setup = useGoLiveSetup(),
     [mobileOpen, setMobileOpen] = useState(false),
     [offlineOpen, setOfflineOpen] = useState(false),
     [reopenAt, setReopenAt] = useState<Date | null>(null),
@@ -59,8 +61,13 @@ export function usePortalShellViewModel() {
     reopenAt,
     offlineOpen,
     /** Turning on happens at once; turning off first asks why. */
-    toggleOnline: (next: boolean) =>
-      next ? vendor.setOnline(true) : setOfflineOpen(true),
+    setup,
+    /** Going online waits for the menu (and own riders); going offline asks why. */
+    toggleOnline: (next: boolean) => {
+      if (next && !setup.ready) return router.push("/dashboard");
+      if (next) vendor.setOnline(true);
+      else setOfflineOpen(true);
+    },
     closeOffline: () => setOfflineOpen(false),
     mobileOpen,
     toggleMobile: () => setMobileOpen((open) => !open),

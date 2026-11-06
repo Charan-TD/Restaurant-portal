@@ -12,6 +12,8 @@ import {
 } from "../services/addOnApi";
 import {
   useAddMenuCategoriesMutation,
+  useSetCategoryActiveMutation,
+  useRenameCategoryMutation,
   useDeleteMenuItemMutation,
   useListMenuCategoriesQuery,
   useListMenuItemsQuery,
@@ -23,6 +25,7 @@ import {
 import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { loadSwitchedOff, rememberActive } from "../services/categoryStatus";
 import { menuErrorMessage } from "./menuErrors";
 export type FoodFilter = MenuFoodType | "All";
 export type MenuTab = "items" | "categories" | "addons";
@@ -40,6 +43,8 @@ export function useMenuItemsViewModel() {
     [deleteAddOn, { isLoading: deletingAddOn }] = useDeleteAddOnMutation(),
     [addCategories, { isLoading: savingCategory }] =
       useAddMenuCategoriesMutation(),
+    [switchCategory] = useSetCategoryActiveMutation(),
+    [renameCategory] = useRenameCategoryMutation(),
     recommendedQuery = useListRecommendedCategoriesQuery(),
     [selectRecommended, { isLoading: addingRecommended }] =
       useSelectRecommendedCategoryMutation(),
@@ -85,14 +90,54 @@ export function useMenuItemsViewModel() {
           (item.subCategory ?? "").toLowerCase().includes(query)),
     );
   }, [items, found.data, searching, search, foodFilter, categoryFilter]);
-  const categories = useMemo(
-    () => buildCategoryTree(serverCategories, items),
-    [serverCategories, items],
-  );
-  // Admin categories this restaurant has not added to its own yet.
-  const recommended = useMemo(() => {
+  // Switches saved from this browser fill in for a status the server does not send.
+  const [switchedOff, setSwitchedOff] = useState<string[]>([]);
+  useEffect(() => {
+    queueMicrotask(() => setSwitchedOff(loadSwitchedOff()));
+  }, []);
+  const categories = useMemo(() => {
+    const flag = (list: { id?: string; active: boolean }) =>
+      list.id && switchedOff.includes(list.id) ? false : list.active;
+    return buildCategoryTree(serverCategories, items).map((c) => ({
+      ...c,
+      active: flag(c),
+      subs: c.subs.map((s) => ({ ...s, active: flag(s) })),
+    }));
+  }, [serverCategories, items, switchedOff]);
+  /** Switches a category (or sub category) on or off for this restaurant only. */
+  const setCategoryActive = async (
+    id: string,
+    active: boolean,
+    name: string,
+  ): Promise<boolean> => {
+    setActionError("");
+    try {
+      await switchCategory({ id, active }).unwrap();
+      setSwitchedOff(rememberActive(id, active));
+      toast.success(
+        active ? `${name} is on again.` : `${name} is hidden from passengers.`,
+      );
+      return true;
+    } catch (e) {
+      setActionError(menuErrorMessage(e));
+      return false;
+    }
+  };
+  /** Renames a category this restaurant created. */
+  const renameCategoryTo = async (id: string, name: string): Promise<boolean> => {
+    setActionError("");
+    try {
+      await renameCategory({ id, name }).unwrap();
+      return true;
+    } catch (e) {
+      setActionError(menuErrorMessage(e));
+      return false;
+    }
+  };
+  // Every admin category, each marked when this restaurant already has it.
+  const recommendedAll = useMemo(() => {
     const mine = new Set(serverCategories.categories.map((c) => c.id));
-    return (recommendedQuery.data ?? []).filter((c) => !mine.has(c.id));
+    return (recommendedQuery.data ?? []).map((c) => ({ ...c, added: mine.has(c.id) }));
   }, [recommendedQuery.data, serverCategories]);
   const addRecommended = async (
     category: { id: string; name: string },
@@ -204,8 +249,10 @@ export function useMenuItemsViewModel() {
     addOns,
     addOnCategories: serverCategories.categories,
     addCategory,
+    setCategoryActive,
+    renameCategory: renameCategoryTo,
     savingCategory,
-    recommended,
+    recommendedAll,
     addRecommended,
     addingRecommended,
     saveAddOn,

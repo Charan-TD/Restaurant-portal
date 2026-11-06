@@ -11,17 +11,22 @@ export function OnlineToggle({
   online,
   onChange,
   reopenAt,
+  locked = false,
 }: {
   online: boolean;
   onChange: (online: boolean) => void;
   /** When an offline restaurant comes back online by itself. */
   reopenAt?: Date | null;
+  /** Not allowed to go online yet: the menu or riders are still to add. */
+  locked?: boolean;
 }) {
   const back = !online && reopenAt ? reopenLabel(reopenAt) : "";
   return (
     <Tooltip
       title={
-        online
+        locked
+          ? "Add your menu (and riders) first, then you can go online."
+          : online
           ? "You are taking orders. Turn off to stop."
           : back
             ? `You are not taking orders. You reopen at ${back}, or turn on now.`
@@ -36,6 +41,7 @@ export function OnlineToggle({
             ? "Restaurant is online. Turn off to stop taking orders."
             : "Restaurant is offline. Turn on to start taking orders."
         }
+        aria-disabled={locked}
         onClick={() => onChange(!online)}
         sx={{
           flexShrink: 0,
@@ -49,6 +55,7 @@ export function OnlineToggle({
           color: "#fff",
           bgcolor: online ? tokens.color.success : OFF,
           transition: "background-color .2s",
+          ...(locked ? { cursor: "not-allowed", opacity: 0.6 } : {}),
           "&.Mui-focusVisible": {
             outline: `2px solid ${tokens.color.info}`,
             outlineOffset: 2,

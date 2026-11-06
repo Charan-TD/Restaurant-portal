@@ -97,6 +97,7 @@ export function useOrdersViewModel() {
     id: string,
     state: OrderStatus,
     rider?: OrderRider,
+    prepMinutes?: number,
   ) {
     setActionError("");
     setBusyId(id);
@@ -108,8 +109,21 @@ export function useOrdersViewModel() {
           // The server refuses a rider from restaurants on TrainDhaba riders.
           riderId:
             state === "HandedOver" && !trainDhabaRiders ? rider?.id : undefined,
+          prepMinutes,
         }).unwrap();
-      setOrders((old) => old.map((o) => (o.id === id ? { ...o, state } : o)));
+      setOrders((old) =>
+        old.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                state,
+                ...(state === "Preparing"
+                  ? { acceptedAt: new Date().toISOString(), prepMinutes: prepMinutes ?? o.prepMinutes }
+                  : {}),
+              }
+            : o,
+        ),
+      );
       if (rider?.id) riders.pick(riderKey(id), { ...rider, id: rider.id });
       if (state === "Delivered" || state === "Rejected")
         riders.forget(riderKey(id));

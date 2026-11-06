@@ -23,13 +23,13 @@ export interface Bar {
 
 /** Hour bands of the "Busiest hours" card: [from, to) on a 24-hour clock. */
 export const HOUR_BANDS = [
-  { label: "8 – 10 AM", from: 8, to: 10 },
-  { label: "10 AM – 12 PM", from: 10, to: 12 },
-  { label: "12 – 2 PM", from: 12, to: 14 },
-  { label: "2 – 4 PM", from: 14, to: 16 },
-  { label: "4 – 6 PM", from: 16, to: 18 },
-  { label: "6 – 8 PM", from: 18, to: 20 },
-  { label: "8 – 10 PM", from: 20, to: 22 },
+  { label: "08:00 – 10:00", from: 8, to: 10 },
+  { label: "10:00 – 12:00", from: 10, to: 12 },
+  { label: "12:00 – 14:00", from: 12, to: 14 },
+  { label: "14:00 – 16:00", from: 14, to: 16 },
+  { label: "16:00 – 18:00", from: 16, to: 18 },
+  { label: "18:00 – 20:00", from: 18, to: 20 },
+  { label: "20:00 – 22:00", from: 20, to: 22 },
 ] as const;
 
 const NO_ORDERS: Order[] = [];
@@ -41,7 +41,7 @@ const startOfDay = (date: Date) => {
 };
 const sum = (orders: Order[]) => orders.reduce((s, o) => s + o.amount, 0);
 const hourLabel = (hour: number) =>
-  `${hour % 12 || 12}${hour < 12 ? "a" : "p"}`;
+  String(hour).padStart(2, "0");
 
 /** Percent change from `before` to `now`; null when there is nothing to compare. */
 const change = (now: number, before: number) =>

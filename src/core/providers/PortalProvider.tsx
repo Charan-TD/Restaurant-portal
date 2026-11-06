@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
   type Dispatch,
@@ -65,9 +66,16 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     [profile, setProfile] = useState<SessionProfile>({}),
     [online, setOnline] = useState(true),
     [orders, setOrders] = useState<Order[]>([]);
-  // Signing out drops everything fetched for that account.
+  // Signing out drops everything fetched for that account. Not on first load:
+  // that would cancel requests a page has just started (the saved registration
+  // being reloaded, for one).
+  const signedIn = useRef(false);
   useEffect(() => {
-    if (!authenticated) dispatch(baseApi.util.resetApiState());
+    if (authenticated) signedIn.current = true;
+    else if (signedIn.current) {
+      signedIn.current = false;
+      dispatch(baseApi.util.resetApiState());
+    }
   }, [authenticated, dispatch]);
   // A page reload empties React state, but the token is still saved: pick the
   // login back up instead of sending the vendor to the sign-in page.

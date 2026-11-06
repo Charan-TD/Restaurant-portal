@@ -6,7 +6,7 @@ import AllInclusiveOutlined from "@mui/icons-material/AllInclusiveOutlined";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { CommonCard } from "@/shared/components/layout/CommonCard";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
-import { CommonTextField } from "@/shared/components/form/CommonTextField";
+import { TimeField } from "@/shared/components/form/TimeField";
 import { FormField } from "@/shared/components/form/FormField";
 import { useWorkingHoursViewModel } from "../viewmodels/useWorkingHoursViewModel";
 import { SettingsTabs } from "./SettingsTabs";
@@ -55,25 +55,10 @@ export function WorkingHoursView() {
               </Typography>
             </Box>
             <FormField label="Opens at">
-              <CommonTextField
-                type="time"
-                value={vm.bulk.start}
-                onChange={(e) =>
-                  vm.setBulk({ ...vm.bulk, start: e.target.value })
-                }
-                sx={{ width: 140 }}
-              />
+              <TimeField label="Opens at" value={vm.bulk.start} onChange={(v) => vm.setBulk({ ...vm.bulk, start: v })} width={150} />
             </FormField>
             <FormField label="Closes at">
-              <CommonTextField
-                type="time"
-                value={vm.bulk.end}
-                error={vm.bulkInvalid}
-                onChange={(e) =>
-                  vm.setBulk({ ...vm.bulk, end: e.target.value })
-                }
-                sx={{ width: 140 }}
-              />
+              <TimeField label="Closes at" value={vm.bulk.end} error={vm.bulkInvalid ? " " : undefined} onChange={(v) => vm.setBulk({ ...vm.bulk, end: v })} width={150} />
             </FormField>
             <CommonButton
               variant="contained"
@@ -146,28 +131,10 @@ export function WorkingHoursView() {
                       }}
                     >
                       <FormField label="Opens at">
-                        <CommonTextField
-                          type="time"
-                          size="small"
-                          value={day.start}
-                          onChange={(e) =>
-                            vm.edit(i, { start: e.target.value })
-                          }
-                        />
+                        <TimeField compact label={`${day.day} opens`} value={day.start} onChange={(v) => vm.edit(i, { start: v })} />
                       </FormField>
                       <FormField label="Closes at">
-                        <CommonTextField
-                          type="time"
-                          size="small"
-                          value={day.end}
-                          error={day.end <= day.start}
-                          helperText={
-                            day.end <= day.start
-                              ? "Must be after opening"
-                              : undefined
-                          }
-                          onChange={(e) => vm.edit(i, { end: e.target.value })}
-                        />
+                        <TimeField compact label={`${day.day} closes`} value={day.end} error={day.end <= day.start ? "Must be after opening" : undefined} onChange={(v) => vm.edit(i, { end: v })} />
                       </FormField>
                     </Box>
                   </>

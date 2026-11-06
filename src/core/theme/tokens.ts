@@ -51,6 +51,22 @@ export const cardHeaderSx = {
 } as const;
 
 /**
+ * A search box: its border, and the search icon, turn the primary colour on
+ * hover and focus, with a soft tint behind it while typing.
+ */
+export const searchFieldSx = {
+  "&& .MuiOutlinedInput-root": {
+    "&:hover fieldset": { borderColor: t.color.primary },
+    "&.Mui-focused": {
+      bgcolor: t.color.primarySubtle,
+      boxShadow: `0 0 0 3px ${t.color.primarySubtleBorder}66`,
+    },
+    "&.Mui-focused fieldset": { borderColor: t.color.primary },
+  },
+  "& .search-icon": { color: t.color.primary },
+} as const;
+
+/**
  * Put on a screen's wrapper so the inputs and buttons inside follow the
  * tokens: 48px inputs with 12px corners and a 1.5px border that turns dark on
  * focus, a 48px primary button, and a 40px outlined one.

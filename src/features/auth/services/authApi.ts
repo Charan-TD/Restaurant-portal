@@ -82,14 +82,29 @@ async function login(
   });
   return startSession(data);
 }
+/**
+ * Whether the server says the number has no restaurant account yet: send-otp
+ * answers `accountExists: false`, and verify-otp answers
+ * `registrationRequired: true` instead of tokens.
+ */
+function isNewVendor(...sources: Payload[]): boolean {
+  return sources.some(
+    (source) =>
+      source?.accountExists === false || source?.registrationRequired === true,
+  );
+}
 /** `phone` is the full number with country code, e.g. +919876543210. */
 async function sendOtp(phone: string, send: Send): Promise<OtpChallenge> {
-  const data = await send<{ data?: OtpChallenge }>({
+  const body = await send<{ data?: OtpChallenge }>({
     url: endpoint(API_PATHS.sendOtp),
     method: "post",
     data: { phone },
   });
-  return data.data ?? {};
+  const challenge = body.data ?? {};
+  return {
+    ...challenge,
+    isNewUser: isNewVendor(body as Payload, challenge as Payload),
+  };
 }
 async function verifyOtp(
   { phone, otp }: { phone: string; otp: string },
@@ -100,6 +115,29 @@ async function verifyOtp(
     method: "post",
     data: { phone, otp },
   });
+  const inner = (data?.data ?? undefined) as Payload,
+    tokens = (inner?.tokens ?? inner ?? data) as Payload;
+  // A verified number with no account has no token to give: register instead,
+  // or carry on with the saved registration the server names.
+  // A submitted registration is answered with nextStep "review" and its id,
+  // and may not say registrationRequired at all.
+  const id = pick(inner, "registrationId", "registration_id");
+  if (
+    !pick(tokens, "accessToken", "access_token", "token") &&
+    (isNewVendor(data, inner) ||
+      !!id ||
+      inner?.nextStep === "registration" ||
+      inner?.nextStep === "review")
+  ) {
+    return {
+      accessToken: "",
+      profile: { phone },
+      isNewUser: !id,
+      registration: id
+        ? { id, next: inner?.nextStep === "review" ? "review" : "registration" }
+        : undefined,
+    };
+  }
   return startSession(data);
 }
 /**

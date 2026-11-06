@@ -143,9 +143,9 @@ export const railItems: RailItem[] = [
   {
     id: "orders",
     label: "Orders",
-    href: "/dashboard",
+    href: "/orders",
     paths: ["/dashboard", "/orders"],
-    title: "Orders",
+    title: "Manage Orders",
   },
   {
     id: "groupOrders",

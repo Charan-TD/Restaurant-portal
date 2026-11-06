@@ -2,7 +2,6 @@ import NextLink from "next/link";
 import { Box, Typography } from "@mui/material";
 import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import EditOutlined from "@mui/icons-material/EditOutlined";
-import DeleteOutline from "@mui/icons-material/DeleteOutlined";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
@@ -35,12 +34,10 @@ function PriceValue({ item }: { item: MenuItem }) {
 export function MenuItemRow({
   item,
   saving,
-  onDelete,
   onAvailable,
 }: {
   item: MenuItem;
   saving: boolean;
-  onDelete: () => void;
   onAvailable: (available: boolean) => void;
 }) {
   const detail = [item.qtyType, item.preparationMinutes ? `${item.preparationMinutes} min` : ""]
@@ -120,19 +117,6 @@ export function MenuItemRow({
           aria-label={`Edit ${item.name}`}
         >
           Edit
-        </CommonButton>
-        <CommonButton
-          variant="outlined"
-          startIcon={<DeleteOutline />}
-          onClick={onDelete}
-          aria-label={`Delete ${item.name}`}
-          sx={{
-            color: `${tokens.color.error} !important`,
-            borderColor: "#f0c4c0 !important",
-            "&:hover": { bgcolor: tokens.color.errorBg },
-          }}
-        >
-          Delete
         </CommonButton>
       </Box>
     </Box>

@@ -44,11 +44,11 @@ export const valueLabel = (type: OfferType) =>
       ? "Combo price"
       : "Discount";
 
-/** "15:00" → "3:00 PM". */
+/** Times are shown in 24 hours, like 15:00. */
 export function clockText(value: string) {
   const [h, m] = value.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return "";
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 /** The headline passengers see, e.g. "Flat ₹50 off". Empty until a value is typed. */

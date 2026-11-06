@@ -14,8 +14,6 @@ import {
   createFilterOptions,
   Box,
   Button,
-  Checkbox,
-  Chip,
   CircularProgress,
   ButtonBase,
   IconButton,
@@ -29,10 +27,10 @@ import {
   Typography,
 } from "@mui/material";
 import AddOutlined from "@mui/icons-material/AddOutlined";
+import EditOutlined from "@mui/icons-material/EditOutlined";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
 import CameraAltOutlined from "@mui/icons-material/CameraAltOutlined";
 import RemoveOutlined from "@mui/icons-material/RemoveOutlined";
-import AddPhotoAlternateOutlined from "@mui/icons-material/AddPhotoAlternateOutlined";
 import { tokens } from "@/core/theme/tokens";
 import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -43,6 +41,7 @@ import {
   menuFoodTypes,
   qtyTypes,
   type MenuItemForm,
+  type QuantityRow,
 } from "../models/menuItem";
 import { formatRupees } from "@/shared/utils/format";
 import { menuImageUrl } from "../services/menuItemApi";
@@ -180,186 +179,239 @@ type CreateAddOn = (
   price: number,
   image: File | null,
 ) => Promise<string>;
-/** Inline box to create an add-on while filling in the item. */
-function NewAddOn({ onCreate }: { onCreate: CreateAddOn }) {
-  const [open, setOpen] = useState(false),
-    [name, setName] = useState(""),
-    [price, setPrice] = useState(""),
-    [image, setImage] = useState<File | null>(null),
-    [error, setError] = useState(""),
-    [imageError, setImageError] = useState(""),
-    [busy, setBusy] = useState(false),
-    preview = useMemo(() => (image ? URL.createObjectURL(image) : ""), [image]);
+
+const addOnBox = {
+  height: 44,
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  px: 1.5,
+  fontSize: 14,
+  borderRadius: tokens.radius.input,
+  border: `1.5px solid ${tokens.color.borderInput}`,
+  bgcolor: tokens.color.card,
+} as const;
+
+/** The small square photo of an add-on; tap it to choose or change the picture. */
+function AddOnPhoto({
+  url,
+  file,
+  onPick,
+  label,
+}: {
+  url?: string;
+  file?: File | null;
+  /** Left out for a saved add-on, whose picture is changed in Add-ons. */
+  onPick?: (file: File) => void;
+  label: string;
+}) {
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]),
+    [problem, setProblem] = useState(""),
+    shown = preview || url || "";
   useEffect(
     () => () => {
       if (preview) URL.revokeObjectURL(preview);
     },
     [preview],
   );
-  const pick = (file: File | undefined) => {
-    if (!file) return;
-    if (!ADDON_IMAGE_TYPES.includes(file.type))
-      return setImageError("Choose a JPG, PNG or WEBP picture.");
-    if (file.size > ADDON_IMAGE_MAX_BYTES)
-      return setImageError("The picture must be smaller than 2 MB.");
-    setImageError("");
-    setImage(file);
-  };
-  const close = () => {
-    setOpen(false);
-    setName("");
-    setPrice("");
-    setImage(null);
-    setError("");
-    setImageError("");
-  };
+  return (
+    <Tooltip title={problem}>
+      <Box
+        component={onPick ? "label" : "div"}
+        aria-label={label}
+        sx={{
+          position: "relative",
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          cursor: onPick ? "pointer" : "default",
+          color: tokens.color.textMuted,
+          borderRadius: tokens.radius.input,
+          border: `1.5px solid ${problem ? tokens.color.error : tokens.color.borderInput}`,
+          bgcolor: tokens.color.sunken,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          ...(shown && { backgroundImage: `url("${shown}")` }),
+        }}
+      >
+        {!shown && <CameraAltOutlined sx={{ fontSize: 20 }} />}
+        {shown && onPick && (
+          <Box
+            component="span"
+            sx={{
+              position: "absolute",
+              right: -4,
+              bottom: -4,
+              width: 16,
+              height: 16,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: "50%",
+              bgcolor: tokens.color.card,
+              border: `1px solid ${tokens.color.borderInput}`,
+            }}
+          >
+            <EditOutlined sx={{ fontSize: 10 }} />
+          </Box>
+        )}
+        {onPick && (
+          <input
+            hidden
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              const bad = !ADDON_IMAGE_TYPES.includes(f.type)
+                ? "Choose a JPG, PNG or WEBP picture."
+                : f.size > ADDON_IMAGE_MAX_BYTES
+                  ? "The picture must be smaller than 2 MB."
+                  : "";
+              setProblem(bad);
+              if (!bad) onPick(f);
+            }}
+          />
+        )}
+      </Box>
+    </Tooltip>
+  );
+}
+
+const removeSx = { color: tokens.color.textMuted, flexShrink: 0 } as const;
+
+/** A new add-on being typed in; it is saved once it has a name and a price and focus leaves the row. */
+function DraftAddOn({
+  taken,
+  suggestions,
+  onPickSaved,
+  onCreate,
+  onRemove,
+}: {
+  taken: string[];
+  suggestions: RestaurantAddOn[];
+  onPickSaved: (addOn: RestaurantAddOn) => void;
+  onCreate: CreateAddOn;
+  onRemove: () => void;
+}) {
+  const [name, setName] = useState(""),
+    [price, setPrice] = useState(""),
+    [image, setImage] = useState<File | null>(null),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    options = suggestions.filter((a) => a.active && !taken.includes(a.id));
   const save = async () => {
-    if (!name.trim()) return setError("Enter the add-on name.");
-    if (price === "") return setError("Enter the price (0 if free).");
+    if (busy || !name.trim() || price === "") return;
     setBusy(true);
     const problem = await onCreate(name.trim(), Number(price), image);
     setBusy(false);
     if (problem) setError(problem);
-    else close();
-  };
-  if (!open)
-    return (
-      <Box sx={{ mt: 1 }}>
-        <Button
-          size="small"
-          startIcon={<AddOutlined />}
-          onClick={() => setOpen(true)}
-          sx={linkButtonSx}
-        >
-          Add new add-on
-        </Button>
-      </Box>
-    );
-  const enter = (e: { key: string; preventDefault: () => void }) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void save();
-    }
+    else onRemove();
   };
   return (
-    <Box
-      sx={{
-        mt: 1,
-        p: 1.5,
-        display: "grid",
-        gap: 1.5,
-        alignItems: "start",
-        border: 1,
-        borderColor: "divider",
-        borderRadius: "14px",
-        gridTemplateColumns: { xs: "1fr", sm: "auto 2fr 1fr auto" },
-      }}
-    >
-      <Tooltip
-        title={
-          imageError ||
-          (image ? "Change picture" : "Add a picture (optional, up to 2 MB)")
-        }
+    <Box>
+      <Box
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) void save();
+        }}
+        sx={{ display: "flex", alignItems: "center", gap: 1 }}
       >
-        <Box
-          component="label"
-          aria-label="Add-on picture"
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: "10px",
-            display: "grid",
-            placeItems: "center",
-            cursor: busy ? "default" : "pointer",
-            color: imageError ? "error.main" : "text.secondary",
-            bgcolor: "#f3f4f2",
-            border: 1,
-            borderColor: imageError ? "error.main" : "transparent",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            ...(preview && { backgroundImage: `url("${preview}")` }),
+        <AddOnPhoto file={image} onPick={setImage} label="Add-on picture" />
+        <Autocomplete
+          freeSolo
+          fullWidth
+          disabled={busy}
+          options={options}
+          getOptionLabel={(o) => (typeof o === "string" ? o : o.name)}
+          inputValue={name}
+          onInputChange={(_, next, reason) => {
+            if (reason !== "reset") {
+              setName(next);
+              setError("");
+            }
           }}
-        >
-          {!preview && <AddPhotoAlternateOutlined fontSize="small" />}
-          <input
-            hidden
-            type="file"
-            disabled={busy}
-            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-            onChange={(e) => {
-              pick(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </Box>
-      </Tooltip>
-      <CommonTextField
-        autoFocus
-        value={name}
-        placeholder="Add-on name, e.g. Extra raita"
-        onChange={(e) => {
-          setName(e.target.value);
-          setError("");
-        }}
-        onKeyDown={enter}
-        error={!!error && !name.trim()}
-        helperText={!name.trim() ? error : undefined}
-        slotProps={{
-          htmlInput: { maxLength: 100, "aria-label": "Add-on name" },
-        }}
-      />
-      <CommonTextField
-        value={price}
-        placeholder="Price, e.g. 30"
-        onChange={(e) => {
-          setPrice(clean(e.target.value));
-          setError("");
-        }}
-        onKeyDown={enter}
-        error={!!error && !!name.trim()}
-        helperText={name.trim() ? error : undefined}
-        slotProps={{
-          htmlInput: { inputMode: "numeric", "aria-label": "Add-on price" },
-          input: {
-            startAdornment: (
-              <Box sx={{ mr: 1, color: "text.secondary" }}>₹</Box>
-            ),
-          },
-        }}
-      />
-      <Box sx={{ display: "flex", gap: 1 }}>
-        <CommonButton
-          size="small"
-          variant="contained"
+          onChange={(_, picked) => {
+            if (picked && typeof picked !== "string") {
+              onPickSaved(picked);
+              onRemove();
+            }
+          }}
+          renderOption={({ key, ...props }, a) => (
+            <li key={key} {...props}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
+                <span>{a.name}</span>
+                <strong>{a.price ? formatRupees(a.price) : "Free"}</strong>
+              </Box>
+            </li>
+          )}
+          renderInput={(params) => (
+            <CommonTextField
+              {...params}
+              autoFocus
+              placeholder="Add-on name"
+              error={!!error}
+              slotProps={{
+                ...params.slotProps,
+                htmlInput: {
+                  ...params.slotProps.htmlInput,
+                  maxLength: 100,
+                  "aria-label": "Add-on name",
+                },
+              }}
+            />
+          )}
+        />
+        <CommonTextField
+          value={price}
           disabled={busy}
-          onClick={() => void save()}
-        >
-          {busy ? "Adding…" : "Add"}
-        </CommonButton>
-        <CommonButton
-          size="small"
-          variant="outlined"
-          color="inherit"
+          placeholder="Price"
+          onChange={(e) => {
+            setPrice(clean(e.target.value));
+            setError("");
+          }}
+          error={!!error}
+          slotProps={{
+            htmlInput: { inputMode: "numeric", "aria-label": "Add-on price" },
+            input: {
+              startAdornment: (
+                <Box sx={{ mr: 1, color: tokens.color.textMuted }}>₹</Box>
+              ),
+            },
+          }}
+          sx={{ width: 120, flexShrink: 0 }}
+        />
+        <IconButton
+          aria-label="Remove add-on"
+          onClick={onRemove}
           disabled={busy}
-          onClick={close}
+          sx={removeSx}
         >
-          Cancel
-        </CommonButton>
+          <CloseOutlined fontSize="small" />
+        </IconButton>
       </Box>
-      {imageError && (
-        <Typography
-          variant="caption"
-          color="error"
-          sx={{ gridColumn: "1 / -1", mt: -0.5 }}
-        >
-          {imageError}
-        </Typography>
+      {error && (
+        <FormHelperText error sx={{ ml: 6.5 }}>
+          {error}
+        </FormHelperText>
       )}
     </Box>
   );
 }
 
-/** The restaurant's add-ons as a checklist; the ticked ones go with the item. */
+/**
+ * Add-ons for the dish as rows: photo, name, price and a cross. Rows are the
+ * restaurant's add-ons ticked for this dish; "Add add-on" opens a blank row,
+ * where a new add-on is typed or a saved one picked.
+ */
 function AddOnsField({
   control,
   addOns,
@@ -369,74 +421,182 @@ function AddOnsField({
   addOns: RestaurantAddOn[];
   onCreate: CreateAddOn;
 }) {
+  const [drafts, setDrafts] = useState<number[]>([]),
+    [counter, setCounter] = useState(0);
   return (
-    <div>
-      <FieldLabel text="Add-ons" htmlFor="menu-addons" />
-      {addOns.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No add-ons yet. Add one below.
-        </Typography>
-      ) : (
-        <Controller
-          control={control}
-          name="addOnIds"
-          render={({ field }) => (
-            <Autocomplete
-              id="menu-addons"
-              multiple
-              disableCloseOnSelect
-              openOnFocus
-              options={addOns}
-              value={addOns.filter((a) => field.value.includes(a.id))}
-              onChange={(_, picked) => field.onChange(picked.map((a) => a.id))}
-              getOptionLabel={(a) => a.name}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              noOptionsText="No add-ons match"
-              renderOption={({ key, ...props }, addOn, { selected }) => (
-                <li key={key} {...props}>
-                  <Checkbox checked={selected} sx={{ mr: 1, p: 0.5 }} />
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 2,
-                      width: "100%",
-                    }}
-                  >
-                    <span>{addOn.name}</span>
-                    <strong>
-                      {addOn.price ? `+${formatRupees(addOn.price)}` : "Free"}
-                    </strong>
+    <Controller
+      control={control}
+      name="addOnIds"
+      render={({ field }) => {
+        const ticked = field.value
+          .map((id) => addOns.find((a) => a.id === id))
+          .filter((a): a is RestaurantAddOn => !!a);
+        return (
+          <div>
+            <FieldLabel text="Add-ons" />
+            <Typography
+              sx={{ mt: -0.5, mb: 1.25, fontSize: 12, color: tokens.color.textMuted }}
+            >
+              Add a photo so passengers can see the add-on
+            </Typography>
+            <Box sx={{ display: "grid", gap: 1.25 }}>
+              {ticked.map((a) => (
+                <Box key={a.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <AddOnPhoto url={a.imageUrl} label={`${a.name} picture`} />
+                  <Box sx={{ ...addOnBox, flex: 1, minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontSize: 14 }}>
+                      {a.name}
+                    </Typography>
                   </Box>
-                </li>
-              )}
-              renderValue={(picked, getItemProps) =>
-                picked.map((addOn, index) => {
-                  const { key, ...props } = getItemProps({ index });
-                  return (
-                    <Chip
-                      key={key}
-                      {...props}
-                      label={`${addOn.name} · ${addOn.price ? formatRupees(addOn.price) : "Free"}`}
-                    />
-                  );
-                })
-              }
-              renderInput={(params) => (
-                <CommonTextField
-                  {...params}
-                  placeholder={field.value.length ? "" : "Select add-ons"}
+                  <Box sx={{ ...addOnBox, width: 120, flexShrink: 0, gap: 1 }}>
+                    <Box sx={{ color: tokens.color.textMuted }}>₹</Box>
+                    {a.price}
+                  </Box>
+                  <IconButton
+                    aria-label={`Remove ${a.name}`}
+                    onClick={() =>
+                      field.onChange(field.value.filter((id) => id !== a.id))
+                    }
+                    sx={removeSx}
+                  >
+                    <CloseOutlined fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              {drafts.map((key) => (
+                <DraftAddOn
+                  key={key}
+                  taken={field.value}
+                  suggestions={addOns}
+                  onPickSaved={(a) => field.onChange([...field.value, a.id])}
+                  onCreate={onCreate}
+                  onRemove={() => setDrafts((d) => d.filter((k) => k !== key))}
                 />
-              )}
-            />
-          )}
-        />
-      )}
-      <NewAddOn onCreate={onCreate} />
-    </div>
+              ))}
+            </Box>
+            <Button
+              size="small"
+              startIcon={<AddOutlined />}
+              onClick={() => {
+                setDrafts((d) => [...d, counter]);
+                setCounter((n) => n + 1);
+              }}
+              sx={linkButtonSx}
+            >
+              Add add-on
+            </Button>
+          </div>
+        );
+      }}
+    />
   );
 }
 
+/**
+ * The ways the dish is sold, as rows of quantity name and price, e.g. 500 g at
+ * ₹299 and 1 kg at ₹549. Any number of rows; × removes one.
+ */
+function QuantitiesField({
+  control,
+  options,
+}: {
+  control: Control<MenuItemForm>;
+  options: string[];
+}) {
+  return (
+    <Controller
+      control={control}
+      name="quantities"
+      render={({ field }) => {
+        const rows = field.value ?? [],
+          update = (i: number, change: Partial<QuantityRow>) =>
+            field.onChange(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
+        return (
+          <div>
+            <FieldLabel text="Quantities" />
+            <Typography
+              sx={{ mt: -0.5, mb: 1.25, fontSize: 12, color: tokens.color.textMuted }}
+            >
+              Add sizes if the dish comes in more than one portion
+            </Typography>
+            <Box sx={{ display: "grid", gap: 1.25 }}>
+              {rows.map((row, i) => (
+                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <ComboField
+                      id={`menu-quantity-${i}`}
+                      value={row.name}
+                      options={options.filter(
+                        (o) =>
+                          o === row.name ||
+                          !rows.some((r) => r.name.toLowerCase() === o.toLowerCase()),
+                      )}
+                      placeholder="e.g. 500 g"
+                      error={false}
+                      onChange={(name) => update(i, { name })}
+                      onBlur={field.onBlur}
+                    />
+                  </Box>
+                  <CommonTextField
+                    value={row.price == null ? "" : String(row.price)}
+                    placeholder="Price"
+                    onChange={(e) => {
+                      const next = clean(e.target.value);
+                      update(i, { price: next === "" ? null : Number(next) });
+                    }}
+                    slotProps={{
+                      htmlInput: {
+                        inputMode: "numeric",
+                        "aria-label": `Price for ${row.name || "quantity"}`,
+                      },
+                      input: {
+                        startAdornment: (
+                          <Box
+                            sx={{
+                              alignSelf: "stretch",
+                              display: "flex",
+                              alignItems: "center",
+                              px: 1.25,
+                              mr: 1.25,
+                              ml: -1.75,
+                              bgcolor: tokens.color.muted,
+                              borderRight: 1,
+                              borderColor: tokens.color.borderInput,
+                              borderRadius: "10px 0 0 10px",
+                              color: "text.secondary",
+                            }}
+                          >
+                            ₹
+                          </Box>
+                        ),
+                      },
+                    }}
+                    sx={{ width: 120, flexShrink: 0 }}
+                  />
+                  <IconButton
+                    aria-label={`Remove ${row.name || "quantity"}`}
+                    onClick={() => field.onChange(rows.filter((_, j) => j !== i))}
+                    sx={removeSx}
+                  >
+                    <CloseOutlined fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+            <Button
+              size="small"
+              startIcon={<AddOutlined />}
+              onClick={() => field.onChange([...rows, { name: "", price: null }])}
+              sx={linkButtonSx}
+            >
+              Add quantity
+            </Button>
+          </div>
+        );
+      }}
+    />
+  );
+}
 /** A small blue text button, e.g. Add new category. */
 const linkButtonSx = {
   mt: 1,
@@ -598,9 +758,7 @@ function DiscountField({
     [mode, setMode] = useState<"percent" | "flat">("percent"),
     // What the vendor typed here, and the offer price it produced. When the
     // offer price changes any other way, the discount is worked out from it.
-    [typed, setTyped] = useState<{ text: string; offer: number | null } | null>(
-      null,
-    ),
+    [typed, setTyped] = useState<string | null>(null),
     off = offer != null && price ? price - offer : 0,
     derived =
       off > 0 && price
@@ -608,23 +766,39 @@ function DiscountField({
           ? String(Math.round((off / price) * 10000) / 100)
           : String(off)
         : "",
-    amount = typed && typed.offer === offer ? typed.text : derived;
-  const type = (raw: string) => {
-    const text =
-        mode === "percent"
-          ? raw.replace(/[^d.]/g, "").replace(/(..*)./g, "$1")
-          : raw.replace(/D/g, ""),
-      n = Number(text),
+    amount = typed !== null && offerFor(typed) === offer ? typed : derived;
+  // The offer price a discount of `text` gives on the current price, or null.
+  function offerFor(text: string) {
+    const n = Number(text),
       cut =
         price && Number.isFinite(n) && n > 0
           ? mode === "percent"
             ? Math.round((price * n) / 100)
             : Math.round(n)
-          : 0,
-      next = price && cut > 0 && cut < price ? price - cut : null;
-    setTyped({ text, offer: next });
-    setValue("discountedPrice", next, { shouldValidate: true });
+          : 0;
+    return price && cut > 0 && cut < price ? price - cut : null;
+  }
+  const type = (raw: string) => {
+    const text = clean(raw, mode === "percent");
+    setTyped(text);
+    setValue("discountedPrice", offerFor(text), { shouldValidate: true });
   };
+  // A new price re-works the typed discount, so the offer price never goes stale.
+  useEffect(() => {
+    if (typed) {
+      const next = offerFor(typed);
+      if (next !== offer) setValue("discountedPrice", next, { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [price]);
+  const problem =
+      typed && Number(typed) > 0 && offerFor(typed) === null
+        ? price
+          ? mode === "percent"
+            ? "The discount must be under 100%."
+            : "The discount must be less than the price."
+          : "Enter the price first."
+        : "";
   return (
     <div>
       <FieldLabel text="Discount" htmlFor="menu-discount" />
@@ -648,6 +822,7 @@ function DiscountField({
           value={amount}
           placeholder="10"
           onChange={(e) => type(e.target.value)}
+          error={!!problem}
           slotProps={{
             htmlInput: { inputMode: "decimal", "aria-label": "Discount value" },
             input: {
@@ -661,7 +836,11 @@ function DiscountField({
           sx={{ flex: 1 }}
         />
       </Box>
-      {offer != null && price != null && off > 0 ? (
+      {problem ? (
+        <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.75 }}>
+          {problem}
+        </Typography>
+      ) : offer != null && price != null && off > 0 ? (
         <Typography
           variant="caption"
           sx={{
@@ -780,7 +959,14 @@ function PhotoTile({
 const PREP_STEP = 5;
 const SECTION_TITLE = { fontSize: 16, fontWeight: 700, mb: 1.5 } as const;
 
-export function MenuItemFormView({ id }: { id?: string }) {
+export function MenuItemFormView({
+  id,
+  onDelete,
+}: {
+  id?: string;
+  /** Asks to delete the item being edited. */
+  onDelete?: (item: { id: string; name: string }) => void;
+}) {
   const vm = useMenuItemFormViewModel(id),
     { control, setValue } = vm.form,
     offer = useWatch({ control, name: "discountedPrice" }),
@@ -1122,26 +1308,9 @@ export function MenuItemFormView({ id }: { id?: string }) {
                 How the dish is sold, and extras passengers can add
               </Typography>
               <Box sx={{ display: "grid", gap: 2.5 }}>
-                <Controller
+                <QuantitiesField
                   control={control}
-                  name="qtyType"
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <FieldLabel text="Sold as" htmlFor="menu-qty-type" />
-                      <ChoiceField
-                        id="menu-qty-type"
-                        value={field.value ?? ""}
-                        options={vm.qtyOptions.length ? vm.qtyOptions : [...qtyTypes]}
-                        placeholder="e.g. Plate, Half Plate"
-                        addLabel="Add new quantity type"
-                        newPlaceholder="Type how it is sold, e.g. Family pack"
-                        error={!!fieldState.error}
-                        helperText={fieldState.error?.message}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                      />
-                    </div>
-                  )}
+                  options={vm.qtyOptions.length ? vm.qtyOptions : [...qtyTypes]}
                 />
                 <AddOnsField
                   control={control}
@@ -1162,6 +1331,16 @@ export function MenuItemFormView({ id }: { id?: string }) {
           borderTop: `1px solid ${tokens.color.borderSubtle}`,
         }}
       >
+        {vm.editing && vm.item && onDelete && (
+          <CommonButton
+            variant="text"
+            color="error"
+            onClick={() => onDelete(vm.item!)}
+            disabled={vm.submitting}
+          >
+            Delete
+          </CommonButton>
+        )}
         <CommonButton variant="text" onClick={vm.cancel} disabled={vm.submitting}>
           Cancel
         </CommonButton>

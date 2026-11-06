@@ -1,4 +1,5 @@
-import { DashboardView } from "@/features/dashboard/views/DashboardView";
+import { OrdersView } from "@/features/orders/views/OrdersView";
+
 export default function Page() {
-  return <DashboardView />;
+  return <OrdersView />;
 }

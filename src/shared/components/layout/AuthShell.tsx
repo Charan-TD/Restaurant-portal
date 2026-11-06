@@ -1,5 +1,7 @@
+"use client";
 import type { ReactNode } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { BackButton } from "@/shared/components/actions/BackButton";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
@@ -24,6 +26,8 @@ const highlights = [
 const stations = ["Order placed", "Preparing", "Handed over"];
 /** Split screen for login and similar pages: brand panel left, form right. */
 export function AuthShell({ children }: { children: ReactNode }) {
+  // The sign-in page is a full screen of its own.
+  if (usePathname() === "/login") return <>{children}</>;
   return (
     <div className="auth-split">
       <aside className="auth-hero">

@@ -51,7 +51,23 @@ function toOrder(row: Row): Order {
         item.title,
         asRow(item.menu_item).name,
       );
-    return name ? [{ name, quantity: Number(item.quantity) || 1 }] : [];
+    if (!name) return [];
+    const price = Number(
+        item.total_price ?? item.line_total ?? item.price ?? item.unit_price,
+      ),
+      type = first(item.food_type, item.item_type, item.type);
+    return [
+      {
+        name,
+        quantity: Number(item.quantity) || 1,
+        price: Number.isFinite(price) && price > 0 ? price : undefined,
+        category: first(item.category, item.category_name, asRow(item.menu_item).category),
+        type: type
+          ? { veg: "Veg", non_veg: "Non-veg", egg: "Egg" }[type.toLowerCase()] ?? type
+          : undefined,
+        note: first(item.note, item.special_instructions, item.instructions),
+      },
+    ];
   });
   const station = first(
     asRow(row.boarding_station).name,
@@ -110,6 +126,11 @@ function toOrder(row: Row): Order {
       row.delivery_deadline,
     ),
     placedAt: first(row.created_at, row.createdAt),
+    paymentStatus: first(row.payment_status, row.paymentStatus)?.toUpperCase(),
+    acceptedAt: first(row.accepted_at, row.preparing_at, row.updated_at),
+    prepMinutes:
+      Number(row.prep_time_limit) > 0 ? Number(row.prep_time_limit) : undefined,
+    pickupOtp: first(row.pickup_otp, row.handover_otp, row.delivery_otp),
     note: first(row.customer_note, row.note),
     rider: riderName
       ? {
@@ -236,14 +257,15 @@ export const orderApi = baseApi.injectEndpoints({
      */
     updateOrder: build.mutation<
       void,
-      { id: string; state: OrderStatus; riderId?: string }
+      { id: string; state: OrderStatus; riderId?: string; prepMinutes?: number }
     >({
-      query: ({ id, state, riderId }) => ({
+      query: ({ id, state, riderId, prepMinutes }) => ({
         url: updatePath(id),
         method: "patch",
         data: {
           status: toServer[state],
           ...(riderId && { assign_rider: riderId }),
+          ...(prepMinutes && { prep_time_limit: prepMinutes }),
         },
       }),
       invalidatesTags: ["Orders"],

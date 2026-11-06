@@ -11,6 +11,8 @@ export interface StepDefinition {
   id: StepId;
   title: string;
   description: string;
+  /** The short line under the title in the setup list. */
+  hint: string;
   /** Disabled steps stay defined so they can be switched back on later. */
   enabled: boolean;
 }
@@ -18,28 +20,29 @@ const allSteps: StepDefinition[] = [
   {
     id: "details",
     title: "Restaurant details",
-    description:
-      "Tell us about your restaurant, set up your login and add your restaurant's photos.",
+    description: "Your restaurant info and how food reaches the train",
+    hint: "Name, owner, cuisines, delivery",
     enabled: true,
   },
   {
     id: "location",
-    title: "Restaurant location",
-    description:
-      "Search for your restaurant, then add the building and a landmark.",
+    title: "Location",
+    description: "Where riders pick up your orders",
+    hint: "Address and stations you serve",
     enabled: true,
   },
   {
     id: "documents",
-    title: "Business documents",
-    description:
-      "Enter your business document numbers and upload a PDF copy of each.",
+    title: "Documents",
+    description: "We check these before your restaurant goes live",
+    hint: "FSSAI, PAN, GST",
     enabled: true,
   },
   {
     id: "bank",
     title: "Bank account",
-    description: "Add the bank account for your payouts.",
+    description: "Where we send your weekly payouts",
+    hint: "Where we send weekly payouts",
     enabled: true,
   },
   {
@@ -47,6 +50,7 @@ const allSteps: StepDefinition[] = [
     title: "Menu",
     description:
       "Add your menu items with a description, picture and veg / non-veg type.",
+    hint: "Dishes, prices and pictures",
     // Hidden for now. To bring it back, set this to true and restore
     // `.min(1)` on menuItems in the registration schema.
     enabled: false,
@@ -54,14 +58,17 @@ const allSteps: StepDefinition[] = [
   {
     id: "hours",
     title: "Operating hours",
-    description: "Choose the days and times you accept orders.",
+    description: "Passengers can order only while you are open",
+    hint: "Days and times you take orders",
     enabled: true,
   },
   {
     id: "review",
     title: "Review & submit",
     description: "Check your information before sending it for approval.",
-    enabled: true,
+    hint: "Check and send for approval",
+    // The design submits from the last step, Operating hours.
+    enabled: false,
   },
 ];
 export const steps = allSteps.filter((step) => step.enabled);
@@ -96,6 +103,26 @@ export interface FieldDefinition {
   matches?: FieldPath<RegistrationForm>;
   multiline?: boolean;
   fullWidth?: boolean;
+  placeholder?: string;
+  /** Shown under the field while it has no error. */
+  hint?: string;
+  /** A small icon at the start of the input. */
+  icon?:
+    | "restaurant"
+    | "owner"
+    | "email"
+    | "dining"
+    | "phone"
+    | "hash"
+    | "calendar"
+    | "bank"
+    | "lock";
+  /** Left out of the required mark. */
+  optional?: boolean;
+  /** A muted line after the label, like "for customers & riders". */
+  labelNote?: string;
+  /** Shown in green under a confirm field once both match. */
+  matchText?: string;
 }
 const phoneField = {
   type: "tel",
@@ -105,29 +132,74 @@ const phoneField = {
   inputMode: "numeric",
 } as const;
 export const fieldGroups: Partial<Record<StepId, FieldDefinition[]>> = {
+  // Sign-in is by OTP, so the form asks for no password.
   details: [
-    { name: "restaurantName", label: "Restaurant name", fullWidth: true },
-    { name: "ownerName", label: "Owner name" },
-    { name: "mobile", label: "Mobile", ...phoneField },
-    { name: "email", label: "Email", type: "email", fullWidth: true },
-    { name: "cuisines", label: "Cuisines", type: "cuisines" },
     {
-      name: "customerContact",
-      label: "Restaurant contact (for customers & riders)",
+      name: "restaurantName",
+      label: "Restaurant name",
+      placeholder: "e.g. Kitchen Bowl",
+      icon: "restaurant",
+      fullWidth: true,
+    },
+    {
+      name: "ownerName",
+      label: "Owner name",
+      placeholder: "Full name",
+      icon: "owner",
+      fullWidth: true,
+    },
+    {
+      name: "mobile",
+      label: "Mobile",
+      placeholder: "10-digit mobile number",
+      hint: "Verified with OTP",
       ...phoneField,
     },
-    { name: "password", label: "Password", type: "password" },
+    {
+      name: "email",
+      label: "Email",
+      type: "email",
+      icon: "email",
+      placeholder: "name@restaurant.com",
+    },
+    {
+      name: "password",
+      label: "Create password",
+      type: "password",
+      icon: "lock",
+      placeholder: "Create a password",
+    },
     {
       name: "confirmPassword",
       label: "Confirm password",
       type: "password",
+      icon: "lock",
+      placeholder: "Re-enter the password",
       matches: "password",
+      matchText: "Passwords match",
     },
     {
       name: "restaurantType",
       label: "Restaurant type",
-      type: "radio",
+      icon: "dining",
+      placeholder: "Select restaurant type",
+      hint: "Dhaba, family restaurant, cloud kitchen, sweet shop...",
+      type: "select",
       options: restaurantTypes,
+    },
+    { name: "cuisines", label: "Cuisines", type: "cuisines" },
+    {
+      name: "customerContact",
+      label: "Restaurant phone",
+      labelNote: "for customers & riders",
+      fullWidth: true,
+      icon: "phone",
+      placeholder: "Landline or mobile",
+      hint: "Mobile, or landline with area code (10 digits). Riders and passengers call this number about an order",
+      ...phoneField,
+      prefix: undefined,
+      // A landline is often written with a leading 0 (0866 …): drop it.
+      sanitize: (value: string) => digits(value).replace(/^0+/, ""),
     },
     {
       name: "foodServed",
@@ -143,30 +215,44 @@ export const fieldGroups: Partial<Record<StepId, FieldDefinition[]>> = {
     },
   ],
   location: [
-    { name: "building", label: "Shop no. / Building / Floor" },
-    { name: "landmark", label: "Landmark" },
-    { name: "city", label: "City" },
-    { name: "state", label: "State" },
+    {
+      name: "building",
+      label: "Shop number and building",
+      placeholder: "e.g. 12, Ground floor, Sri Sai Complex",
+      fullWidth: true,
+    },
+    { name: "landmark", label: "Landmark", placeholder: "e.g. Near Sony World signal" },
+    { name: "city", label: "City", placeholder: "City" },
+    { name: "state", label: "State", placeholder: "State" },
     {
       name: "pincode",
-      label: "Pin code",
+      label: "PIN code",
+      placeholder: "6-digit PIN code",
       sanitize: digits,
       maxLength: 6,
       inputMode: "numeric",
     },
   ],
   bank: [
-    { name: "accountHolder", label: "Account holder name", fullWidth: true },
+    {
+      name: "accountHolder",
+      label: "Account holder name",
+      placeholder: "e.g. KITCHEN BOWL",
+      hint: "As printed on your passbook or cheque",
+      fullWidth: true,
+    },
     {
       name: "accountNumber",
       label: "Account number",
+      placeholder: "9 to 18 digits",
       sanitize: digits,
       maxLength: 18,
       inputMode: "numeric",
     },
     {
       name: "confirmAccountNumber",
-      label: "Confirm account number",
+      label: "Re-enter account number",
+      placeholder: "Type it again",
       sanitize: digits,
       maxLength: 18,
       inputMode: "numeric",
@@ -174,56 +260,20 @@ export const fieldGroups: Partial<Record<StepId, FieldDefinition[]>> = {
     },
     {
       name: "ifsc",
-      label: "IFSC",
+      label: "IFSC code",
+      placeholder: "e.g. HDFC0001234",
       sanitize: alphanumericUpper,
       maxLength: 11,
     },
-    { name: "bankName", label: "Bank name" },
+    { name: "bankName", label: "Bank name", icon: "bank", placeholder: "e.g. HDFC Bank" },
   ],
 };
-export const restaurantPhotoFields = [
-  {
-    name: "coverPhoto",
-    label: "Restaurant picture",
-    optional: true,
-    accept: "picture",
-  },
-  { name: "logo", label: "Restaurant logo", optional: true, accept: "picture" },
-] as const;
-/** Step 1 is long, so its fields are shown in titled groups, in this order. */
-export const detailSections: {
-  title: string;
-  description: string;
-  fields: FieldPath<RegistrationForm>[];
-  photos?: boolean;
-}[] = [
-  {
-    title: "Restaurant information",
-    description: "Enter your restaurant name as it will appear to customers.",
-    fields: [
-      "restaurantName",
-      "customerContact",
-      "cuisines",
-      "restaurantType",
-      "foodServed",
-      "riderOwner",
-    ],
-  },
-  {
-    title: "Owner & login",
-    description: "You will use this email and password to log in.",
-    fields: ["ownerName", "mobile", "email", "password", "confirmPassword"],
-  },
-  {
-    title: "Photos",
-    description:
-      "Add your restaurant photo and logo to help customers recognize your brand.",
-    fields: [],
-    photos: true,
-  },
-];
 export const documentFields: {
   label: string;
+  /** What the card says under its title. */
+  note: string;
+  /** Left out of the required mark. */
+  optional?: boolean;
   file: FieldPath<RegistrationForm>;
   number: FieldDefinition;
   /** Extra fields shown under the number, e.g. an expiry date. */
@@ -231,30 +281,42 @@ export const documentFields: {
 }[] = [
   {
     label: "GST certificate",
+    note: "GSTIN and certificate",
     file: "documents.gst",
     number: {
       name: "documentNumbers.gst",
       label: "GSTIN",
+      icon: "hash",
+      placeholder: "Enter GST no.",
+      hint: "15 characters, e.g. 29ABCDE1234F1Z5",
       sanitize: alphanumericUpper,
       maxLength: 15,
     },
   },
   {
     label: "PAN card",
+    note: "PAN number and card copy",
     file: "documents.pan",
     number: {
       name: "documentNumbers.pan",
       label: "PAN number",
+      icon: "hash",
+      placeholder: "Enter PAN no.",
+      hint: "10 characters, e.g. ABCDE1234F",
       sanitize: alphanumericUpper,
       maxLength: 10,
     },
   },
   {
-    label: "FSSAI licence",
+    label: "FSSAI",
+    note: "Licence number, valid until and licence copy",
     file: "documents.fssai",
     number: {
       name: "documentNumbers.fssai",
-      label: "FSSAI licence number",
+      label: "FSSAI number",
+      icon: "hash",
+      placeholder: "Enter FSSAI no.",
+      hint: "14 digits",
       sanitize: digits,
       maxLength: 14,
       inputMode: "numeric",
@@ -262,17 +324,23 @@ export const documentFields: {
     extra: [
       {
         name: "documentNumbers.fssaiExpiry",
-        label: "FSSAI expiry date",
+        label: "Valid until",
+        icon: "calendar",
+        placeholder: "DD / MM / YYYY",
         type: "date",
       },
     ],
   },
   {
-    label: "Aadhaar card",
+    label: "Identity",
+    note: "Owner Aadhaar number and copy",
     file: "documents.identity",
     number: {
       name: "documentNumbers.identity",
       label: "Aadhaar number",
+      icon: "hash",
+      placeholder: "Enter Aadhaar no.",
+      hint: "12 digits",
       sanitize: digits,
       maxLength: 12,
       inputMode: "numeric",
@@ -280,10 +348,13 @@ export const documentFields: {
   },
   {
     label: "Business proof",
+    note: "Shop licence or trade licence and number",
     file: "documents.businessProof",
     number: {
       name: "documentNumbers.businessProof",
       label: "Registration / licence number",
+      icon: "hash",
+      placeholder: "Enter licence no.",
       sanitize: (value) => value.toUpperCase(),
       maxLength: 30,
     },
@@ -291,7 +362,7 @@ export const documentFields: {
 ];
 const names = (id: StepId) => (fieldGroups[id] ?? []).map((f) => f.name);
 export const stepFields: Record<StepId, FieldPath<RegistrationForm>[]> = {
-  details: [...names("details"), ...restaurantPhotoFields.map((f) => f.name)],
+  details: [...names("details"), "coverPhoto", "logo"],
   location: ["address", "latitude", "longitude", ...names("location")],
   documents: documentFields.flatMap((f) => [
     f.number.name,

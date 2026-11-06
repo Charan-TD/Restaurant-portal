@@ -1,6 +1,6 @@
 import { z } from "zod";
 // Kept free of app imports so tests can compile this model on its own.
-export const menuFoodTypes = ["Veg", "Egg", "Non-veg"] as const;
+export const menuFoodTypes = ["Veg", "Non-veg", "Egg"] as const;
 export type MenuFoodType = (typeof menuFoodTypes)[number];
 /** The backend stores food types as lowercase keys in `food_served`. */
 export const foodTypeKeys: Record<MenuFoodType, string> = {
@@ -75,6 +75,11 @@ const wholeNumber = (label: string) =>
     .number({ invalid_type_error: `Enter the ${label}.` })
     .int(`Enter the ${label} in whole numbers.`)
     .min(0, `The ${label} cannot be negative.`);
+/** One way a dish is sold: a quantity name and its price. */
+export interface QuantityRow {
+  name: string;
+  price: number | null;
+}
 /** Form state; empty number inputs are null. */
 export interface MenuItemForm {
   foodType: MenuFoodType | "";
@@ -90,6 +95,8 @@ export interface MenuItemForm {
   lowStockThreshold: number | null;
   addOnIds: string[];
   qtyType: string;
+  /** The ways the dish is sold, e.g. 500 g at ₹299 and 1 kg at ₹549. */
+  quantities: QuantityRow[];
   available: boolean;
   /** New pictures; choosing any replaces the saved ones. */
   images: (File | null)[];
@@ -108,6 +115,7 @@ export const emptyMenuItemForm = (): MenuItemForm => ({
   lowStockThreshold: 0,
   addOnIds: [],
   qtyType: "",
+  quantities: [],
   available: true,
   images: [null],
 });
@@ -150,6 +158,12 @@ export const menuItemFormSchema: z.ZodType<MenuItemForm> = z
     lowStockThreshold: wholeNumber("low-stock level"),
     addOnIds: z.array(z.string()),
     qtyType: z.string(),
+    quantities: z.array(
+      z.object({
+        name: z.string().trim().max(100, "Keep the quantity name short."),
+        price: z.number().int("Enter whole rupees.").min(0).nullable(),
+      }),
+    ),
     available: z.boolean(),
     images: z
       .array(
@@ -186,6 +200,7 @@ export const toMenuItemForm = (item: MenuItem): MenuItemForm => ({
   lowStockThreshold: item.lowStockThreshold,
   addOnIds: item.addOnIds,
   qtyType: item.qtyType,
+  quantities: item.qtyType ? [{ name: item.qtyType, price: item.price }] : [],
   available: item.available,
   images: [null],
 });
@@ -211,7 +226,8 @@ export function toMenuItemPayload(form: MenuItemForm) {
     tax_rate: form.taxRate ?? 0,
     preparation_time_minutes: form.preparationMinutes ?? 0,
     quantity: form.quantity ?? 0,
-    qty_type: form.qtyType || undefined,
+    // Only the first quantity reaches the backend until it takes a list.
+    qty_type: form.quantities[0]?.name.trim() || form.qtyType || undefined,
     addons: form.addOnIds,
     low_stock_threshold: form.lowStockThreshold ?? 0,
     owner_is_available: form.available,

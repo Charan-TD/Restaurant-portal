@@ -37,9 +37,21 @@ export interface AuthSession {
   accessToken: string;
   refreshToken?: string;
   profile: SessionProfile;
+  /**
+   * The number was verified but has no restaurant account yet, so there is no
+   * login: the vendor goes on to register.
+   */
+  isNewUser?: boolean;
+  /**
+   * A saved registration the backend found for the verified number: where to
+   * carry on (the steps, or the review of one already submitted) and its id.
+   */
+  registration?: { id: string; next: "registration" | "review" };
 }
 export interface OtpChallenge {
   challengeId?: string;
+  /** The number has no restaurant account yet. */
+  isNewUser?: boolean;
   /** Returned by non-production backends only, for testing. */
   otp?: string;
   expiresAt?: string;

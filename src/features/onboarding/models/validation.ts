@@ -15,9 +15,12 @@ const isFile = (value: unknown, types: string[]): value is File =>
   value.size > 0 &&
   value.size <= MAX_FILE_SIZE &&
   types.includes(value.type);
-const isPdf = (value: unknown) => isFile(value, ["application/pdf"]);
-const PDF_MESSAGE = "Upload a PDF file (up to 2 MB).";
-const upload = z.custom<File>(isPdf, PDF_MESSAGE);
+// Business documents and the bank proof: the backend takes a PDF or a JPEG,
+// PNG or WEBP picture of the paper, up to 2 MB, judged by the file's type.
+const isDocument = (value: unknown) =>
+  isFile(value, ["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const DOCUMENT_MESSAGE = "Upload a PDF, JPG, PNG or WEBP file (up to 2 MB).";
+const upload = z.custom<File>(isDocument, DOCUMENT_MESSAGE);
 // The restaurant photo and logo: whatever the server takes, JPG, PNG or WEBP.
 // Typed File | null to match the form's empty state; null is allowed.
 const optionalPicture = z.custom<File | null>(
@@ -42,12 +45,20 @@ const FOOD_TYPES: readonly FoodType[] = ["Veg", "Egg", "Non-veg"];
 const phone = z
   .string()
   .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number.");
+// The restaurant phone: a mobile, or a landline with its area code, as 10 digits
+// (no leading 0 or +91). The backend takes 10 to 15 digits starting 1–9.
+const contact = z
+  .string()
+  .regex(
+    /^[1-9]\d{9}$/,
+    "Enter a 10-digit mobile, or a landline with its area code.",
+  );
 // Typed with "" to match the unselected form state; "" still fails the check.
 const oneOf = <T extends string>(allowed: readonly T[], message: string) =>
   z.custom<T | "">((v) => allowed.includes(v as T), message);
 const time = z
   .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a valid time.");
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Select a time.");
 export const passwordRules = [
   {
     label: "At least 8 characters",
@@ -65,6 +76,11 @@ export const passwordRules = [
     test: (v: string) => /[a-z]/.test(v),
   },
   {
+    label: "One number (0–9)",
+    short: "Number",
+    test: (v: string) => /\d/.test(v),
+  },
+  {
     label: "One symbol (e.g. ! @ # $ %)",
     short: "Symbol",
     test: (v: string) => /[^A-Za-z0-9\s]/.test(v),
@@ -74,7 +90,7 @@ const password = z
   .string()
   .refine(
     (value) => passwordRules.every((rule) => rule.test(value)),
-    "Password does not meet all the requirements below.",
+    "Use 8+ characters with an uppercase, a lowercase, a number and a symbol.",
   );
 export const menuItemSchema = z.object({
   type: oneOf<ItemType>(
@@ -103,8 +119,11 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
       "Choose who delivers your orders to the train.",
     ),
     email: z.string().email("Enter a valid email."),
-    cuisines: z.array(required).min(1, "Choose at least one cuisine."),
-    customerContact: phone,
+    cuisines: z
+      .array(required)
+      .min(1, "Choose at least one cuisine.")
+      .max(3, "Pick up to 3 cuisines."),
+    customerContact: contact,
     password,
     confirmPassword: z.string().min(1, "Confirm your password."),
     address: z
@@ -132,6 +151,7 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
       .regex(/^[A-Z0-9]{11}$/, "IFSC must be exactly 11 letters or digits."),
     bankName: required,
     documentNumbers: z.object({
+      // The backend asks for the GSTIN and its certificate like the rest.
       gst: z
         .string()
         .regex(
