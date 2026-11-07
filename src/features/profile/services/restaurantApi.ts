@@ -367,15 +367,25 @@ export interface RestaurantDetails {
   mobile?: string;
   contact?: string;
   fssai?: string;
+  /** Licence kind, e.g. "State licence". */
+  fssaiType?: string;
+  /** Licence expiry as YYYY-MM-DD. */
+  fssaiExpiry?: string;
   status?: string;
   logoUrl?: string;
   coverUrl?: string;
   gstin?: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
+  businessProofNumber?: string;
+  businessProofType?: string;
   /** Signed links to the documents already on record. */
   documents: {
+    fssai?: string;
     gst?: string;
     pan?: string;
     aadhaar?: string;
+    businessProof?: string;
     bankProof?: string;
   };
   location: {
@@ -440,14 +450,34 @@ async function getRestaurantDetails(send: Send): Promise<RestaurantDetails> {
     mobile: first(row.mobile, row.owner_mobile, row.phone),
     contact: first(row.restaurant_contact),
     fssai: first(row.fssai_number, row.fssai),
-    status: label(first(row.review_status, row.status)),
+    fssaiType: label(first(row.fssai_type, row.fssai_license_type)),
+    fssaiExpiry: first(
+      row.fssai_valid_until,
+      row.fssai_expiry_date,
+      row.fssai_expiry,
+    )?.slice(0, 10),
+    status: label(
+      first(row.review_status, row.status, row.admin_restaurant_status),
+    ),
     logoUrl: first(row.logo_url, row.logo),
     coverUrl: first(row.cover_url, row.cover, row.cover_image),
     gstin: first(row.gstin, row.gst),
+    panNumber: first(row.pan_number, row.pan),
+    aadhaarNumber: first(row.aadhaar_number, row.adhaar_number),
+    businessProofNumber: first(
+      row.business_proof_document_number,
+      row.business_proof_number,
+    ),
+    businessProofType: label(first(row.business_proof_type)),
     documents: {
+      fssai: first(row.fssai_document_url, row.fssai_url),
       gst: first(row.gst_document_url),
       pan: first(row.pan_document_url),
       aadhaar: first(row.aadhaar_document_url),
+      businessProof: first(
+        row.business_proof_document_url,
+        row.business_proof_url,
+      ),
       bankProof: first(row.bank_proof_url),
     },
     location: {

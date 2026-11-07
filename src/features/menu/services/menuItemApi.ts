@@ -485,6 +485,8 @@ async function withCategoryNames(
 async function listCategoryNames(send: Send): Promise<{
   categories: string[];
   subCategories: string[];
+  /** Sub category names of each category, keyed by the category name in lower case. */
+  subsByCategory: Record<string, string[]>;
 }> {
   const remembered = loadRemembered();
   let lists: MenuCategories = { categories: [], subCategories: [] };
@@ -500,7 +502,23 @@ async function listCategoryNames(send: Send): Promise<{
   const names = (...groups: (string | undefined)[][]) => [
     ...new Set(groups.flat().filter((n): n is string => !!n)),
   ];
+  // Which sub categories belong to which category: from the server's list,
+  // from this browser's saved names, and from the restaurant's own items.
+  const catName = new Map(lists.categories.map((c) => [c.id, c.name])),
+    subsByCategory: Record<string, string[]> = {},
+    link = (category: string | undefined, sub: string | undefined) => {
+      if (!category || !sub || ID_LIKE.test(category)) return;
+      const key = category.trim().toLowerCase(),
+        list = (subsByCategory[key] ??= []);
+      if (!list.some((n) => n.toLowerCase() === sub.toLowerCase())) list.push(sub);
+    };
+  for (const sub of lists.subCategories)
+    link(sub.parentId ? catName.get(sub.parentId) : undefined, sub.name);
+  for (const known of Object.values(remembered.names))
+    link(known.parent, known.parent ? known.name : undefined);
+  for (const i of own) link(i.category, i.subCategory);
   return {
+    subsByCategory,
     categories: names(
       lists.categories.map((c) => c.name),
       remembered.categories,
@@ -547,8 +565,15 @@ async function createQtyType(name: string, send: Send): Promise<void> {
 /** One row of the sheet the server could not accept, as it reports it. */
 export interface ExcelRowError {
   row: number;
-  item: string | null;
-  errors: string[];
+  /** The column heading and the cell, e.g. "price" and "D3". */
+  column: string;
+  cell: string;
+  /** What the cell held. */
+  value: string;
+  /** What is wrong. */
+  error: string;
+  /** How to fix it. */
+  suggestion: string;
 }
 /** The names an import would reuse or create. */
 interface NameSplit {
@@ -580,13 +605,18 @@ const names = (value: unknown): NameSplit => {
     list = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
   return { existing: list(o.existing), new: list(o.new) };
 };
+// The server reports one entry per bad cell: { row, column, cell, value, error, suggestion }.
+const text = (v: unknown) => (v == null ? "" : String(v));
 const rowErrors = (value: unknown): ExcelRowError[] =>
   (Array.isArray(value) ? value : []).map((e) => {
     const o = (e ?? {}) as Row;
     return {
       row: Number(o.row) || 0,
-      item: typeof o.item === "string" ? o.item : null,
-      errors: Array.isArray(o.errors) ? o.errors.map(String) : [],
+      column: text(o.column),
+      cell: text(o.cell),
+      value: text(o.value),
+      error: text(o.error ?? o.message) || "This cell is not valid.",
+      suggestion: text(o.suggestion),
     };
   });
 const excelBody = (file: File) => {
@@ -601,17 +631,21 @@ async function previewMenuExcel(file: File, send: Send): Promise<ExcelPreview> {
       method: "post",
       data: excelBody(file),
     }),
-    d = ((data as { data?: unknown })?.data ?? data) as Row,
-    s = (d.summary ?? {}) as Row;
+    d = ((data as { data?: Row })?.data ?? data) as Row,
+    s = (d.summary ?? {}) as Row,
+    errors = rowErrors(d.errors),
+    rows = Number(d.total_rows) || 0,
+    badRows = new Set(errors.map((e) => e.row)).size;
   return {
-    valid: d.valid === true,
-    rows: Number(s.rows) || 0,
-    validRows: Number(s.valid_rows) || 0,
-    invalidRows: Number(s.invalid_rows) || 0,
+    valid: d.success === true && errors.length === 0,
+    rows,
+    validRows: Math.max(0, rows - badRows),
+    invalidRows: badRows,
     categories: names(s.categories),
     subcategories: names(s.subcategories),
+    // The server does not list quantity types; unknown ones are reported as errors.
     quantityTypes: names(s.quantity_types),
-    errors: rowErrors(d.errors),
+    errors,
   };
 }
 /**
@@ -639,7 +673,8 @@ async function importMenuExcel(file: File, send: Send): Promise<ExcelImportResul
       errors: rowErrors(d.errors),
     };
   } catch (e) {
-    const body = (e as { status?: number; data?: { data?: Row } })?.data?.data;
+    // A workbook with bad cells is answered with 400 and { errors: [...] }.
+    const body = (e as { data?: Row })?.data;
     if ((e as { status?: number })?.status === 400 && Array.isArray(body?.errors))
       return {
         imported: false,
@@ -758,7 +793,11 @@ export const menuItemApi = baseApi.injectEndpoints({
       invalidatesTags: ["Categories", "MenuItems"],
     }),
     listCategoryNames: build.query<
-      { categories: string[]; subCategories: string[] },
+      {
+        categories: string[];
+        subCategories: string[];
+        subsByCategory: Record<string, string[]>;
+      },
       void
     >({
       queryFn: flow((_: void, send: Send) => listCategoryNames(send)),

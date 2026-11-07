@@ -11,7 +11,10 @@ import { cardSx, tokens } from "@/core/theme/tokens";
 export function SetupSidebar() {
   const portal = usePortal(),
     router = useRouter(),
-    done = portal.completed.filter((i) => i < steps.length).length;
+    done = portal.completed.filter((i) => i < steps.length).length,
+    // The first step not saved yet. Steps are taken in order: a step opens
+    // once it is saved, or when every step before it is.
+    firstOpen = steps.findIndex((_, i) => !portal.completed.includes(i));
   return (
     <Box component="aside" sx={{ ...cardSx, p: 3, position: { md: "sticky" }, top: { md: 24 } }}>
       <Typography sx={{ fontSize: 16, fontWeight: 700 }}>
@@ -40,7 +43,8 @@ export function SetupSidebar() {
       <Box component="nav" aria-label="Registration steps">
         {steps.map(({ id, title, hint }, i) => {
           const complete = portal.completed.includes(i),
-            current = portal.currentStep === i;
+            current = portal.currentStep === i,
+            locked = !complete && firstOpen !== -1 && i > firstOpen;
           return (
             <Box key={id} sx={{ position: "relative" }}>
               {i < steps.length - 1 && (
@@ -58,6 +62,8 @@ export function SetupSidebar() {
               )}
               <ButtonBase
                 aria-current={current ? "step" : undefined}
+                disabled={locked}
+                title={locked ? "Save the step before to unlock this one" : undefined}
                 onClick={() => {
                   portal.setCurrentStep(i);
                   router.push("/register");
@@ -74,6 +80,8 @@ export function SetupSidebar() {
                   borderRadius: "12px",
                   bgcolor: current ? tokens.color.primarySubtle : "transparent",
                   "&:hover": { bgcolor: current ? tokens.color.primarySubtle : tokens.color.sunken },
+                  "&.Mui-disabled": { opacity: 0.45, cursor: "not-allowed", pointerEvents: "auto" },
+                  "&.Mui-disabled:hover": { bgcolor: "transparent" },
                 }}
               >
                 <Box

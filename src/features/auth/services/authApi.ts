@@ -93,7 +93,7 @@ function isNewVendor(...sources: Payload[]): boolean {
       source?.accountExists === false || source?.registrationRequired === true,
   );
 }
-/** `phone` is the full number with country code, e.g. +919876543210. */
+/** `phone` is the 10-digit mobile number only, without +91 (the server rejects anything else). */
 async function sendOtp(phone: string, send: Send): Promise<OtpChallenge> {
   const body = await send<{ data?: OtpChallenge }>({
     url: endpoint(API_PATHS.sendOtp),

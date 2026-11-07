@@ -19,7 +19,7 @@ import { DEMO_MODE } from "@/core/constants/config";
 import type { ProfileViewModel } from "../viewmodels/useProfileViewModel";
 import { useChangeRequests } from "../viewmodels/useChangeRequests";
 import { BankPane } from "./BankPane";
-import { DocumentsPane } from "./DocumentsPane";
+import { DocumentsPane, WARN_DAYS, daysLeft } from "./DocumentsPane";
 import { HoursPane } from "./HoursPane";
 import { LocationPane } from "./LocationPane";
 import { SettingsPane } from "./SettingsPane";
@@ -119,6 +119,12 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
     [logoutRequest] = useLogoutMutation(),
     [section, setSection] = useState<SectionId>("details"),
     changes = useChangeRequests(),
+    // Fields whose change is waiting for an admin; the outcome comes as a notification.
+    pending = new Set(
+      changes.requests
+        .filter((r) => r.status.toLowerCase() === "pending")
+        .flatMap((r) => r.fields),
+    ),
     { vendor, details } = vm,
     place = details?.location,
     area = [place?.city, place?.state].filter(Boolean).join(", "),
@@ -221,7 +227,11 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
             <NavRow
               icon={<DescriptionOutlined />}
               title="Business documents"
-              hint="Names, GST, PAN and Aadhaar"
+              hint={
+                (daysLeft(details?.fssaiExpiry) ?? Infinity) <= WARN_DAYS
+                  ? "FSSAI licence expires soon"
+                  : "FSSAI, PAN, GST and Aadhaar"
+              }
               selected={section === "documents"}
               onClick={pick("documents")}
             />
@@ -287,12 +297,16 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
       <Box sx={{ ...paneSx, overflow: "hidden" }}>
         {section === "details" && <RestaurantDetailsPanel vm={vm} />}
         {section === "location" && (
-          <LocationPane details={details} onSent={changes.reload} />
+          <LocationPane
+            details={details}
+            pending={pending}
+            onSent={changes.reload}
+          />
         )}
         {section === "documents" && (
           <DocumentsPane
             details={details}
-            requests={changes.requests}
+            pending={pending}
             onSent={changes.reload}
           />
         )}

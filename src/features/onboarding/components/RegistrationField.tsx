@@ -191,7 +191,14 @@ export function RegistrationField({
                 input: {
                   readOnly: locked,
                   startAdornment: start,
-                  endAdornment: definition.type === "date" ? (
+                  endAdornment: locked ? (
+                    <InputAdornment position="end" sx={{ color: tokens.color.textSubtle }}>
+                      <LockOutlined
+                        titleAccess="Verified number, it cannot be changed"
+                        sx={{ fontSize: 20 }}
+                      />
+                    </InputAdornment>
+                  ) : definition.type === "date" ? (
                     <InputAdornment position="end" sx={{ color: tokens.color.success }}>
                       <CalendarMonthOutlined sx={{ fontSize: 20 }} />
                     </InputAdornment>

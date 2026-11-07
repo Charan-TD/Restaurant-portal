@@ -17,7 +17,8 @@ import { LocationMap } from "@/features/onboarding/components/LocationMap";
 import { DEMO_MODE } from "@/core/constants/config";
 import type { RestaurantDetails } from "../services/restaurantApi";
 import { useLocationRequestViewModel } from "../viewmodels/useLocationRequestViewModel";
-import { PaneFooter, ReadField, SubHeading } from "./PaneParts";
+import { FIELD_GROUPS } from "../models/changeRequestLabels";
+import { PaneFooter, PendingChip, ReadField, SubHeading } from "./PaneParts";
 import { PaneHeading } from "./PaneHeading";
 
 const noop = () => undefined;
@@ -29,12 +30,16 @@ const noop = () => undefined;
  */
 export function LocationPane({
   details,
+  pending,
   onSent,
 }: {
   details?: RestaurantDetails | null;
+  /** Request fields now waiting for an admin. */
+  pending: ReadonlySet<string>;
   onSent: () => void;
 }) {
   const vm = useLocationRequestViewModel(onSent),
+    waiting = FIELD_GROUPS.location.some((f) => pending.has(f)),
     place = details?.location,
     changing = !!vm.picked && !!vm.pin,
     pin =
@@ -83,7 +88,10 @@ export function LocationPane({
           </ToastAlert>
         )}
         {vm.error && <ToastAlert severity="error">{vm.error}</ToastAlert>}
-        <SubHeading>Restaurant address</SubHeading>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <SubHeading>Restaurant address</SubHeading>
+          {waiting && <PendingChip />}
+        </Box>
         {!DEMO_MODE && (
           <Autocomplete
             options={vm.options}

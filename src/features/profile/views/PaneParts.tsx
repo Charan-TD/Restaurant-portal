@@ -24,6 +24,28 @@ export function SubHeading({
   );
 }
 
+/** Marks a field whose change request is waiting for an admin. */
+export function PendingChip() {
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        px: 1,
+        py: 0.25,
+        borderRadius: tokens.radius.badge,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.4px",
+        color: "#8a5a00",
+        bgcolor: "#fff4d6",
+      }}
+    >
+      PENDING
+    </Box>
+  );
+}
+
 /** A blue information bar. */
 export function InfoBar({ children }: { children: ReactNode }) {
   return (

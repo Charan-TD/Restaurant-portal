@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/core/providers/ToastProvider";
 import { menuErrorMessage } from "./menuErrors";
 const NO_NAMES: string[] = [];
+const NO_SUBS: Record<string, string[]> = {};
 const NO_ADDONS: RestaurantAddOn[] = [];
 /** Adds a new item, or edits the one with `id`. */
 export function useMenuItemFormViewModel(id?: string) {
@@ -53,7 +54,7 @@ export function useMenuItemFormViewModel(id?: string) {
     loading = editing && itemQuery.isLoading,
     loadError = itemQuery.error ? menuErrorMessage(itemQuery.error) : "",
     categories = namesQuery.data?.categories ?? NO_NAMES,
-    subCategories = namesQuery.data?.subCategories ?? NO_NAMES,
+    subsByCategory = namesQuery.data?.subsByCategory ?? NO_SUBS,
     addOns = addOnsQuery.data ?? NO_ADDONS;
   const form = useForm<MenuItemForm>({
     resolver: zodResolver(menuItemFormSchema),
@@ -145,7 +146,7 @@ export function useMenuItemFormViewModel(id?: string) {
     error,
     dismissError: () => setError(""),
     categories,
-    subCategories,
+    subsByCategory,
     addOns,
     qtyOptions,
     createAddOn: createNewAddOn,

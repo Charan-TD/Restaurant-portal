@@ -191,9 +191,8 @@ function StepBody({
     case "bank":
       return (
         <>
-          <Banner title="Payouts every Friday">
-            Money for orders from Friday to Thursday reaches this account the
-            next Friday.
+          <Banner title="Payouts 3 times a week">
+            Your earnings are paid into this account three times a week.
           </Banner>
           <Section title="Bank account">
             <Grid>
@@ -211,7 +210,7 @@ function StepBody({
             <RegistrationUpload
               name="bankProof"
               label="Upload cancelled cheque or passbook"
-              hint="PDF, JPG or PNG · up to 5 MB"
+              hint="PDF, JPG or PNG · up to 2 MB"
             />
           </Section>
         </>
@@ -243,9 +242,7 @@ export function OnboardingView() {
           onClose={vm.dismissRestored}
           sx={{ mb: 2 }}
         >
-          Welcome back. We restored your saved registration, so you can carry on
-          from where you stopped. Documents you already uploaded are saved; you
-          only need to upload them again if you change that step.
+          Welcome back. Your saved registration is restored.
         </ToastAlert>
       )}
       <Box

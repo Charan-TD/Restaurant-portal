@@ -372,7 +372,11 @@ export function fromMenuItemRow(row: Row): MenuItem {
     images:
       [row.img_urls, row.img_id]
         .find(Array.isArray)
-        ?.filter((p): p is string => typeof p === "string" && !!p) ?? [],
+        ?.filter((p): p is string => typeof p === "string" && !!p) ??
+      // A single picture comes as image_url (a signed link), or img_url / img_id.
+      [row.image_url, row.img_url, row.img_id]
+        .filter((p): p is string => typeof p === "string" && !!p)
+        .slice(0, 1),
     createdAt: text(row.created_at),
   };
 }

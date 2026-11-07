@@ -53,9 +53,22 @@ export const theme = createTheme({
     },
     // One look for the chosen row of every dropdown (the Restaurant type one):
     // a soft primary tint, a little deeper under the pointer.
+    // The Select menu and the Autocomplete list share one panel and one row
+    // size, so Restaurant type and Cuisines open looking the same.
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          marginTop: 4,
+          borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+        },
+        list: { paddingTop: 8, paddingBottom: 8 },
+      },
+    },
     MuiMenuItem: {
       styleOverrides: {
         root: {
+          "&&": { minHeight: 44, paddingLeft: 20, paddingRight: 20 },
           "&.Mui-selected": { backgroundColor: "rgba(242, 106, 46, 0.08)" },
           "&.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
             backgroundColor: "rgba(242, 106, 46, 0.12)",
@@ -65,7 +78,14 @@ export const theme = createTheme({
     },
     MuiAutocomplete: {
       styleOverrides: {
+        paper: {
+          marginTop: 4,
+          borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+        },
+        listbox: { paddingTop: 8, paddingBottom: 8 },
         option: {
+          "&&": { minHeight: 44, paddingLeft: 20, paddingRight: 20 },
           '&[aria-selected="true"]': { backgroundColor: "rgba(242, 106, 46, 0.08)" },
           '&[aria-selected="true"].Mui-focused, &[aria-selected="true"]:hover': {
             backgroundColor: "rgba(242, 106, 46, 0.12)",

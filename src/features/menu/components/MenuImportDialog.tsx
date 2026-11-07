@@ -159,19 +159,34 @@ export function MenuImportDialog({
             <Box sx={{ border: `1px solid ${tokens.color.border}`, borderRadius: tokens.radius.input, overflow: "hidden" }}>
               <Box sx={{ display: "grid", gridTemplateColumns: "56px 1.2fr 3fr", gap: 1, px: 2, py: 1, fontSize: 12, fontWeight: 700, bgcolor: tokens.color.muted, color: tokens.color.textMuted }}>
                 <span>Row</span>
-                <span>Dish</span>
+                <span>Cell</span>
                 <span>Problem</span>
               </Box>
-              {vm.errors.map((e) => (
+              {vm.errors.map((e, i) => (
                 <Box
-                  key={`${e.row}-${e.item}`}
+                  key={`${e.row}-${e.cell}-${i}`}
                   sx={{ display: "grid", gridTemplateColumns: "56px 1.2fr 3fr", gap: 1, alignItems: "start", px: 2, py: 1, fontSize: 13, borderTop: `1px solid ${tokens.color.borderSubtle}`, bgcolor: tokens.color.errorBg }}
                 >
                   <span>{e.row}</span>
-                  <Box component="span" sx={{ overflowWrap: "anywhere" }}>{e.item || "—"}</Box>
+                  <Box component="span" sx={{ overflowWrap: "anywhere" }}>
+                    <b>{e.column || "—"}</b>
+                    {e.cell && ` (${e.cell})`}
+                    {e.value && (
+                      <Box component="span" sx={{ display: "block", color: tokens.color.textMuted }}>
+                        {e.value}
+                      </Box>
+                    )}
+                  </Box>
                   <Box component="span" sx={{ display: "flex", gap: 0.5, color: tokens.color.error }}>
                     <ErrorOutlineOutlined sx={{ fontSize: 16, mt: "2px", flexShrink: 0 }} />
-                    <span>{e.errors.join("; ")}</span>
+                    <span>
+                      {e.error}
+                      {e.suggestion && (
+                        <Box component="span" sx={{ display: "block", color: tokens.color.textMuted }}>
+                          {e.suggestion}
+                        </Box>
+                      )}
+                    </span>
                   </Box>
                 </Box>
               ))}

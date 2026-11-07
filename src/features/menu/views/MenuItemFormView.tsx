@@ -1,4 +1,5 @@
 "use client";
+import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
@@ -19,7 +20,6 @@ import {
   IconButton,
   MenuItem,
   Select,
-  Switch,
   Tooltip,
   FormHelperText,
   ToggleButton,
@@ -540,6 +540,12 @@ function QuantitiesField({
                           )}
                           placeholder="e.g. 500 g"
                           error={!!nameError}
+                          helperText={
+                            row.name.trim() &&
+                            !options.some((o) => o.toLowerCase() === row.name.trim().toLowerCase())
+                              ? "New quantity type: saved to your list when you save the dish."
+                              : undefined
+                          }
                           onChange={(name) => update(i, { name })}
                           onBlur={field.onBlur}
                         />
@@ -986,7 +992,8 @@ export function MenuItemFormView({
     { control, setValue } = vm.form,
     offer = useWatch({ control, name: "discountedPrice" }),
     [discountOpen, setDiscountOpen] = useState(false),
-    description = useWatch({ control, name: "description" });
+    description = useWatch({ control, name: "description" }),
+    category = useWatch({ control, name: "category" }) ?? "";
   return (
     <Box
       component="form"
@@ -1155,7 +1162,13 @@ export function MenuItemFormView({
                         newPlaceholder="Type the new category"
                         error={!!fieldState.error}
                         helperText={fieldState.error?.message}
-                        onChange={field.onChange}
+                        onChange={(next) => {
+                          // Sub-categories belong to a category: a different
+                          // category starts with none chosen.
+                          if (next.trim().toLowerCase() !== field.value.trim().toLowerCase())
+                            setValue("subCategory", "");
+                          field.onChange(next);
+                        }}
                         onBlur={field.onBlur}
                       />
                     </div>
@@ -1170,7 +1183,8 @@ export function MenuItemFormView({
                       <ChoiceField
                         id="menu-sub"
                         value={field.value}
-                        options={vm.subCategories}
+                        // Only the sub-categories of the chosen category.
+                        options={vm.subsByCategory[category.trim().toLowerCase()] ?? []}
                         placeholder="e.g. Non-veg biryani"
                         addLabel="Add new sub-category"
                         newPlaceholder="Type the new sub-category"
@@ -1299,16 +1313,10 @@ export function MenuItemFormView({
                       Passengers can order this dish right away
                     </Typography>
                   </Box>
-                  <Switch
+                  <ToggleSwitch
                     checked={field.value ?? true}
                     onChange={(e) => field.onChange(e.target.checked)}
-                    sx={{
-                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#fff" },
-                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                        bgcolor: tokens.color.success,
-                        opacity: 1,
-                      },
-                    }}
+                    slotProps={{ input: { "aria-label": "Available now" } }}
                   />
                 </Box>
               )}

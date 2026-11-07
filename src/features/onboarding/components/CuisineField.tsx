@@ -72,12 +72,8 @@ export function CuisineField({
         getOptionDisabled={(option) => selected.length >= MAX && !ids.includes(option.id)}
         onChange={(_, value) => field.onChange(value.slice(0, MAX).map((v) => v.id))}
         onBlur={field.onBlur}
-        slotProps={{
-          // The same panel as the Restaurant type menu: a small gap under the
-          // field, rounded corners and the same shadow.
-          paper: { sx: { mt: 0.5, borderRadius: "12px", boxShadow: 8 } },
-          listbox: { sx: { py: 1 } },
-        }}
+        // The list panel and rows come from the theme, shared with the
+        // Restaurant type menu.
         sx={{
           // One line, always the same height: extra picks show as "+n".
           "& .MuiOutlinedInput-root": { flexWrap: "nowrap", overflow: "hidden" },

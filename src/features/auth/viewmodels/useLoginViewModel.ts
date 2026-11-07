@@ -71,7 +71,7 @@ export function useLoginViewModel() {
     }
     setSending(true);
     try {
-      const challenge = await sendOtp(fullPhone).unwrap();
+      const challenge = await sendOtp(phone).unwrap();
       setTestOtp(challenge.otp ?? "");
       setOtpSent(true);
       setWait(RESEND_AFTER);
@@ -100,7 +100,7 @@ export function useLoginViewModel() {
       // Demo mode keeps the original behaviour: any code opens the dashboard.
       const session = DEMO_MODE
         ? null
-        : await verifyOtp({ phone: fullPhone, otp }).unwrap();
+        : await verifyOtp({ phone, otp }).unwrap();
       if (session?.isNewUser || session?.registration) {
         // Verified, but no restaurant yet. The server says whether this number
         // is new, has a registration part-way done, or has one under review.

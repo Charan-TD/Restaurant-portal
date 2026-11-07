@@ -391,7 +391,11 @@ const loaders: Record<
         gst: str(row, "gst_number"),
         pan: str(row, "pan_number"),
         fssai: str(row, "fssai_number"),
-        fssaiExpiry: str(row, "fssai_expiry_date").slice(0, 10),
+        // The profile calls it fssai_valid_until; the saved step may too.
+        fssaiExpiry: str(row, "fssai_expiry_date", "fssai_valid_until").slice(
+          0,
+          10,
+        ),
         identity: str(row, "aadhaar_number"),
         businessProof: str(row, "business_proof_document_number"),
       },

@@ -1,47 +1,12 @@
 "use client";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { useState, type ReactNode } from "react";
-import { Box, Chip, Typography } from "@mui/material";
+import type { ReactNode } from "react";
+import { Box, Typography } from "@mui/material";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { DocumentUpload } from "@/shared/components/form/DocumentUpload";
 import { useChangeRequestFormViewModel } from "../viewmodels/useChangeRequestFormViewModel";
-import {
-  type ProfileChangeRequest,
-  type RestaurantDetails,
-} from "../services/restaurantApi";
-/** How many of the newest requests are listed before "See more requests". */
-const LATEST_REQUESTS = 3;
-const FIELD_LABELS: Record<string, string> = {
-  rest_name: "Restaurant name",
-  owner_name: "Owner name",
-  restaurant_type: "Restaurant type",
-  riders_owner: "Delivery riders",
-  fssai_number: "FSSAI number",
-  fssai_expiry_date: "FSSAI expiry",
-  fssai: "FSSAI certificate",
-  business_proof_number: "Business proof number",
-  business_proof: "Business proof",
-  gst: "GSTIN",
-  gst_document: "GST certificate",
-  pan_number: "PAN number",
-  pan_card: "PAN card",
-  aadhaar_number: "Aadhaar number",
-  adhaar_card: "Aadhaar card",
-  house_no: "Location",
-  landmark: "Location",
-  city: "Location",
-  state: "Location",
-  pincode: "Location",
-  lat: "Location",
-  lon: "Location",
-};
-const STATUS_COLOR = {
-  pending: "warning",
-  approved: "success",
-  accepted: "success",
-  rejected: "error",
-} as const;
+import type { RestaurantDetails } from "../services/restaurantApi";
 /** One identity document: its number on the left, its file on the right, centred together. */
 function DocumentRow({
   title,
@@ -168,76 +133,5 @@ export function ChangeRequestForm({
         </CommonButton>
       </Box>
     </form>
-  );
-}
-/** Past requests and whether an admin approved them. */
-export function ChangeRequestHistory({
-  requests,
-}: {
-  requests: ProfileChangeRequest[];
-}) {
-  const [showAll, setShowAll] = useState(false);
-  if (!requests.length) return null;
-  // Newest first; only the latest few until the vendor asks for the rest.
-  const sorted = [...requests].sort(
-      (a, b) =>
-        (Date.parse(b.createdAt ?? "") || 0) -
-        (Date.parse(a.createdAt ?? "") || 0),
-    ),
-    shown = showAll ? sorted : sorted.slice(0, LATEST_REQUESTS),
-    older = sorted.length - LATEST_REQUESTS;
-  return (
-    <Box>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-        Your requests
-      </Typography>
-      {shown.map((request) => (
-        <Box
-          key={request.id}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-            py: 1.5,
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography noWrap sx={{ fontWeight: 600 }}>
-              {[
-                ...new Set(request.fields.map((key) => FIELD_LABELS[key])),
-              ].join(", ") || "Profile change"}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {request.createdAt
-                ? new Date(request.createdAt).toLocaleString()
-                : ""}
-              {request.reason ? ` · ${request.reason}` : ""}
-            </Typography>
-          </Box>
-          <Chip
-            size="small"
-            label={request.status}
-            color={
-              STATUS_COLOR[
-                request.status.toLowerCase() as keyof typeof STATUS_COLOR
-              ] ?? "default"
-            }
-            sx={{ textTransform: "capitalize" }}
-          />
-        </Box>
-      ))}
-      {older > 0 && (
-        <CommonButton
-          variant="text"
-          onClick={() => setShowAll((all) => !all)}
-          sx={{ mt: 1, ml: -1, fontWeight: 700 }}
-        >
-          {showAll ? "Show fewer requests" : `See more requests (${older})`}
-        </CommonButton>
-      )}
-    </Box>
   );
 }

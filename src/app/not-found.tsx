@@ -1,11 +1,5 @@
-import Link from "next/link";
+import { NotFoundScreen } from "@/shared/components/feedback/NotFoundScreen";
+
 export default function NotFound() {
-  return (
-    <main className="centered-page">
-      <section className="card">
-        <h1>Page not found</h1>
-        <Link href="/login">Return to login</Link>
-      </section>
-    </main>
-  );
+  return <NotFoundScreen />;
 }
