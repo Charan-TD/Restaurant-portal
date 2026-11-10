@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
-import { claimsOf, getAccessToken } from "@/core/api/axios";
+import { claimsOf, getAccessToken } from "@/core/api/session";
 import { usePortal } from "@/core/providers/PortalProvider";
 import {
   useGetRidersOwnerQuery,

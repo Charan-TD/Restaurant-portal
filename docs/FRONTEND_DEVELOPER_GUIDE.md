@@ -43,7 +43,7 @@
 | UI kit | @mui/material, @mui/icons-material, @mui/material-nextjs | 9.4.0 |
 | Styling | @emotion/react, @emotion/styled, @emotion/cache | 11.14.0 / 11.14.1 / 11.14.0 |
 | State and data | @reduxjs/toolkit (RTK Query), react-redux | 2.13.0, 9.3.0 |
-| HTTP | axios | 1.20.0 |
+| HTTP | native fetch via RTK Query `fetchBaseQuery` | n/a |
 | Forms | react-hook-form, @hookform/resolvers | 7.89.0, 5.9.1 |
 | Validation | zod | 3.25.76 |
 | Maps | maplibre-gl | 6.13.0 |
@@ -55,7 +55,7 @@ No `browserslist` entry and no compatibility matrix exist in the repository. The
 
 ### 1.5 Backend integration overview
 - Single REST backend, default `https://train-dhaba-backend-dev.up.railway.app` (override with `NEXT_PUBLIC_API_BASE_URL`).
-- Auth is by **bearer JWT** stored in `localStorage`; no cookies, no credentials (`src/core/api/axios.ts`).
+- Auth is by **bearer JWT** stored in `localStorage`; no cookies, no credentials (`src/core/api/session.ts`).
 - Endpoint paths are fixed in `src/core/constants/config.ts` (`API_PATHS`), not in environment variables.
 - One extra server-side route in the Next app proxies Geoapify address search so the key never reaches the browser (`src/app/api/locations`).
 - A **demo mode** (`NEXT_PUBLIC_DEMO_MODE=true`) replaces API calls with in-memory data. CI builds in demo mode.
@@ -114,7 +114,7 @@ Feature-sliced **MVVM**. Every feature folder uses the same layers:
 
 ```
 models/      types, zod schemas, mappers (API row <-> app type). No React.
-services/    RTK Query endpoints (axios via a shared base query).
+services/    RTK Query endpoints (fetch via a shared base query).
 viewmodels/  hooks holding screen logic and state; return what the view needs.
 views/       screens (JSX only, composed from components).
 components/  UI pieces used by that feature's views.
@@ -138,7 +138,7 @@ restaurant-portal/
    │  ├─ terms/  privacy/  not-found.tsx  page.tsx  layout.tsx  globals.css
    │  └─ api/locations/{route.ts, reverse/route.ts, geoapify.ts}
    ├─ core/
-   │  ├─ api/        axios.ts (instance, tokens), baseApi.ts (RTK Query base, flow())
+   │  ├─ api/        session.ts (tokens), baseApi.ts (RTK Query base, flow())
    │  ├─ constants/  config.ts, navigation.ts, onboarding.ts
    │  ├─ providers/  AppProviders, PortalProvider, ToastProvider
    │  ├─ store/      store.ts, StoreProvider.tsx
@@ -167,7 +167,7 @@ Each route group adds its shell: `(auth)` → `AuthShell`, `(onboarding)` → `P
 
 ### 3.4 Reusable code
 - `src/shared/components/*`: generic UI (see §6).
-- `src/shared/utils/errors.ts`: `errorMessage(error)` turns any axios or RTK error into text.
+- `src/shared/utils/errors.ts`: `errorMessage(error)` turns any RTK or thrown error into text.
 - `src/shared/utils/format.ts`: `formatRupees`.
 - `src/shared/hooks/useDebouncedValue.ts`: debounce for search boxes.
 
@@ -385,15 +385,7 @@ Menu sub-routes used in code: `/menu-items/search`, `/menu-items/categories`, `/
 ### 7.2 Service structure
 One RTK Query API (`baseApi`, `reducerPath: "api"`); each feature calls `baseApi.injectEndpoints`. Tag types: `Orders, Customers, Reviews, GroupOrders, Riders, MenuItems, AddOns, Categories, QtyTypes, Profile, Hours, ChangeRequests`.
 
-All requests go through one axios instance:
-```ts
-export const api = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
-api.interceptors.request.use((config) => {
-  const token = typeof window === "undefined" ? null : getAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-```
+All requests go through one `fetchBaseQuery`-based base query (`apiBaseQuery` in `src/core/api/baseApi.ts`): `API_BASE_URL`, a 15 s timeout, and the bearer token added from `getAccessToken()` on every request. Failures are mapped to `{ status?, message, data? }`. File downloads use `downloadBlob(path)` from the same file.
 
 ### 7.3 The `flow()` helper
 For endpoints needing several requests, demo data or reshaping, write plain async code against `send`; a thrown error becomes the endpoint error:
@@ -418,7 +410,7 @@ Tokens in `localStorage`: `td.accessToken`, `td.refreshToken`; plus `td.ridersOw
 GET (lists, search), POST (create, OTP, select recommended), PATCH (menu item updates, category changes), DELETE (menu item, add-on deactivation). PUT: none found.
 
 ### 7.7 Error handling and loading
-Errors surface as flash toasts (`useToast`), inline `helperText`, or `Alert`. Loading uses `CircularProgress`, `isLoading` flags and disabled buttons ("Saving…"). 15 s axios timeout.
+Errors surface as flash toasts (`useToast`), inline `helperText`, or `Alert`. Loading uses `CircularProgress`, `isLoading` flags and disabled buttons ("Saving…"). 15 s request timeout.
 
 ### 7.8 Pagination
 Orders: `GET /orders?page=N&status=…`. Menu items: read page by page up to `MAX_ITEM_PAGES = 50`, stopping at `data.pagination.totalPages`:

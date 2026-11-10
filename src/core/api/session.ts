@@ -1,11 +1,5 @@
-import axios from "axios";
-import { API_BASE_URL } from "@/core/constants/config";
 // The backend uses bearer tokens, not cookies, and allows any origin (*).
 // Browsers block credentialed requests to a "*" origin, so none are sent.
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-});
 const TOKEN_KEY = "td.accessToken",
   REFRESH_KEY = "td.refreshToken";
 // Storage can be unavailable (private mode, blocked site data), so every
@@ -48,8 +42,3 @@ export function clearTokens() {
     localStorage.removeItem("td.ridersOwner");
   } catch {}
 }
-api.interceptors.request.use((config) => {
-  const token = typeof window === "undefined" ? null : getAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});

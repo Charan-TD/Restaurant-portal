@@ -1,4 +1,4 @@
-import { claimsOf, getAccessToken } from "@/core/api/axios";
+import { claimsOf, getAccessToken } from "@/core/api/session";
 
 // The category list does not say which categories this restaurant has switched
 // off, so the switches it has saved are remembered here, per restaurant. A

@@ -4,7 +4,7 @@ import {
   clearTokens,
   claimsOf,
   getRefreshToken,
-} from "@/core/api/axios";
+} from "@/core/api/session";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type {
   LoginCredentials,

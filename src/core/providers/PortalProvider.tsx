@@ -22,7 +22,7 @@ import type { ApprovalResult } from "@/features/approval/models/approval";
 import type { Order } from "@/features/dashboard/models/order";
 import type { SessionProfile } from "@/features/auth/models/auth";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
-import { claimsOf, clearTokens, getAccessToken } from "@/core/api/axios";
+import { claimsOf, clearTokens, getAccessToken } from "@/core/api/session";
 import { useLazyGetMyRestaurantQuery } from "@/features/profile/services/restaurantApi";
 interface PortalState {
   form: UseFormReturn<RegistrationForm>;

@@ -76,7 +76,8 @@ async function createRegistration(
       : "",
     riders_owner: form.riderOwner,
     restaurant_email: form.email,
-    restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
+    // Mobile or landline: the backend takes the bare 10 digits, no country code.
+    restaurant_contact: form.customerContact.replace(/\D/g, "").slice(-10),
     // Sign-in is by OTP, so the vendor is never asked for a password; the
     // backend still wants one, so it gets a random one nobody needs to know.
     password: form.password || randomPassword(),
@@ -113,7 +114,8 @@ async function updateRegistrationDetails(
       : "",
     riders_owner: form.riderOwner,
     restaurant_email: form.email,
-    restaurant_contact: `${COUNTRY_CODE}${form.customerContact}`,
+    // The edit endpoint wants the bare 10 digits, without the country code.
+    restaurant_contact: form.customerContact.replace(/\D/g, "").slice(-10),
     password: form.password,
     logo: form.logo,
     cover: form.coverPhoto,

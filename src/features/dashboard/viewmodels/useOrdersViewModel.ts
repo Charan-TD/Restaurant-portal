@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
-import { clearTokens } from "@/core/api/axios";
+import { clearTokens } from "@/core/api/session";
 import { useLazyGetMyRestaurantQuery } from "@/features/profile/services/restaurantApi";
 import {
   useGetOrdersQuery,
