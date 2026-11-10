@@ -27,7 +27,7 @@ npm start
 
 ## Stack
 
-Next.js 16.3.8 App Router, React 19.2, TypeScript, MUI 9.4, MUI Icons, Emotion, React Hook Form, Zod, Axios. Exact versions and the lockfile are included.
+Next.js 16.3.8 App Router, React 19.2, TypeScript, MUI 9.4, MUI Icons, Emotion, React Hook Form, Zod. Exact versions and the lockfile are included.
 
 ## Flow
 
@@ -42,12 +42,12 @@ Routes: `/` redirects to `/register`; `/register`, `/status`, `/login`, `/dashbo
 - `features/*/models`: domain types and Zod validation.
 - `features/*/views`: migrated screen rendering.
 - `features/*/viewmodels`: forms, step navigation, submission, approval and order logic.
-- `features/*/services`: Axios communication and explicit demo adapters.
+- `features/*/services`: API communication and explicit demo adapters.
 - `features/*/components`: feature-specific form steps and order rows.
 - `shared/components`: common fields, selects, uploads, checkboxes, buttons, cards, dialog and shell.
 - `core/theme/theme.ts`: the original global MUI theme.
 - `core/providers/AppProviders.tsx`: MUI App Router cache provider, Emotion/theme integration and application state provider.
-- `core/api/axios.ts`: central Axios instance.
+- `core/api/session.ts`: token storage; `core/api/baseApi.ts`: fetch-based RTK Query base query.
 - `core/constants/onboarding.ts`: typed common field definitions and exact step order.
 
 ## Explicit demo mode
@@ -69,7 +69,7 @@ Set `NEXT_PUBLIC_DEMO_MODE=false`, supply the real API base URL and confirmed en
 Integration work still required:
 
 1. Confirm endpoint paths, request/response DTOs and multipart upload names; adapt the typed feature services to the actual backend. Registration currently sends JSON under `registration` and individual files under their field names.
-2. Confirm authentication. Axios currently uses cookie sessions (`withCredentials: true`). Adapt to the actual backend, restore sessions/application data on reload, and enforce approval/authorization on the server. The client route guard is only a UI guard.
+2. Confirm authentication. The portal uses bearer tokens (no cookies). Adapt to the actual backend, restore sessions/application data on reload, and enforce approval/authorization on the server. The client route guard is only a UI guard.
 3. Connect real admin decisions, document storage and live orders. The status refresh and order methods are already separated into services.
 4. Supply the actual Partner Agreement/commission wording. The checkbox text is inherited from the prototype.
 5. Add map/geocoding integration only if required; the existing editable location form remains intact.

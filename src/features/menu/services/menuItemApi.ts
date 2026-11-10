@@ -1,5 +1,4 @@
-import { baseApi, flow, type Send } from "@/core/api/baseApi";
-import { api } from "@/core/api/axios";
+import { baseApi, downloadBlob, flow, type Send } from "@/core/api/baseApi";
 import {
   API_PATHS,
   endpoint,
@@ -687,10 +686,10 @@ async function importMenuExcel(file: File, send: Send): Promise<ExcelImportResul
 /** GET /menu-items/excel-template: the workbook to fill in, as a file. */
 export async function downloadMenuExcelTemplate(): Promise<void> {
   if (DEMO_MODE) throw new Error("The template is not available in demo mode.");
-  const response = await api.get(`${endpoint(API_PATHS.menuItems)}/excel-template`, {
-    responseType: "blob",
-  });
-  const url = URL.createObjectURL(response.data as Blob),
+  const blob = await downloadBlob(
+    `${endpoint(API_PATHS.menuItems)}/excel-template`,
+  );
+  const url = URL.createObjectURL(blob),
     link = document.createElement("a");
   link.href = url;
   link.download = "train-dhaba-menu-template.xlsx";

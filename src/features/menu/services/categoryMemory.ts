@@ -1,4 +1,4 @@
-import { claimsOf, getAccessToken } from "@/core/api/axios";
+import { claimsOf, getAccessToken } from "@/core/api/session";
 
 // The server's category list is shared by every restaurant, and an item only
 // carries an id such as "CAT004". So the names this restaurant saved are
