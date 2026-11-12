@@ -79,7 +79,8 @@ function toOrder(row: Row): Order {
     first(row.coach) && `Coach ${first(row.coach)}`,
     first(row.seat) && `Seat ${first(row.seat)}`,
   ].filter(Boolean);
-  const user = asRow(row.customer_user ?? row.customer),
+  const payment = asRow(Array.isArray(row.payments) ? row.payments[0] : undefined),
+    user = asRow(row.customer_user ?? row.customer),
     riderRow = asRow(row.rider ?? row.assigned_rider),
     riderName = first(riderRow.rider_name, riderRow.name, row.rider_name);
   return {
@@ -126,7 +127,12 @@ function toOrder(row: Row): Order {
       row.delivery_deadline,
     ),
     placedAt: first(row.created_at, row.createdAt),
-    paymentStatus: first(row.payment_status, row.paymentStatus)?.toUpperCase(),
+    // Each order lists its payments: { method: "COD", status: "PENDING" }.
+    paymentStatus: (
+      first(row.payment_status, row.paymentStatus) ?? first(payment.status)
+    )?.toUpperCase(),
+    paymentMethod: first(payment.method)?.toUpperCase(),
+    prepDeadline: first(row.prep_deadline),
     acceptedAt: first(row.accepted_at, row.preparing_at, row.updated_at),
     prepMinutes:
       Number(row.prep_time_limit) > 0 ? Number(row.prep_time_limit) : undefined,

@@ -193,17 +193,21 @@ async function listMenuItems(send: Send): Promise<MenuItem[]> {
   for (let page = 1; page <= MAX_ITEM_PAGES; page++) {
     const data = await send({
       url: endpoint(API_PATHS.menuItems),
-      params: { page },
+      // 100 is the most the server returns per page, which keeps the number of pages (and page edges) small.
+      params: { page, limit: 100 },
     });
     rows.push(...itemRows(data));
     const body = (data as { data?: { pagination?: { totalPages?: unknown } } })
       ?.data;
     if (page >= (Number(body?.pagination?.totalPages) || 1)) break;
   }
-  return withCategoryNames(
-    rows.map((row) => fromMenuItemRow(row as Record<string, unknown>)),
-    send,
-  );
+  // The server orders pages by created_at alone, and dishes saved together (an
+  // import) share one time, so a dish can come back on two pages. Keep each once.
+  const seen = new Set<string>(),
+    items = rows
+      .map((row) => fromMenuItemRow(row as Record<string, unknown>))
+      .filter((item) => !seen.has(item.id) && seen.add(item.id));
+  return withCategoryNames(items, send);
 }
 async function createMenuItem(
   form: MenuItemForm,
@@ -563,6 +567,8 @@ async function createQtyType(name: string, send: Send): Promise<void> {
 }
 /** One row of the sheet the server could not accept, as it reports it. */
 export interface ExcelRowError {
+  /** The worksheet the cell is on, e.g. "Menu Items" or "Addons". */
+  sheet: string;
   row: number;
   /** The column heading and the cell, e.g. "price" and "D3". */
   column: string;
@@ -610,6 +616,7 @@ const rowErrors = (value: unknown): ExcelRowError[] =>
   (Array.isArray(value) ? value : []).map((e) => {
     const o = (e ?? {}) as Row;
     return {
+      sheet: text(o.sheet),
       row: Number(o.row) || 0,
       column: text(o.column),
       cell: text(o.cell),
@@ -618,6 +625,8 @@ const rowErrors = (value: unknown): ExcelRowError[] =>
       suggestion: text(o.suggestion),
     };
   });
+/** Checking or saving a workbook with pictures takes the server far longer than a normal call. */
+const EXCEL_TIMEOUT_MS = 180000;
 const excelBody = (file: File) => {
   const body = new FormData();
   body.append("file", file);
@@ -629,6 +638,7 @@ async function previewMenuExcel(file: File, send: Send): Promise<ExcelPreview> {
       url: `${endpoint(API_PATHS.menuItems)}/excel-preview`,
       method: "post",
       data: excelBody(file),
+      timeout: EXCEL_TIMEOUT_MS,
     }),
     d = ((data as { data?: Row })?.data ?? data) as Row,
     s = (d.summary ?? {}) as Row,
@@ -658,6 +668,7 @@ async function importMenuExcel(file: File, send: Send): Promise<ExcelImportResul
         url: `${endpoint(API_PATHS.menuItems)}/excel-import`,
         method: "post",
         data: excelBody(file),
+      timeout: EXCEL_TIMEOUT_MS,
       }),
       d = ((data as { data?: unknown })?.data ?? data) as Row,
       c = (d.created ?? {}) as Row;
@@ -683,12 +694,14 @@ async function importMenuExcel(file: File, send: Send): Promise<ExcelImportResul
     throw e;
   }
 }
+/** GET /menu-items/excel-template: the workbook the server's import reads. */
+export async function fetchMenuExcelTemplate(): Promise<Blob> {
+  if (DEMO_MODE) throw new Error("The template is not available in demo mode.");
+  return downloadBlob(`${endpoint(API_PATHS.menuItems)}/excel-template`);
+}
 /** GET /menu-items/excel-template: the workbook to fill in, as a file. */
 export async function downloadMenuExcelTemplate(): Promise<void> {
-  if (DEMO_MODE) throw new Error("The template is not available in demo mode.");
-  const blob = await downloadBlob(
-    `${endpoint(API_PATHS.menuItems)}/excel-template`,
-  );
+  const blob = await fetchMenuExcelTemplate();
   const url = URL.createObjectURL(blob),
     link = document.createElement("a");
   link.href = url;

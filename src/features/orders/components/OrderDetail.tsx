@@ -145,7 +145,9 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
   const tone = badge[order.state],
     own = !ws.trainDhabaRiders,
     prepMinutes = order.prepMinutes ?? 15,
-    deadline = Date.parse(order.acceptedAt ?? "") + prepMinutes * 60000,
+    deadline =
+      Date.parse(order.prepDeadline ?? "") ||
+      Date.parse(order.acceptedAt ?? "") + prepMinutes * 60000,
     left = Number.isFinite(deadline) ? deadline - now : prepMinutes * 60000,
     arrival = Date.parse(order.deliveryBy ?? ""),
     arrives = arrival ? clock(arrival) : "",
@@ -267,9 +269,9 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
               <Box sx={{ textAlign: "right" }}>
                 <Typography sx={{ fontSize: 10, color: tokens.color.textMuted }}>Grand total</Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, justifyContent: "flex-end" }}>
-                  {order.paymentStatus === "PAID" && (
+                  {(order.paymentStatus === "PAID" || order.paymentMethod === "COD") && (
                     <Box component="span" sx={{ px: 0.75, fontSize: 10, lineHeight: "16px", fontWeight: 700, borderRadius: "4px", color: tokens.color.success, bgcolor: tokens.color.successBg }}>
-                      PAID
+                      {order.paymentStatus === "PAID" ? "PAID" : "COD"}
                     </Box>
                   )}
                   <Typography sx={{ fontSize: 16, fontWeight: 700 }}>{formatRupees(order.amount)}</Typography>

@@ -21,6 +21,8 @@ export interface ApiQueryArgs {
   data?: unknown;
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
+  /** Milliseconds before the request gives up; slow uploads (a menu workbook with pictures) ask for longer. */
+  timeout?: number;
 }
 const TIMEOUT_MS = 15000;
 /**
@@ -37,7 +39,7 @@ const readBody = async (response: Response): Promise<unknown> => {
   }
 };
 /** Same wording the app has always shown for each kind of failure. */
-function toApiError(error: FetchBaseQueryError): ApiError {
+function toApiError(error: FetchBaseQueryError, timeout = TIMEOUT_MS): ApiError {
   if (typeof error.status === "number") {
     const message = (error.data as { message?: string } | null | undefined)
       ?.message;
@@ -48,7 +50,7 @@ function toApiError(error: FetchBaseQueryError): ApiError {
     };
   }
   if (error.status === "TIMEOUT_ERROR")
-    return { message: `timeout of ${TIMEOUT_MS}ms exceeded` };
+    return { message: `timeout of ${timeout}ms exceeded` };
   if (error.status === "FETCH_ERROR") return { message: "Network Error" };
   return { message: error.error };
 }
@@ -72,10 +74,10 @@ const rawBaseQuery = fetchBaseQuery({
  * timeout stay configured in one place.
  */
 export const apiBaseQuery: BaseQueryFn<ApiQueryArgs, unknown, ApiError> =
-  async ({ url, method = "get", data, params, headers }, api, extra) => {
+  async ({ url, method = "get", data, params, headers, timeout }, api, extra) => {
     const result = await rawBaseQuery(
       // fetch only normalises some verbs, so "patch" must be upper-cased.
-      { url, method: method.toUpperCase(), body: data, params, headers },
+      { url, method: method.toUpperCase(), body: data, params, headers, timeout },
       // RTK's own signal is dropped on purpose: signing out resets the API
       // cache, which would cancel the logout request itself. Requests always
       // finish (or time out), as they did before.
@@ -83,7 +85,7 @@ export const apiBaseQuery: BaseQueryFn<ApiQueryArgs, unknown, ApiError> =
       extra,
     );
     return result.error
-      ? { error: toApiError(result.error) }
+      ? { error: toApiError(result.error, timeout) }
       : { data: result.data };
   };
 /**

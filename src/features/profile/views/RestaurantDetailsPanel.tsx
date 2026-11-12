@@ -151,7 +151,44 @@ export function RestaurantDetailsPanel({ vm }: { vm: ProfileViewModel }) {
     phoneOpen =
       phoneClicked &&
       (phoneFocused || !!vm.form.formState.dirtyFields.phone),
-    changed = vm.form.formState.isDirty || !!vm.logo || !!vm.cover;
+    changed = vm.form.formState.isDirty || !!vm.logo || !!vm.cover,
+    // The owner's sign-in number, which cannot be edited here.
+    ownerDigits = details?.mobile?.replace(/\D/g, "").slice(-10),
+    ownerMobile = ownerDigits ? `${COUNTRY_CODE} ${ownerDigits}` : undefined;
+  /** The editable phone: the restaurant's number, or the mobile in demo mode. */
+  const phoneField = (label: string) => (
+    <Controller
+      name="phone"
+      control={vm.form.control}
+      render={({ field, fieldState }) => (
+        <FormField label={label} htmlFor="profile-phone">
+          <CommonTextField
+            {...field}
+            id="profile-phone"
+            type="tel"
+            onClick={() => setPhoneClicked(true)}
+            onFocus={() => setPhoneFocused(true)}
+            onBlur={() => {
+              field.onBlur();
+              setPhoneFocused(false);
+            }}
+            error={!!fieldState.error}
+            helperText={fieldState.error?.message}
+            onChange={(e) =>
+              field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
+            }
+            slotProps={{
+              htmlInput: { inputMode: "numeric", maxLength: 10 },
+              input: {
+                readOnly: !phoneOpen,
+                startAdornment: prefixAdornment(COUNTRY_CODE),
+              },
+            }}
+          />
+        </FormField>
+      )}
+    />
+  );
   return (
     <Box component="form" noValidate onSubmit={vm.save}>
       <PaneHeading
@@ -274,49 +311,18 @@ export function RestaurantDetailsPanel({ vm }: { vm: ProfileViewModel }) {
                 </FormField>
               )}
             />
-            <Controller
-              name="phone"
-              control={vm.form.control}
-              render={({ field, fieldState }) => (
-                <FormField label="Mobile" htmlFor="profile-phone">
-                  <CommonTextField
-                    {...field}
-                    id="profile-phone"
-                    type="tel"
-                    onClick={() => setPhoneClicked(true)}
-                    onFocus={() => setPhoneFocused(true)}
-                    onBlur={() => {
-                      field.onBlur();
-                      setPhoneFocused(false);
-                    }}
-                    error={!!fieldState.error}
-                    helperText={fieldState.error?.message}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
-                    }
-                    slotProps={{
-                      htmlInput: { inputMode: "numeric", maxLength: 10 },
-                      input: {
-                        readOnly: !phoneOpen,
-                        startAdornment: prefixAdornment(COUNTRY_CODE),
-                      },
-                    }}
-                  />
-                </FormField>
-              )}
-            />
+            {DEMO_MODE ? (
+              phoneField("Mobile")
+            ) : (
+              <Locked label="Mobile" value={ownerMobile} />
+            )}
             <Locked label="Email" value={vm.email} />
             <Locked label="Restaurant type" value={details?.type} />
             <Cuisines names={details?.cuisines ?? []} />
           </Box>
           {!DEMO_MODE && (
             <Box sx={{ mt: 2.5 }}>
-              <Locked
-                label="Restaurant phone · for customers & riders"
-                value={details?.contact}
-              />
+              {phoneField("Restaurant phone · for customers & riders")}
             </Box>
           )}
           {DEMO_MODE && (
@@ -336,7 +342,7 @@ export function RestaurantDetailsPanel({ vm }: { vm: ProfileViewModel }) {
             <Typography
               sx={{ mt: 1.5, fontSize: 12, color: tokens.color.textSubtle }}
             >
-              You can change the mobile number, logo and cover here. Other
+              You can change the restaurant phone, logo and cover here. Other
               details need approval, see Business documents and Restaurant
               location.
             </Typography>

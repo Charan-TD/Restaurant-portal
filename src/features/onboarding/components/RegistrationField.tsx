@@ -224,6 +224,16 @@ export function RegistrationField({
                   ) : undefined,
                   sx: {
                     ...(locked ? { bgcolor: tokens.color.sunken } : {}),
+                    // Hide the browser's own reveal/clear buttons; we draw our own eye icon.
+                    ...(password
+                      ? {
+                          "& input::-ms-reveal": { display: "none" },
+                          "& input::-ms-clear": { display: "none" },
+                          "& input::-webkit-credentials-auto-fill-button": {
+                            display: "none !important",
+                          },
+                        }
+                      : {}),
                     ...(definition.type === "date"
                       ? {
                           cursor: "pointer",
