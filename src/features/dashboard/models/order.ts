@@ -80,6 +80,10 @@ export interface Order {
   acceptedAt?: string;
   /** Minutes the kitchen has to prepare it. */
   prepMinutes?: number;
+  /** When the food must be ready, as the server sets it (ISO time). */
+  prepDeadline?: string;
+  /** How the customer pays, e.g. COD. */
+  paymentMethod?: string;
   /** The code the rider quotes at pickup. */
   pickupOtp?: string;
 }

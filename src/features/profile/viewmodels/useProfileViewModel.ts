@@ -15,7 +15,7 @@ import {
   profileSchema,
   type ProfileForm,
 } from "../models/profile";
-import { useVendorProfile } from "./useVendorProfile";
+import { localDigits, useVendorProfile } from "./useVendorProfile";
 export function useProfileViewModel() {
   const portal = usePortal(),
     vendor = useVendorProfile(),
@@ -30,11 +30,14 @@ export function useProfileViewModel() {
     [busy, setBusy] = useState(false),
     [logo, setLogo] = useState<File | null>(null),
     [cover, setCover] = useState<File | null>(null);
+  // The editable number is the restaurant phone from the profile; the sign-in
+  // number the session started with is only a fallback.
+  const restaurantPhone = localDigits(details?.contact) || vendor.phone;
   const loadDetails = () => void (DEMO_MODE || refetch());
   const current = (): ProfileForm => ({
     name: vendor.nameKnown ? vendor.vendorName : "",
     restaurantName: vendor.restaurantName,
-    phone: vendor.phone,
+    phone: restaurantPhone,
     city: vendor.city,
   });
   const form = useForm<ProfileForm>({
@@ -47,7 +50,8 @@ export function useProfileViewModel() {
     setCover(null);
   };
   // The form is always on screen, so it fills in once the profile has loaded.
-  const { phone, vendorName, restaurantName, city, nameKnown } = vendor;
+  const { vendorName, restaurantName, city, nameKnown } = vendor,
+    phone = restaurantPhone;
   useEffect(() => {
     if (!form.formState.isDirty)
       form.reset({
@@ -62,7 +66,7 @@ export function useProfileViewModel() {
   const save = form.handleSubmit(async (values) => {
     setError("");
     if (!DEMO_MODE) {
-      const phoneChanged = !!values.phone && values.phone !== vendor.phone;
+      const phoneChanged = !!values.phone && values.phone !== restaurantPhone;
       if (phoneChanged || logo || cover) {
         setBusy(true);
         try {
