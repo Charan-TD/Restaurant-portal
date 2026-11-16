@@ -129,7 +129,7 @@ export function AddRiderPanel({
             id="rider-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Ravi Kumar"
+            placeholder="Full name"
             slotProps={{ htmlInput: { maxLength: 60 } }}
           />
         </FormField>
@@ -145,6 +145,9 @@ export function AddRiderPanel({
               input: { startAdornment: prefixAdornment(COUNTRY_CODE) },
             }}
           />
+          <FormHelperText sx={{ mx: 0 }}>
+            We send an OTP to this number to verify the rider.
+          </FormHelperText>
         </FormField>
       </Box>
       <Box sx={{ px: 3, pb: 3, display: "grid", gap: 1, justifyItems: "center" }}>
@@ -158,7 +161,7 @@ export function AddRiderPanel({
         </CommonButton>
         {!phoneOk && (
           <Typography sx={{ fontSize: 13, color: tokens.color.textMuted }}>
-            Add a 10-digit mobile number to continue
+            Add a mobile number to continue
           </Typography>
         )}
       </Box>

@@ -132,6 +132,9 @@ async function verifyOtp(
     return {
       accessToken: "",
       profile: { phone },
+      registrationAccessToken:
+        pick(inner, "registrationAccessToken", "registration_access_token") ||
+        undefined,
       isNewUser: !id,
       registration: id
         ? { id, next: inner?.nextStep === "review" ? "review" : "registration" }

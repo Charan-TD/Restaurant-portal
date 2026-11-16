@@ -16,6 +16,7 @@ import {
   type ProfileForm,
 } from "../models/profile";
 import { localDigits, useVendorProfile } from "./useVendorProfile";
+import { contactDigits } from "@/shared/utils/contactNumber";
 export function useProfileViewModel() {
   const portal = usePortal(),
     vendor = useVendorProfile(),
@@ -32,7 +33,9 @@ export function useProfileViewModel() {
     [cover, setCover] = useState<File | null>(null);
   // The editable number is the restaurant phone from the profile; the sign-in
   // number the session started with is only a fallback.
-  const restaurantPhone = localDigits(details?.contact) || vendor.phone;
+  const restaurantPhone =
+    (DEMO_MODE ? localDigits(details?.contact) : contactDigits(details?.contact)) ||
+    vendor.phone;
   const loadDetails = () => void (DEMO_MODE || refetch());
   const current = (): ProfileForm => ({
     name: vendor.nameKnown ? vendor.vendorName : "",

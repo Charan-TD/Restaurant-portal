@@ -1,4 +1,5 @@
 import type { FieldPath } from "react-hook-form";
+import { CONTACT_MAX, contactDigits } from "@/shared/utils/contactNumber";
 import {
   COUNTRY_CODE,
   foodTypes,
@@ -195,11 +196,12 @@ export const fieldGroups: Partial<Record<StepId, FieldDefinition[]>> = {
       fullWidth: true,
       icon: "phone",
       placeholder: "Landline or mobile",
-      hint: "Mobile, or landline with area code (10 digits). Riders and passengers call this number about an order",
+      hint: "Mobile, or landline with area code (10 digits, or 11 with the leading 0). Riders and passengers call this number about an order",
       ...phoneField,
       prefix: undefined,
-      // A landline is often written with a leading 0 (0866 …): drop it.
-      sanitize: (value: string) => digits(value).replace(/^0+/, ""),
+      // A landline is often written with a leading 0 (0866 …): it is kept.
+      sanitize: contactDigits,
+      maxLength: CONTACT_MAX,
     },
     {
       name: "foodServed",

@@ -8,7 +8,6 @@ import { tokens, tokenScopeSx } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { emptyAddon, validateItem } from "../import/buildDraft";
-import { backendFields } from "../import/toTemplate";
 import { preparePhoto } from "../import/photos";
 import { customerPays } from "../import/pricing";
 import type { DraftAddon, DraftItem, ImportFoodType } from "../import/types";
@@ -39,6 +38,7 @@ export function ItemDetailsDialog({
   categories,
   qtyNames,
   siblings,
+  serverErrors = [],
   onClose,
   onSave,
 }: {
@@ -48,6 +48,8 @@ export function ItemDetailsDialog({
   qtyNames: string[];
   /** The other dishes in this import, to offer their add-ons again. */
   siblings: DraftItem[];
+  /** What the server said about this dish the last time the menu was validated. */
+  serverErrors?: { column: string; error: string; suggestion?: string }[];
   onClose: () => void;
   onSave: (next: DraftItem) => void;
 }) {
@@ -63,7 +65,7 @@ export function ItemDetailsDialog({
       discPercent: draft.discountType === "percent" ? value : 0,
       flatAmount: draft.discountType === "flat" ? value : 0,
     },
-    issues = validateItem(withDiscount, qtyNames);
+    issues = validateItem(withDiscount);
   const addons = draft.addons ?? [],
     setAddons = (next: DraftAddon[]) => patch({ addons: next }),
     changeAddon = (id: string, change: Partial<DraftAddon>) =>
@@ -114,6 +116,19 @@ export function ItemDetailsDialog({
             </Box>
           </Box>
         )}
+        {serverErrors.length > 0 && (
+          <Box role="alert" sx={{ display: "flex", gap: 1, p: 1.5, borderRadius: tokens.radius.input, bgcolor: tokens.color.errorBg, color: tokens.color.error }}>
+            <ErrorOutlineOutlined />
+            <Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>The server reported</Typography>
+              {serverErrors.map((e, i) => (
+                <Typography key={i} sx={{ fontSize: 13 }}>
+                  {e.column ? `${e.column}: ` : ""}{e.error}{e.suggestion ? ` ${e.suggestion}` : ""}
+                </Typography>
+              ))}
+            </Box>
+          </Box>
+        )}
         <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
           You can save an incomplete draft and finish it later. Dishes with problems cannot be submitted.
         </Typography>
@@ -147,13 +162,20 @@ export function ItemDetailsDialog({
           )}
           {draft.sizes.map((size, i) => (
             <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 120px 110px 32px", gap: 1, alignItems: "center" }}>
-              <CommonTextField select size="small" aria-label="Size name" value={size.name} error={!!size.name && qtyNames.length > 0 && !qtyNames.some((n) => n.toLowerCase() === size.name.trim().toLowerCase())} onChange={(e) => patch({ sizes: draft.sizes.map((s, j) => (j === i ? { ...s, name: e.target.value } : s)) })} slotProps={{ select: { native: true } }}>
-                <option value="">Choose size</option>
-                {size.name && !qtyNames.some((n) => n.toLowerCase() === size.name.trim().toLowerCase()) && (
-                  <option value={size.name}>{size.name} (not available)</option>
-                )}
-                {qtyNames.map((n) => <option key={n} value={n}>{n}</option>)}
-              </CommonTextField>
+              {/* Pick a saved quantity type or type a new one; new ones are saved when the menu is validated. */}
+              <CommonTextField
+                size="small"
+                placeholder="Choose or type a size"
+                value={size.name}
+                error={!size.name.trim()}
+                helperText={
+                  size.name.trim() && !qtyNames.some((n) => n.toLowerCase() === size.name.trim().toLowerCase())
+                    ? "New quantity type"
+                    : undefined
+                }
+                onChange={(e) => patch({ sizes: draft.sizes.map((s, j) => (j === i ? { ...s, name: e.target.value } : s)) })}
+                slotProps={{ htmlInput: { list: "item-dialog-sizes", maxLength: 255, "aria-label": "Size name" } }}
+              />
               <CommonTextField size="small" type="number" aria-label="Size price" value={size.price} onChange={(e) => patch({ sizes: draft.sizes.map((s, j) => (j === i ? { ...s, price: Number(e.target.value) } : s)) })} />
               <Typography sx={{ fontSize: 13, fontWeight: 700 }}>₹{customerPays(size.price, withDiscount)}</Typography>
               <ButtonBase aria-label="Remove size" onClick={() => patch({ sizes: draft.sizes.filter((_, j) => j !== i) })} sx={{ width: 32, height: 32, borderRadius: "50%" }}>
@@ -161,6 +183,9 @@ export function ItemDetailsDialog({
               </ButtonBase>
             </Box>
           ))}
+          <datalist id="item-dialog-sizes">
+            {qtyNames.map((n) => <option key={n} value={n} />)}
+          </datalist>
           <Box>
             <CommonButton variant="outlined" onClick={() => patch({ sizes: [...draft.sizes, { name: "", price: draft.price ?? 0 }] })}>
               + Add size
@@ -237,11 +262,11 @@ export function ItemDetailsDialog({
           </Box>
         </Section>
 
-        <Section title="6. Photo" hint="Required. It is resized to a small JPEG for you.">
+        <Section title="6. Photo (optional)" hint="You can add a picture now or later. It is resized to a small JPEG for you.">
           <ImportPhotoCell
             file={draft.photo}
             name={draft.name}
-            missing={!draft.photo}
+            missing={false}
             onPick={async (file) => {
               if (!file) return;
               try {
@@ -254,19 +279,6 @@ export function ItemDetailsDialog({
             onRemove={() => patch({ photo: null })}
           />
           {photoError && <Typography role="alert" sx={{ fontSize: 13, color: tokens.color.error }}>{photoError}</Typography>}
-        </Section>
-
-        <Section title="7. Saved to the server as" hint="Exactly what is sent for this dish, in the server's own column names and values.">
-          <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px", fontSize: 13 }}>
-            {backendFields(withDiscount).map(({ field, value }) => (
-              <Box key={field} sx={{ display: "contents" }}>
-                <Box component="code" sx={{ color: tokens.color.textMuted }}>{field}</Box>
-                <Box component="span" sx={{ color: value === null || value === "" ? tokens.color.textSubtle : tokens.color.text, overflowWrap: "anywhere" }}>
-                  {value === null || value === "" ? "—" : String(value)}
-                </Box>
-              </Box>
-            ))}
-          </Box>
         </Section>
 
         {(item.original?.length ?? 0) > 0 && (

@@ -11,23 +11,72 @@ const text = (value: unknown) =>
       ? String(value)
       : undefined;
 const list = (value: unknown) => (Array.isArray(value) ? value : []);
+/** The first of several possible field names that holds text. */
+const pick = (row: Row, ...names: string[]) => {
+  for (const name of names) {
+    const value = text(row[name]);
+    if (value) return value;
+  }
+  return undefined;
+};
+const number = (value: unknown) => {
+  const n = typeof value === "string" ? Number(value.replace(/[₹,s]/g, "")) : Number(value);
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(n) ? n : undefined;
+};
+/**
+ * A date-time the server may send whole ("2026-11-12T20:40:00Z") or split
+ * into a date and a clock time ("2026-11-12" and "20:40").
+ */
+const dateTime = (value?: string, day?: string) => {
+  if (!value) return undefined;
+  if (!Number.isNaN(Date.parse(value)) && /d{4}-d{2}-d{2}/.test(value)) return new Date(value).toISOString();
+  const clock = value.match(/^(d{1,2}):(d{2})/);
+  if (clock && day && /^d{4}-d{2}-d{2}/.test(day)) {
+    const local = new Date(`${day.slice(0, 10)}T${clock[1].padStart(2, "0")}:${clock[2]}:00`);
+    return Number.isNaN(local.getTime()) ? undefined : local.toISOString();
+  }
+  return undefined;
+};
+/** "veg", "non-veg" or "egg" from the ways the server may write it. */
+const foodType = (value?: string) => {
+  const t = (value ?? "").toLowerCase().replace(/[s_-]+/g, "");
+  if (!t) return undefined;
+  if (t.startsWith("non") || t === "nv") return "non-veg";
+  if (t.includes("egg")) return "egg";
+  if (t.startsWith("veg") || t === "v") return "veg";
+  return undefined;
+};
 /** Each line is { quantity, menu_item: { name, total_price, … } }. */
 function toItem(line: unknown): GroupOrderItem[] {
   const item = asRow(line),
     menu = asRow(item.menu_item),
-    name = text(menu.name) ?? text(item.name),
+    name = text(menu.name) ?? text(item.name) ?? text(item.item_name),
     quantity = Number(item.quantity) || 1,
-    price = Number(menu.total_price);
+    unitPrice = number(menu.total_price) ?? number(menu.price) ?? number(item.price),
+    lineTotal = number(item.total_price) ?? number(item.amount);
   return name
     ? [
         {
           name,
           quantity,
-          amount: Number.isFinite(price) ? price * quantity : undefined,
+          unitPrice,
+          amount: lineTotal ?? (unitPrice === undefined ? undefined : unitPrice * quantity),
+          description: pick(menu, "description") ?? pick(item, "description"),
+          foodType: foodType(
+            pick(menu, "food_type", "food_served", "type", "veg_type") ??
+              pick(item, "food_type", "food_served", "type"),
+          ),
         },
       ]
     : [];
 }
+/** Coaches as a list, whether sent as ["S4", "S5"] or "S4, S5". */
+const coachesOf = (row: Row) => {
+  const raw = row.coaches ?? row.coach_numbers ?? row.coach;
+  return (Array.isArray(raw) ? raw.map((c) => text(c)) : (text(raw) ?? "").split(/[,/]/))
+    .map((c) => (c ?? "").trim())
+    .filter(Boolean);
+};
 function toGroupOrder(raw: unknown, i: number): GroupOrder {
   const row = asRow(raw),
     contactName = text(row.contact_name) ?? "Customer",
@@ -36,9 +85,27 @@ function toGroupOrder(raw: unknown, i: number): GroupOrder {
     // Not documented yet: the names the orders API uses for its rider.
     riderRow = asRow(row.rider ?? row.assigned_rider),
     riderName = text(riderRow.rider_name) ?? text(riderRow.name);
+  // Train and timing details: the names the orders API uses, and likely others.
+  const train = asRow(row.train),
+    day = pick(row, "journey_date", "travel_date", "date") ?? pick(train, "journey_date");
   return {
     id,
     key: id ?? `${contactName}-${mobile}-${i}`,
+    assignedAt: pick(row, "assigned_at", "created_at"),
+    total: number(row.total_amount) ?? number(row.order_value) ?? number(row.total),
+    trainNumber: pick(row, "train_number", "train_no") ?? pick(train, "train_number", "number"),
+    trainName: pick(row, "train_name") ?? pick(train, "train_name", "name"),
+    stationName:
+      pick(row, "delivery_station_name", "delivery_station", "boarding_station_name", "station_name", "station") ??
+      pick(asRow(row.station), "station_name", "name"),
+    trainArrival: dateTime(
+      pick(row, "train_arrival", "arrival_time", "train_arrival_time", "eta", "delivery_deadline", "delivery_time"),
+      day,
+    ),
+    coaches: coachesOf(row),
+    readyBy: dateTime(pick(row, "food_ready_by", "ready_by", "ready_time", "prep_deadline"), day),
+    riderAt: dateTime(pick(row, "rider_arrival", "rider_eta", "pickup_time", "pickup_at"), day),
+    note: pick(row, "note", "notes", "special_instructions", "instructions", "customer_note") ?? text(row.order_details),
     contactName,
     mobile,
     email: text(row.email),
@@ -73,7 +140,7 @@ export const groupOrderApi = baseApi.injectEndpoints({
     /**
      * Accepting (PREPARING) or rejecting (REJECTED) an ASSIGNED order is
      * POST .../respond; every later step is PATCH .../status, one step forward.
-     * READY → OUT_FOR_DELIVERY requires assigned_rider: the rider's public
+     * PREPARING → READY requires assigned_rider: the rider's public
      * code (e.g. RID-9ERNEW) from GET /restaurant/riders.
      */
     updateGroupOrder: build.mutation<

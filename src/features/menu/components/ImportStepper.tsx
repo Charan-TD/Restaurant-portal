@@ -4,11 +4,10 @@ import CheckOutlined from "@mui/icons-material/CheckOutlined";
 import { tokens } from "@/core/theme/tokens";
 import type { OwnFileStage } from "../viewmodels/useOwnFileImportViewModel";
 
-/** The steps of the import; Column setup only appears when the columns need confirming. */
+/** The steps of the import. */
 export function ImportStepper({ stage }: { stage: OwnFileStage }) {
   const steps: { key: OwnFileStage; label: string }[] = [
       { key: "choose", label: "Upload menu" },
-      ...(stage === "columns" ? [{ key: "columns" as const, label: "Column setup" }] : []),
       { key: "review", label: "Review & edit" },
       { key: "check", label: "Check menu" },
       { key: "done", label: "Done" },

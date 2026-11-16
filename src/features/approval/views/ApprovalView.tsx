@@ -178,7 +178,7 @@ export function ApprovalView() {
             {status === "Approved"
               ? "Log in to open your restaurant and start receiving orders."
               : status === "Rejected"
-                ? `${vm.approval?.reason || "Please review the feedback from your administrator."} Update your documents and resubmit.`
+                ? `${vm.approval?.reason || "Please review the feedback from your administrator."} Change what was asked for and submit again.`
                 : "Most reviews finish within 48 hours. We’ll notify you by SMS and email when you are live."}
           </Typography>
           {status === "Under review" && (
@@ -212,8 +212,9 @@ export function ApprovalView() {
               </CommonButton>
             )}
             {status === "Rejected" && (
-              <CommonButton variant="contained" fullWidth onClick={vm.updateDocuments}>
-                Update documents
+              // The admin may reject for any step, so every step can be changed, not just documents.
+              <CommonButton variant="contained" fullWidth onClick={vm.editRegistration}>
+                Edit registration
               </CommonButton>
             )}
             {!DEMO_MODE && status === "Rejected" && (

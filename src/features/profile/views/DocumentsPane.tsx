@@ -1,10 +1,11 @@
 "use client";
 import { useRef, useState } from "react";
-import { Box, Button, Link, Typography } from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import CheckCircleOutlined from "@mui/icons-material/CheckCircleOutlined";
 import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import ChevronRight from "@mui/icons-material/ChevronRight";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -12,7 +13,11 @@ import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { FormField } from "@/shared/components/form/FormField";
 import { FIELD_GROUPS } from "../models/changeRequestLabels";
 import type { RestaurantDetails } from "../services/restaurantApi";
-import { useFssaiRenewalViewModel } from "../viewmodels/useFssaiRenewalViewModel";
+import {
+  DOC_RULES,
+  useDocumentsViewModel,
+  type DocKey,
+} from "../viewmodels/useDocumentsViewModel";
 import { ChangeRequestForm } from "./ChangeRequestCard";
 import { PaneHeading } from "./PaneHeading";
 import { PaneFooter, PendingChip, SubHeading } from "./PaneParts";
@@ -21,7 +26,7 @@ const DAY = 24 * 60 * 60 * 1000;
 /** The licence is flagged this many days before it runs out. */
 export const WARN_DAYS = 30;
 const AMBER = { text: "#8a5a00", bg: "#fff4d6", border: "#f5dd9b" };
-const FORM_ID = "fssai-renewal";
+const FORM_ID = "documents-form";
 
 const dateText = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", {
@@ -89,70 +94,82 @@ function VerifiedChip() {
   );
 }
 
-function DocRow({
-  title,
-  detail,
+/** The document on record: icon, its facts, and a button to view the file. */
+function DocCard({
+  facts,
   url,
-  verified,
-  pending,
+  viewLabel,
+  warn,
 }: {
-  title: string;
-  detail?: string;
+  facts: { label: string; value: string; color?: string }[];
   url?: string;
-  verified: boolean;
-  pending: boolean;
+  viewLabel: string;
+  warn?: boolean;
 }) {
   return (
     <Box
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 1.5,
-        py: 1.5,
-        borderTop: `1px solid ${tokens.color.borderSubtle}`,
+        flexWrap: "wrap",
+        gap: 2,
+        p: 2,
+        border: `1px solid ${tokens.color.border}`,
+        borderRadius: tokens.radius.input,
       }}
     >
       <Box
         sx={{
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           flexShrink: 0,
           display: "grid",
           placeItems: "center",
           borderRadius: "10px",
-          color: tokens.color.textMuted,
-          bgcolor: tokens.color.muted,
+          color: warn ? AMBER.text : tokens.color.info,
+          bgcolor: warn ? AMBER.bg : tokens.color.infoBg,
         }}
       >
-        <DescriptionOutlined fontSize="small" />
+        <DescriptionOutlined />
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{title}</Typography>
-        <Typography noWrap sx={{ fontSize: 13, color: tokens.color.textMuted }}>
-          {detail || (url ? "On file" : "Not added")}
-        </Typography>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gap: 1.5,
+          gridTemplateColumns: {
+            xs: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(3, minmax(0, 1fr))",
+          },
+        }}
+      >
+        {facts.map((f) => (
+          <Fact key={f.label} {...f} />
+        ))}
       </Box>
       {url && (
-        <Link
+        <Button
+          variant="outlined"
+          startIcon={<DescriptionOutlined />}
           href={url}
           target="_blank"
           rel="noreferrer"
-          underline="none"
-          sx={{ fontSize: 14, fontWeight: 600, color: tokens.color.link }}
         >
-          View
-        </Link>
+          {viewLabel}
+        </Button>
       )}
-      {pending ? <PendingChip /> : verified && <VerifiedChip />}
     </Box>
   );
 }
 
-/** A dashed box to choose or drop the renewed licence. */
-function LicenceDropzone({
+/** A dashed box to choose or drop a file. */
+function DocDropzone({
+  title,
   file,
   onChange,
 }: {
+  title: string;
   file: File | null;
   onChange: (file: File | null) => void;
 }) {
@@ -162,7 +179,7 @@ function LicenceDropzone({
     <Box
       role="button"
       tabIndex={0}
-      aria-label="Upload renewed licence"
+      aria-label={title}
       onClick={() => input.current?.click()}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -192,7 +209,6 @@ function LicenceDropzone({
         borderRadius: tokens.radius.input,
         border: `1.5px dashed ${over ? tokens.color.primary : tokens.color.dashed}`,
         bgcolor: over ? tokens.color.primarySubtle : tokens.color.sunken,
-        "&:hover": { borderColor: tokens.color.primary },
         "&:focus-visible": { outline: `2px solid ${tokens.color.primary}` },
       }}
     >
@@ -202,7 +218,7 @@ function LicenceDropzone({
         <FileUploadOutlined />
       )}
       <Typography sx={{ fontWeight: 700, fontSize: 14 }}>
-        {file ? file.name : "Upload renewed licence"}
+        {file ? file.name : title}
       </Typography>
       <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
         {file
@@ -213,7 +229,7 @@ function LicenceDropzone({
         ref={input}
         hidden
         type="file"
-        aria-label="Renewed licence file"
+        aria-label={`${title} file`}
         accept=".pdf,.jpg,.jpeg,.png"
         onClick={(e) => e.stopPropagation()}
         onChange={(e) => {
@@ -226,7 +242,80 @@ function LicenceDropzone({
   );
 }
 
-/** The documents on record, the FSSAI renewal, and a form to ask for other changes. */
+/** A row in "Other documents"; choosing it opens the same fields as the FSSAI licence. */
+function DocRow({
+  title,
+  detail,
+  verified,
+  pending,
+  open,
+  onClick,
+}: {
+  title: string;
+  detail?: string;
+  verified: boolean;
+  pending: boolean;
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      sx={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        py: 1.5,
+        px: 0,
+        font: "inherit",
+        textAlign: "left",
+        cursor: "pointer",
+        border: 0,
+        borderTop: `1px solid ${tokens.color.borderSubtle}`,
+        bgcolor: "transparent",
+        color: "inherit",
+        "&:focus-visible": { outline: `2px solid ${tokens.color.primary}` },
+      }}
+    >
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: "10px",
+          color: open ? tokens.color.primary : tokens.color.textMuted,
+          bgcolor: open ? tokens.color.primarySubtle : tokens.color.muted,
+        }}
+      >
+        <DescriptionOutlined fontSize="small" />
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography className="doc-title" sx={{ fontWeight: 600, fontSize: 15 }}>
+          {title}
+        </Typography>
+        <Typography noWrap sx={{ fontSize: 13, color: tokens.color.textMuted }}>
+          {detail || "Not added"}
+        </Typography>
+      </Box>
+      {pending ? <PendingChip /> : verified && <VerifiedChip />}
+      <ChevronRight
+        sx={{
+          color: tokens.color.textSubtle,
+          transform: open ? "rotate(90deg)" : "none",
+          transition: "transform .15s",
+        }}
+      />
+    </Box>
+  );
+}
+
+/** Business documents: the FSSAI licence, and the other documents, each renewed the same way. */
 export function DocumentsPane({
   details,
   pending,
@@ -237,7 +326,7 @@ export function DocumentsPane({
   pending: ReadonlySet<string>;
   onSent: () => void;
 }) {
-  const vm = useFssaiRenewalViewModel(onSent),
+  const vm = useDocumentsViewModel(onSent),
     [asking, setAsking] = useState(false),
     waiting = (group: readonly string[]) => group.some((f) => pending.has(f)),
     fssaiWaiting = waiting(FIELD_GROUPS.fssai),
@@ -249,8 +338,8 @@ export function DocumentsPane({
     docs = details?.documents,
     aadhaar = details?.aadhaarNumber;
   const status = fssaiWaiting
-      ? { text: "Renewal pending approval", color: AMBER.text }
-      : !details?.fssaiExpiry
+    ? { text: "Renewal pending approval", color: AMBER.text }
+    : !details?.fssaiExpiry
       ? { text: details?.fssai ? "On file" : "Not added" }
       : expired
         ? { text: "Expired", color: tokens.color.error }
@@ -260,6 +349,106 @@ export function DocumentsPane({
               color: AMBER.text,
             }
           : { text: "Valid", color: tokens.color.success };
+
+  /** The shared "new number" input (and valid-until for FSSAI) under a dropzone. */
+  const renewFields = (doc: DocKey) => {
+    const rule = DOC_RULES[doc],
+      v = vm.values[doc];
+    return (
+      <>
+        <DocDropzone
+          title={`Upload ${doc === "fssai" ? "renewed licence" : `new ${rule.title.toLowerCase()}`}`}
+          file={v.file}
+          onChange={(file) => vm.set(doc, "file", file)}
+        />
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2,
+            gridTemplateColumns: {
+              xs: "1fr",
+              md: doc === "fssai" ? "repeat(2, minmax(0, 1fr))" : "1fr",
+            },
+          }}
+        >
+          <FormField
+            label={`New ${rule.numberLabel}`}
+            htmlFor={`${doc}-new-number`}
+          >
+            <CommonTextField
+              id={`${doc}-new-number`}
+              placeholder={rule.placeholder}
+              value={v.number}
+              onChange={(e) => {
+                const raw = rule.numeric
+                  ? e.target.value.replace(/\D/g, "")
+                  : e.target.value;
+                vm.set(
+                  doc,
+                  "number",
+                  (rule.upper ? raw.toUpperCase() : raw).slice(
+                    0,
+                    rule.maxLength,
+                  ),
+                );
+              }}
+              slotProps={{
+                htmlInput: { inputMode: rule.numeric ? "numeric" : "text" },
+              }}
+            />
+          </FormField>
+          {doc === "fssai" && (
+            <FormField label="Valid until" htmlFor="fssai-new-expiry">
+              <CommonTextField
+                id="fssai-new-expiry"
+                type="date"
+                value={v.expiry}
+                onChange={(e) => vm.set(doc, "expiry", e.target.value)}
+              />
+            </FormField>
+          )}
+        </Box>
+      </>
+    );
+  };
+
+  const others: {
+    key: Exclude<DocKey, "fssai">;
+    detail?: string;
+    url?: string;
+    group: readonly string[];
+    type?: string;
+  }[] = [
+    {
+      key: "pan",
+      detail: details?.panNumber,
+      url: docs?.pan,
+      group: FIELD_GROUPS.pan,
+    },
+    {
+      key: "gst",
+      detail: details?.gstin,
+      url: docs?.gst,
+      group: FIELD_GROUPS.gst,
+    },
+    {
+      key: "aadhaar",
+      detail: aadhaar ? `Aadhaar ••${aadhaar.slice(-4)}` : undefined,
+      url: docs?.aadhaar,
+      group: FIELD_GROUPS.aadhaar,
+    },
+    {
+      key: "businessProof",
+      detail:
+        [details?.businessProofType, details?.businessProofNumber]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+      url: docs?.businessProof,
+      group: FIELD_GROUPS.businessProof,
+      type: details?.businessProofType,
+    },
+  ];
+
   return (
     <>
       <PaneHeading
@@ -296,161 +485,120 @@ export function DocumentsPane({
         )}
 
         <form id={FORM_ID} noValidate onSubmit={vm.submit}>
-          <Box sx={{ display: "grid", gap: 2 }}>
-            <SubHeading>FSSAI licence</SubHeading>
-            {vm.sent && (
-              <ToastAlert severity="success">
-                Renewal sent. An admin will review the new licence.
-              </ToastAlert>
-            )}
-            {vm.error && <ToastAlert severity="error">{vm.error}</ToastAlert>}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 2,
-                p: 2,
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.input,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  flexShrink: 0,
-                  display: "grid",
-                  placeItems: "center",
-                  borderRadius: "10px",
-                  color: soon ? AMBER.text : tokens.color.info,
-                  bgcolor: soon ? AMBER.bg : tokens.color.infoBg,
-                }}
-              >
-                <DescriptionOutlined />
-              </Box>
-              <Box
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: "grid",
-                  gap: 1.5,
-                  gridTemplateColumns: {
-                    xs: "repeat(2, minmax(0, 1fr))",
-                    md: "repeat(3, minmax(0, 1fr))",
-                  },
-                }}
-              >
-                <Fact
-                  label="Licence number"
-                  value={details?.fssai || "Not added"}
-                />
-                {details?.fssaiType && (
-                  <Fact label="Type" value={details.fssaiType} />
-                )}
-                <Fact
-                  label="Valid until"
-                  value={
-                    details?.fssaiExpiry ? dateText(details.fssaiExpiry) : "—"
-                  }
-                  color={soon ? AMBER.text : undefined}
-                />
-                <Fact
-                  label="Status"
-                  value={status.text}
-                  color={status.color}
-                />
-              </Box>
-              {docs?.fssai && (
-                <Button
-                  variant="outlined"
-                  startIcon={<DescriptionOutlined />}
-                  href={docs.fssai}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View licence
-                </Button>
+          <Box sx={{ display: "grid", gap: 3.5 }}>
+            <Box sx={{ display: "grid", gap: 2 }}>
+              <SubHeading>FSSAI licence</SubHeading>
+              {vm.sent && (
+                <ToastAlert severity="success">
+                  Request sent. An admin will review the new documents.
+                </ToastAlert>
               )}
+              {vm.error && <ToastAlert severity="error">{vm.error}</ToastAlert>}
+              <DocCard
+                warn={soon}
+                url={docs?.fssai}
+                viewLabel="View licence"
+                facts={[
+                  {
+                    label: "Licence number",
+                    value: details?.fssai || "Not added",
+                  },
+                  ...(details?.fssaiType
+                    ? [{ label: "Type", value: details.fssaiType }]
+                    : []),
+                  {
+                    label: "Valid until",
+                    value: details?.fssaiExpiry
+                      ? dateText(details.fssaiExpiry)
+                      : "—",
+                    color: soon ? AMBER.text : undefined,
+                  },
+                  {
+                    label: "Status",
+                    value: status.text,
+                    color: status.color,
+                  },
+                ]}
+              />
+              {renewFields("fssai")}
             </Box>
-            <LicenceDropzone
-              file={vm.values.file}
-              onChange={(file) => vm.set("file", file)}
-            />
-            <Box
-              sx={{
-                display: "grid",
-                gap: 2,
-                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-              }}
-            >
-              <FormField label="New licence number" htmlFor="fssai-new-number">
-                <CommonTextField
-                  id="fssai-new-number"
-                  placeholder="14-digit number"
-                  value={vm.values.number}
-                  onChange={(e) =>
-                    vm.set("number", e.target.value.replace(/\D/g, "").slice(0, 14))
-                  }
-                  slotProps={{ htmlInput: { inputMode: "numeric" } }}
-                />
-              </FormField>
-              <FormField label="Valid until" htmlFor="fssai-new-expiry">
-                <CommonTextField
-                  id="fssai-new-expiry"
-                  type="date"
-                  value={vm.values.expiry}
-                  onChange={(e) => vm.set("expiry", e.target.value)}
-                />
-              </FormField>
+
+            <Box>
+              <SubHeading note="Choose a document to replace it.">
+                Other documents
+              </SubHeading>
+              <Box sx={{ mt: -1 }}>
+                {others.map((d) => {
+                  const rule = DOC_RULES[d.key],
+                    open = vm.selected === d.key,
+                    wait = waiting(d.group);
+                  return (
+                    <Box key={d.key}>
+                      <DocRow
+                        title={rule.title}
+                        detail={d.detail}
+                        verified={verified && !!d.url}
+                        pending={wait}
+                        open={open}
+                        onClick={() => vm.select(d.key)}
+                      />
+                      {open && (
+                        <Box sx={{ display: "grid", gap: 2, pb: 2.5, pt: 0.5 }}>
+                          <DocCard
+                            url={d.url}
+                            viewLabel="View document"
+                            facts={[
+                              {
+                                label: `Current ${rule.numberLabel}`,
+                                value:
+                                  d.key === "aadhaar" && aadhaar
+                                    ? `••${aadhaar.slice(-4)}`
+                                    : (d.key === "businessProof"
+                                        ? details?.businessProofNumber
+                                        : d.detail) || "Not added",
+                              },
+                              ...(d.type
+                                ? [{ label: "Type", value: d.type }]
+                                : []),
+                              {
+                                label: "Status",
+                                value: wait
+                                  ? "Pending approval"
+                                  : verified && d.url
+                                    ? "Verified"
+                                    : d.url
+                                      ? "On file"
+                                      : "Not added",
+                                color: wait
+                                  ? AMBER.text
+                                  : verified && d.url
+                                    ? tokens.color.success
+                                    : undefined,
+                              },
+                            ]}
+                          />
+                          {renewFields(d.key)}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
           </Box>
         </form>
 
         <Box>
-          <SubHeading>Other documents</SubHeading>
-          <Box sx={{ mt: -1 }}>
-            <DocRow
-              title="PAN card"
-              detail={details?.panNumber}
-              url={docs?.pan}
-              verified={verified && !!docs?.pan}
-              pending={waiting(FIELD_GROUPS.pan)}
-            />
-            <DocRow
-              title="GST certificate"
-              detail={details?.gstin}
-              url={docs?.gst}
-              verified={verified && !!docs?.gst}
-              pending={waiting(FIELD_GROUPS.gst)}
-            />
-            <DocRow
-              title="Identity proof"
-              detail={aadhaar ? `Aadhaar ••${aadhaar.slice(-4)}` : undefined}
-              url={docs?.aadhaar}
-              verified={verified && !!docs?.aadhaar}
-              pending={waiting(FIELD_GROUPS.aadhaar)}
-            />
-            <DocRow
-              title="Business proof"
-              detail={
-                [details?.businessProofType, details?.businessProofNumber]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
-              url={docs?.businessProof}
-              verified={verified && !!docs?.businessProof}
-              pending={waiting(FIELD_GROUPS.businessProof)}
-            />
-          </Box>
-        </Box>
-
-        <Box>
           <Box
-            sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2 }}
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 2,
+            }}
           >
-            <SubHeading note="Changes wait for admin approval and stay unchanged until approved.">
-              Request a change
+            <SubHeading note="Restaurant or owner name changes wait for admin approval.">
+              Request a name change
             </SubHeading>
             <CommonButton
               variant="outlined"
@@ -459,7 +607,7 @@ export function DocumentsPane({
               {asking ? "Close" : "Request a change"}
             </CommonButton>
           </Box>
-          {asking && <ChangeRequestForm onSent={onSent} details={details} />}
+          {asking && <ChangeRequestForm onSent={onSent} />}
         </Box>
       </Box>
       <PaneFooter>

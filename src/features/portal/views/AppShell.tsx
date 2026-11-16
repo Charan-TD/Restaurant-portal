@@ -1,7 +1,9 @@
 "use client";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Box, Drawer, ThemeProvider } from "@mui/material";
+import { Box, ButtonBase, Drawer, ThemeProvider, Typography } from "@mui/material";
+import NotificationsActiveOutlined from "@mui/icons-material/NotificationsActiveOutlined";
+import { useNewOrderAlerts } from "@/features/notifications/viewmodels/useNewOrderAlerts";
 import { portalTheme } from "@/core/theme/theme";
 import { tokens } from "@/core/theme/tokens";
 import { railItems } from "@/core/constants/navigation";
@@ -21,6 +23,8 @@ const paperSx = {
 } as const;
 export function AppShell({ children }: { children: ReactNode }) {
   const vm = usePortalShellViewModel(),
+    // New orders ring on every page, not only the Orders screen.
+    alerts = useNewOrderAlerts(),
     pathname = usePathname(),
     router = useRouter(),
     { ownRiders } = useRidersOwner(),
@@ -104,6 +108,41 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Box>
         </Box>
       </Box>
+      {/* Browsers keep a page silent until it is tapped once; until then, ask. */}
+      {alerts.needsTap && (
+        <Box
+          role="status"
+          sx={{
+            position: "fixed",
+            right: 16,
+            bottom: 16,
+            zIndex: 1300,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            maxWidth: "calc(100vw - 32px)",
+            px: 2,
+            py: 1.25,
+            borderRadius: "12px",
+            color: "#fff",
+            bgcolor: alerts.waiting ? tokens.color.primary : tokens.color.text,
+            boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+          }}
+        >
+          <NotificationsActiveOutlined sx={{ fontSize: 20 }} />
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+            {alerts.waiting
+              ? `${alerts.waiting} new ${alerts.waiting === 1 ? "order" : "orders"} waiting. Turn on sound so you hear the next one.`
+              : "Turn on sound to hear new orders."}
+          </Typography>
+          <ButtonBase
+            onClick={() => void alerts.enableSound()}
+            sx={{ px: 1.5, height: 32, flexShrink: 0, borderRadius: "8px", fontSize: 13, fontWeight: 700, color: tokens.color.text, bgcolor: "#fff" }}
+          >
+            Turn on
+          </ButtonBase>
+        </Box>
+      )}
     </ThemeProvider>
   );
 }

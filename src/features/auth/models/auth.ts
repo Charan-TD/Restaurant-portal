@@ -47,6 +47,8 @@ export interface AuthSession {
    * carry on (the steps, or the review of one already submitted) and its id.
    */
   registration?: { id: string; next: "registration" | "review" };
+  /** Bearer token scoped to the draft registration, when the server gives one. */
+  registrationAccessToken?: string;
 }
 export interface OtpChallenge {
   challengeId?: string;

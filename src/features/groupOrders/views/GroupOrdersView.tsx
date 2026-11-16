@@ -1,185 +1,106 @@
 "use client";
 import { useState } from "react";
-import NextLink from "next/link";
-import { Box, Link, Tab, Tabs, Typography } from "@mui/material";
+import { Box, ButtonBase, Typography } from "@mui/material";
 import InboxOutlined from "@mui/icons-material/InboxOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import { CommonCard } from "@/shared/components/layout/CommonCard";
-import { PageHeader } from "@/shared/components/layout/PageHeader";
-import {
-  GroupOrderCard,
-  GroupOrderHeadings,
-} from "../components/GroupOrderCard";
-import type { GroupOrder } from "../models/groupOrder";
+import { tokens } from "@/core/theme/tokens";
+import { GroupOrderDrawer } from "../components/GroupOrderDrawer";
+import { GroupOrderTile } from "../components/GroupOrderTile";
+import { parse } from "../components/groupOrderFormat";
+import { readyAt, tabOf, type GroupOrder, type GroupOrderTab } from "../models/groupOrder";
 import { useGroupOrdersViewModel } from "../viewmodels/useGroupOrdersViewModel";
-const tabs: { label: string; statuses: string[]; empty: string }[] = [
-  {
-    label: "New Orders",
-    statuses: ["ASSIGNED"],
-    empty: "No new group orders right now.",
-  },
-  {
-    label: "Preparing",
-    statuses: ["PREPARING"],
-    empty: "Nothing is being prepared.",
-  },
-  {
-    label: "Ready",
-    statuses: ["READY"],
-    empty: "No group orders waiting for a rider.",
-  },
-  {
-    label: "Delivery status",
-    statuses: ["OUT_FOR_DELIVERY", "DELIVERED", "REJECTED", "FAILED"],
-    empty: "No group orders to update yet.",
-  },
+
+const tabs: { id: GroupOrderTab; label: string; count?: boolean; empty: string }[] = [
+  { id: "upcoming", label: "Upcoming", count: true, empty: "No upcoming group orders." },
+  { id: "preparing", label: "Preparing", count: true, empty: "Nothing is being prepared." },
+  { id: "completed", label: "Completed", empty: "No completed group orders yet." },
 ];
-const closed = ["DELIVERED", "REJECTED", "FAILED"];
-/** Orders still to deliver come first; closed ones follow, the newest at the end. */
-const pendingFirst = (a: GroupOrder, b: GroupOrder) =>
-  Number(closed.includes(a.status)) - Number(closed.includes(b.status)) ||
-  (Date.parse(a.updatedAt ?? "") || 0) - (Date.parse(b.updatedAt ?? "") || 0);
-/** Group orders the admin has assigned to this restaurant. */
+
+/** Upcoming and preparing: the soonest ready time first. Completed: the latest first. */
+const sorter = (tab: GroupOrderTab) => (a: GroupOrder, b: GroupOrder) =>
+  tab === "completed"
+    ? (parse(b.updatedAt) ?? 0) - (parse(a.updatedAt) ?? 0)
+    : (readyAt(a) ?? Infinity) - (readyAt(b) ?? Infinity);
+
+/** Group orders the TrainDhaba team assigned to this restaurant, by stage. */
 export function GroupOrdersView() {
   const vm = useGroupOrdersViewModel(),
-    [tab, setTab] = useState(0),
-    current = tabs[tab],
-    // A status no tab lists (e.g. an older admin status) shows under New, as a
-    // read-only chip, rather than the order disappearing.
-    known = tabs.flatMap((t) => t.statuses),
-    inTab = (index: number) =>
-      vm.orders.filter(
-        (o) =>
-          tabs[index].statuses.includes(o.status) ||
-          (index === 0 && !known.includes(o.status)),
-      ),
-    shown = [...inTab(tab)].sort(pendingFirst);
+    [tab, setTab] = useState<GroupOrderTab>("upcoming"),
+    [openKey, setOpenKey] = useState<string | null>(null),
+    inTab = (id: GroupOrderTab) => vm.orders.filter((o) => tabOf(o.status) === id),
+    shown = inTab(tab).sort(sorter(tab)),
+    current = tabs.find((t) => t.id === tab)!,
+    // The open order is read from the list, so a status change shows in the panel at once.
+    open = vm.orders.find((o) => o.key === openKey) ?? null,
+    handlers = {
+      own: !vm.trainDhabaRiders,
+      onChange: (o: GroupOrder, status: string, rider?: Parameters<typeof vm.changeOrder>[3]) =>
+        void vm.changeOrder(o.key, o.id, status, rider),
+      onAssignRider: (o: GroupOrder, rider: Parameters<typeof vm.assignRider>[1]) => vm.assignRider(o.id, rider),
+    };
   return (
-    <>
-      <PageHeader
-        eyebrow="Orders"
-        title="Group orders"
-        subtitle="Large bookings the TrainDhaba team has assigned to your restaurant."
-      />
-      <CommonCard style={{ padding: 0 }}>
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 1,
-            px: { xs: 2.5, sm: 3 },
-            pt: 2.5,
-          }}
-        >
-          <div>
-            <Typography variant="h6" component="h2">
-              Live group orders
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {vm.trainDhabaRiders
-                ? "Accept and prepare group orders, then mark them ready. The TrainDhaba rider updates pickup and delivery."
-                : "Accept and prepare group orders, assign a rider, then update their status until delivered."}
-            </Typography>
-          </div>
-          <Link
-            component={NextLink}
-            href="/group-orders/all"
-            sx={{ fontWeight: 600 }}
-            underline="hover"
-          >
-            View all orders →
-          </Link>
-        </Box>
-        <Tabs
-          value={tab}
-          variant="fullWidth"
-          onChange={(_, value: number) => setTab(value)}
-          sx={{
-            mx: { xs: 2, sm: 3 },
-            mt: 2.5,
-            bgcolor: "#f3f4f2",
-            borderRadius: "10px 10px 0 0",
-          }}
-        >
-          {tabs.map((t, i) => (
-            <Tab
-              key={t.label}
-              label={`${t.label} (${inTab(i).length})`}
-              sx={{ fontWeight: 700, minHeight: 52 }}
-            />
-          ))}
-        </Tabs>
-        {vm.error && (
-          <ToastAlert severity="error" sx={{ m: 2.5 }}>
-            {vm.error}
-          </ToastAlert>
-        )}
-        <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: 200 }}>
-          {shown.length ? (
-            <Box
-              sx={{
-                overflowX: "auto",
-                contain: "inline-size",
-                // Heading plus five rows; more orders scroll inside the card.
-                maxHeight: 400,
-                overflowY: "auto",
-                pr: 0.5,
-              }}
+    <Box>
+      <Box
+        role="tablist"
+        sx={{ display: "flex", alignItems: "center", gap: 1, px: { xs: 2, md: 3 }, bgcolor: tokens.color.card, borderBottom: `1px solid ${tokens.color.border}`, overflowX: "auto" }}
+      >
+        {tabs.map((t) => {
+          const on = tab === t.id,
+            count = t.count ? inTab(t.id).length : undefined;
+          return (
+            <ButtonBase
+              key={t.id}
+              role="tab"
+              aria-selected={on}
+              onClick={() => setTab(t.id)}
+              sx={{ gap: 1, height: 52, px: 1.75, fontSize: 14, fontWeight: on ? 700 : 500, whiteSpace: "nowrap", color: on ? tokens.color.primary : tokens.color.textMuted, borderBottom: `2px solid ${on ? tokens.color.primary : "transparent"}` }}
             >
-              <Box
-                sx={{
-                  display: "grid",
-                  gap: 1.5,
-                  alignContent: "start",
-                  minWidth: 900,
-                }}
-              >
-                <Box
-                  sx={{
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 1,
-                    bgcolor: "background.paper",
-                  }}
-                >
-                  <GroupOrderHeadings />
+              {t.label}
+              {count !== undefined && (
+                <Box component="span" sx={{ minWidth: 22, px: 0.75, fontSize: 12, lineHeight: "20px", fontWeight: 700, borderRadius: "10px", color: on ? "#fff" : tokens.color.textMuted, bgcolor: on ? tokens.color.primary : tokens.color.muted }}>
+                  {count}
                 </Box>
-                {shown.map((order) => (
-                  <GroupOrderCard
-                    key={order.key}
-                    order={order}
-                    busy={vm.busyKey === order.key}
-                    onChange={(o, status, rider) =>
-                      void vm.changeOrder(o.key, o.id, status, rider)
-                    }
-                    onAssignRider={(o, rider) => vm.assignRider(o.id, rider)}
-                    trainDhabaRiders={vm.trainDhabaRiders}
-                  />
-                ))}
-              </Box>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-                minHeight: 160,
-                color: "text.secondary",
-              }}
-            >
-              <InboxOutlined sx={{ fontSize: 44, opacity: 0.5 }} />
-              <Typography>
-                {vm.loading ? "Loading group orders…" : current.empty}
-              </Typography>
-            </Box>
-          )}
+              )}
+            </ButtonBase>
+          );
+        })}
+      </Box>
+
+      <Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, md: 3 }, display: "grid", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderRadius: "10px", color: tokens.color.info, bgcolor: tokens.color.infoBg }}>
+          <InfoOutlined sx={{ fontSize: 17 }} />
+          <Typography sx={{ fontSize: 13 }}>
+            Group orders are assigned to you by the TrainDhaba team. Call support if you can&apos;t take one.
+          </Typography>
         </Box>
-      </CommonCard>
-    </>
+        {vm.error && <ToastAlert severity="error">{vm.error}</ToastAlert>}
+        {shown.length ? (
+          shown.map((order) => (
+            <GroupOrderTile
+              key={order.key}
+              order={order}
+              now={vm.now}
+              busy={vm.busyKey === order.key}
+              onOpen={() => setOpenKey(order.key)}
+              {...handlers}
+            />
+          ))
+        ) : (
+          <Box sx={{ display: "grid", placeItems: "center", gap: 1, minHeight: 220, color: tokens.color.textMuted }}>
+            <InboxOutlined sx={{ fontSize: 44, opacity: 0.5 }} />
+            <Typography>{vm.loading ? "Loading group orders…" : current.empty}</Typography>
+          </Box>
+        )}
+      </Box>
+
+      <GroupOrderDrawer
+        order={open}
+        now={vm.now}
+        busy={!!open && vm.busyKey === open.key}
+        onClose={() => setOpenKey(null)}
+        {...handlers}
+      />
+    </Box>
   );
 }

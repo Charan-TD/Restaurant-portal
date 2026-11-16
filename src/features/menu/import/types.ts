@@ -30,8 +30,28 @@ export const importFields = [
   "discPercent",
   "flatAmount",
   "photoFile",
+  "quantity",
+  "addons",
 ] as const;
 export type ImportField = (typeof importFields)[number];
+
+/** How each detail is named to the vendor. */
+export const importFieldLabels: Record<ImportField, string> = {
+  name: "Dish name",
+  price: "Price",
+  category: "Category",
+  subCategory: "Sub-category",
+  description: "Description",
+  prepMinutes: "Prep time",
+  foodType: "Veg / Non-veg",
+  available: "Available",
+  discountType: "Discount type",
+  discPercent: "Discount %",
+  flatAmount: "Flat discount",
+  photoFile: "Photo file",
+  quantity: "Quantity / sizes",
+  addons: "Add-ons",
+};
 /** The column (0-based) each detail is read from; null when no column holds it. */
 export type ColumnMapping = Record<ImportField, number | null>;
 

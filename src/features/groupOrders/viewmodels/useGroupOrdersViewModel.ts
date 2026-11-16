@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useToast } from "@/core/providers/ToastProvider";
 import { errorMessage } from "@/shared/utils/errors";
@@ -12,6 +12,7 @@ import {
   useGetGroupOrdersQuery,
   useUpdateGroupOrderMutation,
 } from "../services/groupOrderApi";
+import { demoGroupOrders, type GroupOrder } from "../models/groupOrder";
 /** How often the list checks for new group orders and the rider's updates. */
 const REFRESH_MS = 30_000;
 /** Where a group order's chosen rider is remembered. */
@@ -31,7 +32,16 @@ export function useGroupOrdersViewModel() {
     }),
     [updateGroupOrder] = useUpdateGroupOrderMutation(),
     riders = usePickedRiders(),
-    { trainDhabaRiders } = useRidersOwner();
+    { trainDhabaRiders } = useRidersOwner(),
+    // Demo mode has no server: sample orders, changed in place.
+    [demo, setDemo] = useState<GroupOrder[] | null>(null),
+    // The clock the "start 2 hours before" rule and the timers read; a tick a minute is enough.
+    [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    if (DEMO_MODE) queueMicrotask(() => setDemo(demoGroupOrders(Date.now())));
+    return () => clearInterval(timer);
+  }, []);
   /**
    * Assigns a rider while the group order is being prepared. The API only
    * takes the rider on handover, so it is remembered here and sent then.
@@ -49,7 +59,7 @@ export function useGroupOrdersViewModel() {
   /**
    * Moves a group order on. With the restaurant's own riders, the rider
    * assigned while preparing is remembered here; the API takes it (and
-   * requires it) on handover. With TrainDhaba riders, accepting starts the
+   * requires it) when the order goes from PREPARING to READY. With TrainDhaba riders, accepting starts the
    * rider search on the server, and the rider updates the order after it is
    * marked ready.
    */
@@ -68,15 +78,22 @@ export function useGroupOrdersViewModel() {
     }
     setBusyKey(key);
     try {
-      await updateGroupOrder({
-        id,
-        status,
-        // The server refuses a rider from restaurants on TrainDhaba riders.
-        riderId:
-          status === "OUT_FOR_DELIVERY" && !trainDhabaRiders
-            ? rider?.id
-            : undefined,
-      }).unwrap();
+      if (DEMO_MODE)
+        setDemo((old) =>
+          (old ?? []).map((o) =>
+            o.key === key ? { ...o, status, updatedAt: new Date().toISOString() } : o,
+          ),
+        );
+      else
+        await updateGroupOrder({
+          id,
+          status,
+          // The server refuses a rider from restaurants on TrainDhaba riders.
+          riderId:
+            status === "READY" && !trainDhabaRiders
+              ? rider?.id
+              : undefined,
+        }).unwrap();
       if (rider) riders.pick(riderKey(id), rider);
       if (["DELIVERED", "REJECTED", "FAILED"].includes(status))
         riders.forget(riderKey(id));
@@ -103,13 +120,14 @@ export function useGroupOrdersViewModel() {
     // The rider the server reports wins over the one chosen here.
     orders: useMemo(
       () =>
-        (data ?? []).map((o) => {
+        ((DEMO_MODE ? demo : data) ?? []).map((o) => {
           const picked = o.id && riders.picks[riderKey(o.id)];
           return o.rider || !picked ? o : { ...o, rider: picked };
         }),
-      [data, riders.picks],
+      [data, demo, riders.picks],
     ),
     loading: isLoading,
+    now,
     error: actionError || (error ? errorMessage(error) : ""),
     busyKey,
     changeOrder,

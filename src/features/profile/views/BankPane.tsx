@@ -2,13 +2,15 @@
 import { useState } from "react";
 import NextLink from "next/link";
 import { Box, Typography } from "@mui/material";
+import CheckCircleOutlined from "@mui/icons-material/CheckCircleOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import type { RestaurantDetails } from "../services/restaurantApi";
 import { BankAccountForm } from "./BankAccountForm";
-import { FactTile, SubHeading } from "./PaneParts";
+import { FactTile, InfoBar, SubHeading } from "./PaneParts";
 import { PaneHeading } from "./PaneHeading";
 
 /** Where payouts go, and a way to replace the account. */
@@ -21,7 +23,8 @@ export function BankPane({
 }) {
   const [changing, setChanging] = useState(false),
     bank = details?.bank,
-    last4 = bank?.account ? `••${bank.account.slice(-4)}` : "";
+    last4 = bank?.account ? `••${bank.account.slice(-4)}` : "",
+    verified = /approved|verified|active/i.test(details?.status ?? "") && !!bank?.bank;
   return (
     <>
       <PaneHeading
@@ -55,9 +58,31 @@ export function BankPane({
               <AccountBalanceOutlined />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700 }}>
-                {bank?.bank ? `${bank.bank} ${last4}` : "No bank account added"}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Typography sx={{ fontWeight: 700 }}>
+                  {bank?.bank ? `${bank.bank} ${last4}` : "No bank account added"}
+                </Typography>
+                {verified && (
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: tokens.radius.badge,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.4px",
+                      color: tokens.color.success,
+                      bgcolor: tokens.color.successBg,
+                    }}
+                  >
+                    <CheckCircleOutlined sx={{ fontSize: 13 }} />
+                    VERIFIED
+                  </Box>
+                )}
+              </Box>
               <Typography noWrap sx={{ fontSize: 13, color: tokens.color.textMuted }}>
                 {[bank?.holder, bank?.ifsc && `IFSC ${bank.ifsc}`]
                   .filter(Boolean)
@@ -73,6 +98,13 @@ export function BankPane({
             </CommonButton>
           </Box>
         </Box>
+        <InfoBar>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, fontSize: 13 }}>
+            <InfoOutlined sx={{ fontSize: 16, color: tokens.color.info }} />
+            Changing your bank account pauses payouts for up to 24 hours while
+            we verify the new account.
+          </Box>
+        </InfoBar>
         {changing && (
           <BankAccountForm
             onSaved={() => {
@@ -91,9 +123,13 @@ export function BankPane({
               gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
             }}
           >
-            <FactTile label="Frequency" value="—" />
-            <FactTile label="Next payout" value="—" />
-            <FactTile label="Last payout" value="—" />
+            <FactTile
+              label="Frequency"
+              value="Every Friday"
+              note="For orders up to the previous Sunday"
+            />
+            <FactTile label="Next payout" value="—" note="Shown once a payout is scheduled" />
+            <FactTile label="Last payout" value="—" note="No payouts yet" />
           </Box>
         </Box>
         <Box>

@@ -2,7 +2,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useOrdersViewModel } from "@/features/dashboard/viewmodels/useOrdersViewModel";
-import { useGetOrderQuery } from "@/features/dashboard/services/orderApi";
+import {
+  useGetOrderQuery,
+  useLazyGetOrderPageQuery,
+} from "@/features/dashboard/services/orderApi";
+import { errorMessage } from "@/shared/utils/errors";
+import { inRange, type DateRange } from "../models/dateRange";
 import type { Order, OrderStatus } from "@/features/dashboard/models/order";
 
 export type OrdersTab = "new" | "preparing" | "ready" | "past";
@@ -27,15 +32,65 @@ export function useNow(active: boolean) {
   return now;
 }
 
+/** The most pages read for past orders, so a long history cannot load forever. */
+const MAX_PAGES = 30;
+
+/**
+ * Past orders, beyond the first page the live list polls. The orders API has
+ * no date filter and lists the newest first, so pages are read until one goes
+ * past the start of the chosen range, or the list ends.
+ */
+function usePastOrders(active: boolean, from: number | undefined) {
+  const [fetchPage] = useLazyGetOrderPageQuery(),
+    [orders, setOrders] = useState<Order[]>([]),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    if (!active || DEMO_MODE) return;
+    let live = true;
+    void (async () => {
+      setLoading(true);
+      setError("");
+      const all: Order[] = [];
+      try {
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          const got = await fetchPage({ page }, true).unwrap();
+          all.push(...got.orders);
+          const oldest = Math.min(...got.orders.map(placed));
+          if (!got.orders.length || page >= got.totalPages || (from !== undefined && oldest < from)) break;
+        }
+        if (live) setOrders(all);
+      } catch (e) {
+        if (live) setError(errorMessage(e));
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [active, from, fetchPage]);
+  return { orders, loading, error };
+}
+
 /** The Orders screen: a tab for each stage, the orders in it, and the one open on the right. */
 export function useOrdersWorkspace() {
   const orders = useOrdersViewModel(),
     [tab, setTab] = useState<OrdersTab>("new"),
     [search, setSearch] = useState(""),
-    [chosen, setChosen] = useState<string | null>(null);
+    [chosen, setChosen] = useState<string | null>(null),
+    // The date filter of the Past orders tab; null shows them all.
+    [range, setRange] = useState<DateRange | null>(null),
+    past = usePastOrders(tab === "past", range?.from);
+  // The live list wins: it is polled, so its statuses are the newest.
+  const known = useMemo(() => {
+    const live = new Set(orders.orders.map((o) => o.id));
+    return [...orders.orders, ...past.orders.filter((o) => !live.has(o.id))];
+  }, [orders.orders, past.orders]);
   const inTab = (t: OrdersTab) =>
-    orders.orders
+    (t === "past" ? known : orders.orders)
       .filter((o) => tabStates[t].includes(o.state))
+      .filter((o) => t !== "past" || inRange(o.placedAt, range))
       // Oldest waiting first while there is work to do; newest first in the past.
       .sort((a, b) => (t === "past" ? placed(b) - placed(a) : placed(a) - placed(b)));
   const counts = {
@@ -59,10 +114,6 @@ export function useOrdersWorkspace() {
     { data: detail } = useGetOrderQuery(selected?.id ?? "", {
       skip: DEMO_MODE || !selected,
     });
-  const today = new Date().toDateString(),
-    todays = orders.orders.filter(
-      (o) => o.placedAt && new Date(o.placedAt).toDateString() === today,
-    );
   const open = useMemo(
     () =>
       selected
@@ -85,13 +136,16 @@ export function useOrdersWorkspace() {
     counts,
     search,
     setSearch,
+    range,
+    setRange: (next: DateRange | null) => {
+      setRange(next);
+      setChosen(null);
+    },
+    pastLoading: past.loading,
+    error: orders.error || past.error,
     list,
     open,
     choose: setChosen,
-    todayOrders: todays.length,
-    todaySales: todays
-      .filter((o) => o.state !== "Rejected")
-      .reduce((sum, o) => sum + o.amount, 0),
   };
 }
 export type OrdersWorkspace = ReturnType<typeof useOrdersWorkspace>;

@@ -6,6 +6,7 @@ import { cardSx, tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { MAX_IMPORT_ROWS, type DraftItem, type ImportFoodType } from "../import/types";
 import type { OwnFileImport } from "../viewmodels/useOwnFileImportViewModel";
+import { ImportColumnsSummary } from "./ImportColumnsSummary";
 import { ImportPhotoCell } from "./ImportPhotoCell";
 import { ItemDetailsDialog } from "./ItemDetailsDialog";
 
@@ -16,7 +17,7 @@ const filters = {
   ready: "Ready",
   prep: "Missing prep time",
   unassigned: "No category",
-  photo: "Missing photos",
+  photo: "Without photos",
 } as const;
 type Filter = keyof typeof filters;
 
@@ -78,23 +79,18 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
       <Box>
         <Typography component="h2" sx={{ fontSize: 22, fontWeight: 700 }}>Review your imported menu</Typography>
         <Typography sx={{ fontSize: 14, color: tokens.color.textMuted }}>
-          Your spreadsheet is already filled in below. Correct highlighted cells directly, or select many dishes to update them together.
+          Only the details the server requires are shown here. Open More details on a dish to see and edit everything else: sub-category, description, availability, sizes, discount, add-ons. When you are ready, send the dishes to the server to validate them.
         </Typography>
       </Box>
 
-      <Box sx={{ p: 1.5, borderRadius: tokens.radius.input, bgcolor: tokens.color.sunken, fontSize: 13, display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
-        <span>
-          {vm.book?.filename} · {vm.sheet?.name} · Header row {vm.detection?.headerRow || "none"} · {vm.items.length} records
-        </span>
-        <CommonButton variant="text" onClick={vm.backToColumns}>Change sheet or column setup</CommonButton>
-      </Box>
+      <ImportColumnsSummary vm={vm} />
 
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }} aria-label="Summary">
         <Box sx={chip(tokens.color.text, tokens.color.muted)}>{vm.items.length} imported / added</Box>
         <Box sx={chip(tokens.color.success)}>{vm.items.length - bad.size} valid</Box>
         <Box sx={chip(bad.size ? tokens.color.error : tokens.color.text)}>{bad.size} invalid</Box>
         <Box sx={chip(unassigned ? tokens.color.primary : tokens.color.text)}>{unassigned} unassigned</Box>
-        <Box sx={chip(noPhoto ? tokens.color.error : tokens.color.success)}>{noPhoto} missing images</Box>
+        <Box sx={chip(tokens.color.text)}>{noPhoto} without photos</Box>
       </Box>
       {vm.tooMany && (
         <Typography role="alert" sx={{ fontSize: 13, color: tokens.color.error }}>
@@ -106,23 +102,9 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
         <CommonButton variant="contained" onClick={vm.addItem}>+ Add item</CommonButton>
         <CommonButton variant="outlined" onClick={() => { vm.resetDraft(); setSelected(new Set()); }}>Reset imported draft</CommonButton>
         <CommonButton variant="text" onClick={() => setSelected(new Set(vm.items.map((i) => i.id)))}>Select all items</CommonButton>
-        <CommonButton component="label" variant="outlined">
-          Upload photos in bulk
-          <input
-            hidden
-            multiple
-            type="file"
-            accept="image/*"
-            aria-label="Upload photos in bulk"
-            onChange={(e) => {
-              void vm.attachPhotos(Array.from(e.target.files ?? []));
-              e.target.value = "";
-            }}
-          />
-        </CommonButton>
       </Box>
       <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
-        Every dish needs a photo. Select all photos at once: they are matched by the sheet&apos;s photo-file column (e.g. masala_dosa.jpg), or by dish name when there is no such column (e.g. Masala Dosa.jpg). Unmatched or ambiguous names are listed so you can attach them by hand. Photos are resized to JPEG for you.
+        Photos are optional. Use the Photo column to add one for a dish, or leave it empty. Photos are resized to JPEG for you.
       </Typography>
       {vm.photoNote && (
         <Typography role="status" sx={{ fontSize: 13, color: tokens.color.info, bgcolor: tokens.color.infoBg, p: 1.25, borderRadius: tokens.radius.input }}>
@@ -163,28 +145,28 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
       </datalist>
 
       <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
-        Edit cells directly; changes save as you type. Highlighted fields need attention. Scroll across the table for more details.
+        Edit cells directly; changes save as you type. Highlighted fields need attention, and the server&apos;s own complaints appear under the dish they belong to.
       </Typography>
       <Box sx={{ overflowX: "auto", border: `1px solid ${tokens.color.border}`, borderRadius: tokens.radius.input }}>
-        <Box component="table" sx={{ width: "100%", minWidth: 1420, borderCollapse: "collapse", "& td": { p: 1, verticalAlign: "middle", borderTop: `1px solid ${tokens.color.borderSubtle}` } }}>
+        <Box component="table" sx={{ width: "100%", minWidth: 980, borderCollapse: "collapse", "& td": { p: 1, verticalAlign: "top", borderTop: `1px solid ${tokens.color.borderSubtle}` } }}>
           <thead>
             <tr style={{ background: tokens.color.sunken }}>
               <th style={{ ...th, width: 40 }}>
                 <Checkbox size="small" checked={allShown} onChange={() => setSelected(allShown ? new Set() : new Set(shown.map((i) => i.id)))} slotProps={{ input: { "aria-label": "Select all shown" } }} />
               </th>
-              {["Item name", "Price", "Sizes & discount", "Category", "Subcategory", "Veg / Non-veg", "Description", "Prep (min)", "Availability", "Photo", "Status", ""].map((h) => (
+              {["Item name", "Category", "Price", "Prep (min)", "Veg / Non-veg", "Photo", "Status", ""].map((h) => (
                 <th key={h} style={th}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {groups.length === 0 && (
-              <tr><td colSpan={13} style={{ textAlign: "center", color: tokens.color.textMuted, padding: 24 }}>No dishes match.</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: "center", color: tokens.color.textMuted, padding: 24 }}>No dishes match.</td></tr>
             )}
             {groups.map((group) => (
               <Fragment key={group.name || "none"}>
                 <tr>
-                  <td colSpan={13} style={{ background: tokens.color.primarySubtle, fontSize: 13, fontWeight: 700, padding: "8px 12px" }}>
+                  <td colSpan={9} style={{ background: tokens.color.primarySubtle, fontSize: 13, fontWeight: 700, padding: "8px 12px" }}>
                     {renaming?.from === group.name && group.name ? (
                       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                         <TextField
@@ -219,86 +201,67 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
                 </tr>
                 {group.rows.map((item) => {
                   const mine = vm.issuesById.get(item.id) ?? [],
+                    theirs = vm.serverById.get(item.id) ?? [],
                     has = (f: string) => mine.some((i) => i.field === f),
-                    why = (f: string) => mine.filter((i) => i.field === f).map((i) => i.message).join(" ");
+                    why = (f: string) => mine.filter((i) => i.field === f).map((i) => i.message).join(" "),
+                    count = mine.length + theirs.length;
                   return (
-                    <tr key={item.id}>
-                      <td>
-                        <Checkbox size="small" checked={ids.has(item.id)} onChange={() => toggle(item.id)} slotProps={{ input: { "aria-label": `Select ${item.name || "dish"}` } }} />
-                      </td>
-                      <td style={{ minWidth: 170 }}>
-                        <TextField size="small" value={item.name} title={why("name")} error={has("name")} onChange={(e) => vm.editItem(item.id, { name: e.target.value })} sx={cellSx(has("name"))} />
-                        <Typography sx={{ fontSize: 11, color: tokens.color.textSubtle, mt: 0.25 }}>
-                          {item.sourceRow ? `Row ${item.sourceRow}` : "Added here"}
-                        </Typography>
-                      </td>
-                      <td>
-                        <TextField size="small" type="number" value={item.price ?? ""} title={why("price")} error={has("price")} onChange={(e) => vm.editItem(item.id, { price: e.target.value === "" ? null : Number(e.target.value) })} sx={{ ...cellSx(has("price")), width: 96 }} />
-                      </td>
-                      <td style={{ minWidth: 190, fontSize: 12 }}>
-                        {item.sizes.length ? (
-                          item.sizes.map((s) => <div key={s.name}>{s.name}: ₹{s.price}</div>)
-                        ) : (
-                          <div style={{ color: tokens.color.textMuted }}>Single price</div>
-                        )}
-                        <Box component="span" sx={{ ...chip(has("discount") ? tokens.color.error : tokens.color.text), fontSize: 11, display: "inline-block", my: 0.5 }}>
-                          {item.discountType === "percent" ? `${item.discPercent}% off` : item.discountType === "flat" ? `₹${item.flatAmount} off` : "No discount"}
-                        </Box>
-                        {(item.addons ?? []).length > 0 && (
-                          <div style={{ color: has("addons") ? tokens.color.error : tokens.color.textMuted }}>
-                            Add-ons: {item.addons.map((a) => `${a.name || "?"} ₹${a.price ?? "?"}`).join(", ")}
-                          </div>
-                        )}
-                        <div>
-                          <ButtonBase onClick={() => setEditing(item)} sx={{ fontSize: 12, fontWeight: 700, color: tokens.color.primary }}>
-                            {item.sizes.length ? "Edit sizes / discount" : "Add sizes / discount"}
+                    <Fragment key={item.id}>
+                      <tr>
+                        <td>
+                          <Checkbox size="small" checked={ids.has(item.id)} onChange={() => toggle(item.id)} slotProps={{ input: { "aria-label": `Select ${item.name || "dish"}` } }} />
+                        </td>
+                        <td style={{ minWidth: 190 }}>
+                          <TextField size="small" value={item.name} title={why("name")} error={has("name")} onChange={(e) => vm.editItem(item.id, { name: e.target.value })} sx={cellSx(has("name"))} />
+                          <Typography sx={{ fontSize: 11, color: tokens.color.textSubtle, mt: 0.25 }}>
+                            {item.sourceRow ? `Row ${item.sourceRow}` : "Added here"}
+                          </Typography>
+                        </td>
+                        <td>
+                          <TextField size="small" value={item.category} title={why("category")} error={has("category")} onChange={(e) => vm.editItem(item.id, { category: e.target.value })} slotProps={{ htmlInput: { list: "import-categories" } }} sx={{ ...cellSx(has("category")), width: 160 }} />
+                          {has("category") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
+                        </td>
+                        <td>
+                          <TextField size="small" type="number" value={item.price ?? ""} title={why("price")} error={has("price")} onChange={(e) => vm.editItem(item.id, { price: e.target.value === "" ? null : Number(e.target.value) })} sx={{ ...cellSx(has("price")), width: 100 }} />
+                        </td>
+                        <td>
+                          <TextField size="small" type="number" value={item.prepMinutes ?? ""} title={why("prepMinutes")} error={has("prepMinutes")} onChange={(e) => vm.editItem(item.id, { prepMinutes: e.target.value === "" ? null : Number(e.target.value) })} sx={{ ...cellSx(has("prepMinutes")), width: 90 }} />
+                          {has("prepMinutes") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
+                        </td>
+                        <td>
+                          <TextField select size="small" value={item.foodType} title={item.foodTypeText ? `The file says “${item.foodTypeText}”` : ""} onChange={(e) => vm.editItem(item.id, { foodType: e.target.value as ImportFoodType, foodTypeText: "" })} slotProps={{ select: { native: true } }} sx={{ ...cellSx(!!item.foodTypeText || has("foodType")), width: 120 }}>
+                            <option value="">{item.foodTypeText ? `“${item.foodTypeText}”?` : "Not set"}</option>
+                            {foodOptions.map((f) => <option key={f}>{f}</option>)}
+                          </TextField>
+                          {has("foodType") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
+                        </td>
+                        <td>
+                          <ImportPhotoCell file={item.photo} name={item.name} missing={has("photo")} onPick={(f) => void vm.setPhoto(item.id, f)} onRemove={() => vm.removePhoto(item.id)} />
+                        </td>
+                        <td>
+                          <Box component="span" title={mine.map((i) => i.message).join(" ")} sx={{ px: 1.25, py: 0.4, borderRadius: 99, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", color: count ? tokens.color.error : "#fff", bgcolor: count ? tokens.color.errorBg : tokens.color.success }}>
+                            {count ? `${count} to fix` : "Ready"}
+                          </Box>
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <CommonButton variant={count ? "contained" : "outlined"} onClick={() => setEditing(item)} sx={{ mr: 1 }}>
+                            More details
+                          </CommonButton>
+                          <ButtonBase aria-label={`Delete ${item.name || "dish"}`} onClick={() => vm.removeItem(item.id)} sx={{ width: 30, height: 30, borderRadius: "50%", color: tokens.color.error }}>
+                            <DeleteOutlined sx={{ fontSize: 19 }} />
                           </ButtonBase>
-                        </div>
-                      </td>
-                      <td>
-                        <TextField size="small" value={item.category} title={why("category")} error={has("category")} onChange={(e) => vm.editItem(item.id, { category: e.target.value })} slotProps={{ htmlInput: { list: "import-categories" } }} sx={{ ...cellSx(has("category")), width: 150 }} />
-                        {has("category") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
-                      </td>
-                      <td>
-                        <TextField size="small" value={item.subCategory} placeholder="None" onChange={(e) => vm.editItem(item.id, { subCategory: e.target.value })} sx={{ ...cellSx(false), width: 140 }} />
-                      </td>
-                      <td>
-                        <TextField select size="small" value={item.foodType} title={item.foodTypeText ? `The file says “${item.foodTypeText}”` : ""} onChange={(e) => vm.editItem(item.id, { foodType: e.target.value as ImportFoodType, foodTypeText: "" })} slotProps={{ select: { native: true } }} sx={{ ...cellSx(!!item.foodTypeText || has("foodType")), width: 120 }}>
-                          <option value="">{item.foodTypeText ? `“${item.foodTypeText}”?` : "Not set"}</option>
-                          {foodOptions.map((f) => <option key={f}>{f}</option>)}
-                        </TextField>
-                        {has("foodType") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
-                      </td>
-                      <td>
-                        <TextField size="small" value={item.description} onChange={(e) => vm.editItem(item.id, { description: e.target.value })} sx={{ ...cellSx(false), width: 170 }} />
-                      </td>
-                      <td>
-                        <TextField size="small" type="number" value={item.prepMinutes ?? ""} title={why("prepMinutes")} error={has("prepMinutes")} onChange={(e) => vm.editItem(item.id, { prepMinutes: e.target.value === "" ? null : Number(e.target.value) })} sx={{ ...cellSx(has("prepMinutes")), width: 84 }} />
-                        {has("prepMinutes") && <Box component="span" sx={{ display: "block", fontSize: 11, color: tokens.color.error }}>Required</Box>}
-                      </td>
-                      <td>
-                        <TextField select size="small" value={item.available ? "yes" : "no"} onChange={(e) => vm.editItem(item.id, { available: e.target.value === "yes" })} slotProps={{ select: { native: true } }} sx={{ ...cellSx(false), width: 110 }}>
-                          <option value="yes">In stock</option>
-                          <option value="no">Out of stock</option>
-                        </TextField>
-                      </td>
-                      <td>
-                        <ImportPhotoCell file={item.photo} name={item.name} missing={has("photo")} onPick={(f) => void vm.setPhoto(item.id, f)} onRemove={() => vm.removePhoto(item.id)} />
-                      </td>
-                      <td>
-                        <Box component="span" title={mine.map((i) => i.message).join(" ")} sx={{ px: 1.25, py: 0.4, borderRadius: 99, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", color: mine.length ? tokens.color.error : "#fff", bgcolor: mine.length ? tokens.color.errorBg : tokens.color.success }}>
-                          {mine.length ? `${mine.length} to fix` : "Ready"}
-                        </Box>
-                      </td>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        <CommonButton variant={mine.length ? "contained" : "outlined"} onClick={() => setEditing(item)} sx={{ mr: 1 }}>
-                          More details
-                        </CommonButton>
-                        <ButtonBase aria-label={`Delete ${item.name || "dish"}`} onClick={() => vm.removeItem(item.id)} sx={{ width: 30, height: 30, borderRadius: "50%", color: tokens.color.error }}>
-                          <DeleteOutlined sx={{ fontSize: 19 }} />
-                        </ButtonBase>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                      {theirs.length > 0 && (
+                        <tr>
+                          <td />
+                          <td colSpan={8} style={{ background: tokens.color.errorBg, color: tokens.color.error, fontSize: 12, padding: "6px 12px" }}>
+                            <b>Server:</b>{" "}
+                            {theirs.map((e) => `${e.column ? e.column + ": " : ""}${e.error}${e.suggestion ? " " + e.suggestion : ""}`).join(" · ")}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </Fragment>
@@ -306,8 +269,21 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
           </tbody>
         </Box>
       </Box>
-      <CommonButton variant="contained" disabled={vm.items.length === 0} onClick={vm.toCheck} sx={{ width: "100%" }}>
-        Review & validate
+      {vm.problem && (
+        <Typography role="alert" sx={{ fontSize: 13, color: tokens.color.error }}>{vm.problem}</Typography>
+      )}
+      {vm.serverOk && vm.issues.length > 0 && (
+        <Typography role="status" sx={{ fontSize: 13, color: tokens.color.success }}>
+          The server accepted these dishes. Fix the highlighted fields to continue.
+        </Typography>
+      )}
+      {vm.newSizes.length > 0 && (
+        <Typography role="status" sx={{ fontSize: 13, color: tokens.color.info, bgcolor: tokens.color.infoBg, p: 1.25, borderRadius: tokens.radius.input }}>
+          New quantity {vm.newSizes.length === 1 ? "type" : "types"}: <b>{vm.newSizes.join(", ")}</b>. {vm.newSizes.length === 1 ? "It is" : "They are"} added to your quantity types when you validate, and can then be used on any dish.
+        </Typography>
+      )}
+      <CommonButton variant="contained" disabled={vm.items.length === 0 || vm.tooMany || vm.busy} onClick={() => void vm.validate()} sx={{ width: "100%" }}>
+        {vm.savingSizes ? "Adding new quantity types…" : vm.checking ? "Validating with the server…" : "Validate with server"}
       </CommonButton>
       {editing && (
         <ItemDetailsDialog
@@ -316,6 +292,7 @@ export function ImportReviewStep({ vm }: { vm: OwnFileImport }) {
           categories={categories}
           qtyNames={vm.qtyNames}
           siblings={vm.items}
+          serverErrors={vm.serverById.get(editing.id) ?? []}
           onClose={() => setEditing(null)}
           onSave={(next) => vm.editItem(editing.id, next)}
         />

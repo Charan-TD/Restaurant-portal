@@ -145,9 +145,20 @@ export function useRestoreRegistration({
     loadRegistration,
     loadApproval,
   ]);
+  // A saved registration that loads at once (or an empty draft) needs no banner.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!restoring) {
+      queueMicrotask(() => setSlow(false));
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 600);
+    return () => clearTimeout(timer);
+  }, [restoring]);
   return {
     error,
     restoring,
+    slow,
     restored,
     loadFailed,
     settled,

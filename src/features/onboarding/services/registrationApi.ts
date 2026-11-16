@@ -2,8 +2,8 @@ import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type { StepId } from "@/core/constants/onboarding";
 import type { SavedFile } from "./registrationExtras";
+import { contactDigits } from "@/shared/utils/contactNumber";
 import {
-  COUNTRY_CODE,
   type FoodType,
   type RegistrationForm,
   type RestaurantType,
@@ -64,20 +64,24 @@ function randomPassword() {
 async function createRegistration(
   form: RegistrationForm,
   send: Send,
+  /** The draft the server opened when the number was verified, if any. */
+  draftId?: string | null,
 ): Promise<string> {
   // Multipart, so the optional logo and cover picture go in the same request.
   // List fields are sent as one entry per value.
   const data = multipart({
     restaurant_name: form.restaurantName,
     owner_name: form.ownerName,
-    mobile: `${COUNTRY_CODE}${form.mobile}`,
+    // Exactly 10 digits: the server refuses a country code or symbols.
+    mobile: form.mobile.replace(/D/g, "").slice(-10),
+    registrationId: draftId ?? null,
     restaurant_type: form.restaurantType
       ? restaurantTypeValues[form.restaurantType]
       : "",
     riders_owner: form.riderOwner,
     restaurant_email: form.email,
-    // Mobile or landline: the backend takes the bare 10 digits, no country code.
-    restaurant_contact: form.customerContact.replace(/\D/g, "").slice(-10),
+    // Mobile or landline: the digits as typed (10, or 11 with the landline's leading 0).
+    restaurant_contact: contactDigits(form.customerContact),
     // Sign-in is by OTP, so the vendor is never asked for a password; the
     // backend still wants one, so it gets a random one nobody needs to know.
     password: form.password || randomPassword(),
@@ -114,8 +118,7 @@ async function updateRegistrationDetails(
       : "",
     riders_owner: form.riderOwner,
     restaurant_email: form.email,
-    // The edit endpoint wants the bare 10 digits, without the country code.
-    restaurant_contact: form.customerContact.replace(/\D/g, "").slice(-10),
+    restaurant_contact: contactDigits(form.customerContact),
     password: form.password,
     logo: form.logo,
     cover: form.coverPhoto,
@@ -232,16 +235,25 @@ async function saveRegistrationStep(
     step,
     form,
     registrationId,
-  }: { step: StepId; form: RegistrationForm; registrationId: string | null },
+    detailsSaved,
+  }: {
+    step: StepId;
+    form: RegistrationForm;
+    registrationId: string | null;
+    detailsSaved?: boolean;
+  },
   send: Send,
 ): Promise<string | null> {
   if (DEMO_MODE) return registrationId;
   if (step === "details") {
-    if (registrationId) {
+    // A draft is opened when the number is verified, so the first save of the
+    // details goes to the create endpoint with that draft's id; only details
+    // already saved are edited.
+    if (registrationId && detailsSaved) {
       await updateRegistrationDetails(registrationId, form, send);
       return registrationId;
     }
-    return createRegistration(form, send);
+    return createRegistration(form, send, registrationId);
   }
   const save = savers[step];
   if (!save) return registrationId;
@@ -347,7 +359,7 @@ const loaders: Record<
         ownerName: str(row, "owner_name"),
         mobile: localNumber(str(row, "mobile")),
         email: str(row, "restaurant_email", "email"),
-        customerContact: localNumber(str(row, "restaurant_contact")),
+        customerContact: contactDigits(str(row, "restaurant_contact")),
         restaurantType: type ?? "",
         foodServed: food
           .map((value) => reverse(foodTypeValues, value))
@@ -500,6 +512,7 @@ export const registrationApi = baseApi.injectEndpoints({
         step: StepId;
         form: RegistrationForm;
         registrationId: string | null;
+        detailsSaved?: boolean;
       }
     >({ queryFn: flow(saveRegistrationStep) }),
     submitRegistration: build.mutation<void, string>({

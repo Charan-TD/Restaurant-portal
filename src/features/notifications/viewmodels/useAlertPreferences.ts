@@ -2,7 +2,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 export const ALERT_PREFERENCES = [
-  { id: "ring", label: "Ring for new orders", hint: "Plays until you open the order", on: true },
+  { id: "ring", label: "Ring for new orders", hint: "A buzz for each new order, for up to 20 seconds", on: true },
   { id: "popups", label: "Desktop pop-ups", hint: "Shows even when this tab is hidden", on: true },
   { id: "late", label: "Late order reminders", hint: "When an order passes its ready time", on: true },
   { id: "payouts", label: "Payout updates", hint: "When money is sent to your bank", on: true },

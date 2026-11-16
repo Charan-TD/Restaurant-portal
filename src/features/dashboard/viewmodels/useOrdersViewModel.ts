@@ -107,8 +107,9 @@ export function useOrdersViewModel() {
           id,
           state,
           // The server refuses a rider from restaurants on TrainDhaba riders.
+          // The server wants it when the order goes PREPARING → READY.
           riderId:
-            state === "HandedOver" && !trainDhabaRiders ? rider?.id : undefined,
+            state === "Ready" && !trainDhabaRiders ? rider?.id : undefined,
           prepMinutes,
         }).unwrap();
       setOrders((old) =>

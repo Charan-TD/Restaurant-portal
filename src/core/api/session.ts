@@ -34,8 +34,24 @@ export function setTokens(accessToken: string, refreshToken?: string) {
     if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
   } catch {}
 }
+const REGISTRATION_TOKEN_KEY = "td.registrationToken";
+/** The short-lived token the server gives a verified number to fill in its registration. */
+export function getRegistrationToken(): string | null {
+  try {
+    return localStorage.getItem(REGISTRATION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+export function setRegistrationToken(token?: string | null) {
+  try {
+    if (token) localStorage.setItem(REGISTRATION_TOKEN_KEY, token);
+    else localStorage.removeItem(REGISTRATION_TOKEN_KEY);
+  } catch {}
+}
 export function clearTokens() {
   try {
+    localStorage.removeItem(REGISTRATION_TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     // The saved riders choice (useRidersOwner) belongs to this account.

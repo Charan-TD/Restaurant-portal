@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { Alert, Box, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -231,11 +231,6 @@ export function OnboardingView() {
     { id, title, description } = steps[step];
   return (
     <>
-      {vm.restoring && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Loading your saved registration…
-        </Alert>
-      )}
       {vm.restored && (
         <ToastAlert
           severity="success"

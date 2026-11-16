@@ -20,6 +20,7 @@ import { errorMessage } from "@/shared/utils/errors";
 import { verifiedPhone } from "@/features/auth/services/verifiedPhone";
 import type { RegistrationForm } from "../models/registration";
 import {
+  isFileSaved,
   makePreview,
   markSavedFiles,
   rememberExtras,
@@ -132,12 +133,33 @@ export function useOnboardingViewModel() {
     portal.completed.includes(stepIndex("details")) &&
     !portal.form.getValues("password") &&
     !portal.form.getValues("confirmPassword");
+  /**
+   * A file the backend already holds and the vendor has not replaced: the
+   * reloaded form cannot hold it (the backend sends no file back), so it is
+   * not checked, and not sent again when the step is saved.
+   */
+  const keptFile = (name: string) => {
+    const saved = Object.values(stepFiles)
+      .flat()
+      .find(([field]) => field === name)?.[1];
+    return (
+      !!saved &&
+      isFileSaved(saved) &&
+      !(portal.form.getValues(name as "logo") instanceof File)
+    );
+  };
   const fieldsOf = (step: StepId) =>
-    step === "details" && keepPassword()
+    (step === "details" && keepPassword()
       ? stepFields.details.filter(
           (name) => name !== "password" && name !== "confirmPassword",
         )
-      : stepFields[step];
+      : stepFields[step]
+    ).filter((name) => {
+      if (!keptFile(name)) return true;
+      // An error left from an earlier check would otherwise stay on screen.
+      portal.form.clearErrors(name);
+      return false;
+    });
   /** Once every step is saved the vendor reviews and submits; before that, on to the next step. */
   const moveOn = (finished: number) => {
     if (steps.every((_, i) => i === finished || portal.completed.includes(i)))
@@ -219,6 +241,7 @@ export function useOnboardingViewModel() {
             step: id,
             form: portal.form.getValues(),
             registrationId: portal.registrationId,
+            detailsSaved: portal.completed.includes(stepIndex("details")),
           }).unwrap(),
         );
         if (saved) await afterSave(id, saved, portal.form.getValues());
@@ -239,6 +262,7 @@ export function useOnboardingViewModel() {
           step: step.id,
           form,
           registrationId,
+          detailsSaved: portal.completed.includes(stepIndex("details")),
         }).unwrap();
         keepId(registrationId);
         if (registrationId) await afterSave(step.id, registrationId, form);
@@ -258,6 +282,8 @@ export function useOnboardingViewModel() {
     error,
     busy,
     restoring,
+    /** True once loading has taken long enough to be worth announcing. */
+    restoringSlowly: restore.slow,
     restored: restore.restored,
     dismissRestored: restore.dismissRestored,
   };

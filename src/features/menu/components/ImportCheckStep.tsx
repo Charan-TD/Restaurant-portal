@@ -20,13 +20,13 @@ export function ImportCheckStep({ vm }: { vm: OwnFileImport }) {
   const [checked, setChecked] = useState(false),
     bad = new Set(vm.issues.map((i) => i.itemId)),
     valid = vm.items.length - bad.size,
-    canSend = checked && vm.issues.length === 0 && !vm.tooMany && !vm.busy;
+    canSend = checked && vm.serverOk && vm.issues.length === 0 && !vm.tooMany && !vm.busy;
   return (
     <Box sx={{ ...cardSx, p: { xs: 2, md: 3 }, display: "grid", gap: 2 }}>
       <Box>
         <Typography component="h2" sx={{ fontSize: 22, fontWeight: 700 }}>Review before submission</Typography>
         <Typography sx={{ fontSize: 14, color: tokens.color.textMuted }}>
-          Check every dish, size and price. The server checks the file once more before anything is saved.
+          Check every dish, size and price. The server has accepted these dishes; it checks every row once more as they are saved.
         </Typography>
       </Box>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -119,7 +119,7 @@ export function ImportCheckStep({ vm }: { vm: OwnFileImport }) {
       <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
         <CommonButton variant="outlined" onClick={vm.backToReview} disabled={vm.busy}>Return to editing</CommonButton>
         <CommonButton variant="contained" disabled={!canSend} onClick={() => void vm.send()}>
-          {vm.checking ? "Checking…" : vm.importing ? "Importing…" : `Import ${vm.items.length} ${vm.items.length === 1 ? "dish" : "dishes"}`}
+          {vm.importing ? "Importing…" : `Import ${vm.items.length} ${vm.items.length === 1 ? "dish" : "dishes"}`}
         </CommonButton>
       </Box>
     </Box>

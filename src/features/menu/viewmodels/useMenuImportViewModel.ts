@@ -1,5 +1,8 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { handOffFile, isTemplateWorkbook } from "../import/handoff";
+import { readSpreadsheet } from "../import/readSpreadsheet";
 import {
   useImportMenuExcelMutation,
   usePreviewMenuExcelMutation,
@@ -18,7 +21,8 @@ export const EXCEL_MAX_ROWS = 500;
  * an import either adds all the dishes or none.
  */
 export function useMenuImportViewModel() {
-  const [preview, { isLoading: checking }] = usePreviewMenuExcelMutation(),
+  const router = useRouter(),
+    [preview, { isLoading: checking }] = usePreviewMenuExcelMutation(),
     [runImport, { isLoading: importing }] = useImportMenuExcelMutation(),
     [file, setFile] = useState<File | null>(null),
     [checked, setChecked] = useState<ExcelPreview | null>(null),
@@ -46,6 +50,20 @@ export function useMenuImportViewModel() {
     }
     setFile(chosen);
     try {
+      // A file in the vendor's own layout (e.g. "Product" instead of "Item
+      // Name") would come back from the server with every name missing, so it
+      // goes to the import that matches its columns instead.
+      let ownLayout = false;
+      try {
+        ownLayout = !isTemplateWorkbook(await readSpreadsheet(chosen));
+      } catch {
+        // Unreadable here: let the server's check report it.
+      }
+      if (ownLayout) {
+        handOffFile(chosen);
+        router.push("/menu/import");
+        return;
+      }
       setChecked(await preview(chosen).unwrap());
     } catch (e) {
       setProblem(menuErrorMessage(e));

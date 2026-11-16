@@ -19,6 +19,7 @@ import {
   forgetVerifiedPhone,
   rememberVerifiedPhone,
 } from "../services/verifiedPhone";
+import { setRegistrationToken } from "@/core/api/session";
 
 export const OTP_LENGTH = 6;
 /** Seconds before the vendor may ask for another code. */
@@ -109,6 +110,7 @@ export function useLoginViewModel() {
         const saved = session.registration;
         if (saved) rememberRegistration(saved.id);
         else forgetRegistration();
+        setRegistrationToken(session.registrationAccessToken);
         // What this browser kept belongs to whoever used it last.
         if (!saved || saved.id !== portal.registrationId) {
           forgetExtras();

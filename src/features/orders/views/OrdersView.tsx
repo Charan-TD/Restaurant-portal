@@ -1,9 +1,8 @@
 "use client";
-import { Box, ButtonBase, Typography } from "@mui/material";
+import { Box, ButtonBase } from "@mui/material";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { tokens } from "@/core/theme/tokens";
-import { formatRupees } from "@/shared/utils/format";
 import { SetupChecklist } from "@/features/portal/components/SetupChecklist";
 import { useGoLiveSetup } from "@/features/portal/viewmodels/useGoLiveSetup";
 import { useVendorProfile } from "@/features/profile/viewmodels/useVendorProfile";
@@ -87,10 +86,6 @@ export function OrdersView() {
             </ButtonBase>
           );
         })}
-        <Box sx={{ flex: 1 }} />
-        <Typography sx={{ display: { xs: "none", sm: "block" }, whiteSpace: "nowrap", fontSize: 12, color: tokens.color.textMuted }}>
-          Today · <b style={{ color: tokens.color.text }}>{ws.todayOrders} orders</b> · {formatRupees(ws.todaySales)} sales
-        </Typography>
       </Box>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         {ws.error && (

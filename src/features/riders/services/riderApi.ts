@@ -6,6 +6,8 @@ const asRow = (value: unknown): Row =>
   value && typeof value === "object" ? (value as Row) : {};
 const text = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
+const flag = (value: unknown) =>
+  typeof value === "boolean" ? value : undefined;
 function toRider(raw: unknown, i: number): Rider {
   const row = asRow(raw);
   return {
@@ -19,6 +21,12 @@ function toRider(raw: unknown, i: number): Rider {
       ? text(row.rider_profile_img)
       : undefined,
     addedAt: text(row.created_at),
+    onDuty: flag(row.on_duty ?? row.is_on_duty),
+    onDelivery:
+      flag(row.on_delivery) ??
+      (text(row.status)?.toUpperCase() === "ON_DELIVERY" ? true : undefined),
+    deliveriesToday:
+      typeof row.deliveries_today === "number" ? row.deliveries_today : undefined,
   };
 }
 export const riderApi = baseApi.injectEndpoints({
