@@ -33,9 +33,8 @@ export const routeLine = (o: Order) =>
     .toUpperCase() || "TRAIN DELIVERY";
 
 /** The round mark at the right of a preparing order: no rider yet, searching, or who has it. */
-function RiderMark({ order, own }: { order: Order; own: boolean }) {
-  const name = order.rider?.name,
-    initials = name
+export function RiderMark({ name, own }: { name?: string; own: boolean }) {
+  const initials = name
       ?.split(/\s+/)
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase())
@@ -160,7 +159,7 @@ export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
                   {ago(order.placedAt, now)}
                 </Typography>
               </Box>
-              {ws.tab === "preparing" && <RiderMark order={order} own={!ws.trainDhabaRiders} />}
+              {ws.tab === "preparing" && <RiderMark name={order.rider?.name} own={!ws.trainDhabaRiders} />}
             </ButtonBase>
           );
         })

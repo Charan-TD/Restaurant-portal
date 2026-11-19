@@ -35,20 +35,18 @@ export function OrderDateFilter({
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
     <>
-      {/* Just the funnel, no background; filled and orange while a filter is on. */}
+      {/* A plain icon like the search icon beside it: no hover or ripple; filled and orange while a filter is on. */}
       <ButtonBase
+        disableRipple
         aria-label="Filter orders by date"
         aria-pressed={!!value}
         onClick={(e) => setAnchor(e.currentTarget)}
         sx={{
           flexShrink: 0,
-          p: 0.5,
-          borderRadius: "6px",
           color: value ? tokens.color.primary : tokens.color.textMuted,
-          "&:hover": { color: value ? tokens.color.primaryHover : tokens.color.text },
         }}
       >
-        {value ? <FilterAlt sx={{ fontSize: 22 }} /> : <FilterAltOutlined sx={{ fontSize: 22 }} />}
+        {value ? <FilterAlt sx={{ fontSize: 20 }} /> : <FilterAltOutlined sx={{ fontSize: 20 }} />}
       </ButtonBase>
       <Popover
         open={!!anchor}

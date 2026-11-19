@@ -20,7 +20,7 @@ const pick = (row: Row, ...names: string[]) => {
   return undefined;
 };
 const number = (value: unknown) => {
-  const n = typeof value === "string" ? Number(value.replace(/[₹,s]/g, "")) : Number(value);
+  const n = typeof value === "string" ? Number(value.replace(/[₹,\s]/g, "")) : Number(value);
   return value !== null && value !== undefined && value !== "" && Number.isFinite(n) ? n : undefined;
 };
 /**
@@ -29,9 +29,9 @@ const number = (value: unknown) => {
  */
 const dateTime = (value?: string, day?: string) => {
   if (!value) return undefined;
-  if (!Number.isNaN(Date.parse(value)) && /d{4}-d{2}-d{2}/.test(value)) return new Date(value).toISOString();
-  const clock = value.match(/^(d{1,2}):(d{2})/);
-  if (clock && day && /^d{4}-d{2}-d{2}/.test(day)) {
+  if (!Number.isNaN(Date.parse(value)) && /\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value).toISOString();
+  const clock = value.match(/^(\d{1,2}):(\d{2})/);
+  if (clock && day && /^\d{4}-\d{2}-\d{2}/.test(day)) {
     const local = new Date(`${day.slice(0, 10)}T${clock[1].padStart(2, "0")}:${clock[2]}:00`);
     return Number.isNaN(local.getTime()) ? undefined : local.toISOString();
   }
@@ -39,7 +39,7 @@ const dateTime = (value?: string, day?: string) => {
 };
 /** "veg", "non-veg" or "egg" from the ways the server may write it. */
 const foodType = (value?: string) => {
-  const t = (value ?? "").toLowerCase().replace(/[s_-]+/g, "");
+  const t = (value ?? "").toLowerCase().replace(/[\s_-]+/g, "");
   if (!t) return undefined;
   if (t.startsWith("non") || t === "nv") return "non-veg";
   if (t.includes("egg")) return "egg";

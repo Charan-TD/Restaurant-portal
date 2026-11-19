@@ -98,6 +98,18 @@ export function useOrdersWorkspace() {
     preparing: inTab("preparing").length,
     ready: inTab("ready").length,
   };
+  // Today's orders and sales, counted like the dashboard: placed today and not rejected.
+  const today = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const placedToday = known.filter(
+      (o) => o.state !== "Rejected" && (!o.placedAt || placed(o) >= start.getTime()),
+    );
+    return {
+      orders: placedToday.length,
+      sales: placedToday.reduce((sum, o) => sum + o.amount, 0),
+    };
+  }, [known]);
   const query = search.trim().toLowerCase(),
     list = inTab(tab).filter(
       (o) =>
@@ -134,6 +146,7 @@ export function useOrdersWorkspace() {
       setChosen(null);
     },
     counts,
+    today,
     search,
     setSearch,
     range,

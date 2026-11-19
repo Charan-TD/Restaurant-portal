@@ -61,20 +61,20 @@ export function useGroupOrdersViewModel() {
    * assigned while preparing is remembered here; the API takes it (and
    * requires it) when the order goes from PREPARING to READY. With TrainDhaba riders, accepting starts the
    * rider search on the server, and the rider updates the order after it is
-   * marked ready.
+   * marked ready. Resolves true when the change went through.
    */
   async function changeOrder(
     key: string,
     id: string | undefined,
     status: string,
     rider?: PickedRider,
-  ) {
+  ): Promise<boolean> {
     setActionError("");
     if (!id) {
       setActionError(
         "This group order has no id, so its status can't be changed.",
       );
-      return;
+      return false;
     }
     setBusyKey(key);
     try {
@@ -110,8 +110,10 @@ export function useGroupOrdersViewModel() {
               ? `Group order picked up by ${rider.name}.`
               : (done[status] ?? "Group order updated."),
       );
+      return true;
     } catch (e) {
       setActionError(errorMessage(e));
+      return false;
     } finally {
       setBusyKey(null);
     }

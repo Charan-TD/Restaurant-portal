@@ -3,6 +3,7 @@ import { Box, ButtonBase } from "@mui/material";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { tokens } from "@/core/theme/tokens";
+import { formatRupees } from "@/shared/utils/format";
 import { SetupChecklist } from "@/features/portal/components/SetupChecklist";
 import { useGoLiveSetup } from "@/features/portal/viewmodels/useGoLiveSetup";
 import { useVendorProfile } from "@/features/profile/viewmodels/useVendorProfile";
@@ -86,6 +87,18 @@ export function OrdersView() {
             </ButtonBase>
           );
         })}
+        {ws.tab !== "past" && (
+          <Box
+            aria-label="Today's orders and sales"
+            sx={{ ml: "auto", pl: 2, fontSize: 13, whiteSpace: "nowrap", color: tokens.color.textMuted }}
+          >
+            Today ·{" "}
+            <Box component="b" sx={{ color: tokens.color.text }}>
+              {ws.today.orders} {ws.today.orders === 1 ? "order" : "orders"}
+            </Box>{" "}
+            · {formatRupees(ws.today.sales)} sales
+          </Box>
+        )}
       </Box>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         {ws.error && (
