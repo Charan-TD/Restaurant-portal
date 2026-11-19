@@ -7,6 +7,8 @@ import { formatRupees } from "@/shared/utils/format";
 import { orderNumber } from "@/features/dashboard/components/OrderCard";
 import type { Order } from "@/features/dashboard/models/order";
 import type { OrdersWorkspace } from "../viewmodels/useOrdersWorkspace";
+import { rangeLabel } from "../models/dateRange";
+import { OrderDateFilter } from "./OrderDateFilter";
 
 /** "Received 3 min ago". */
 export function ago(iso: string | undefined, now: number) {
@@ -31,9 +33,8 @@ export const routeLine = (o: Order) =>
     .toUpperCase() || "TRAIN DELIVERY";
 
 /** The round mark at the right of a preparing order: no rider yet, searching, or who has it. */
-function RiderMark({ order, own }: { order: Order; own: boolean }) {
-  const name = order.rider?.name,
-    initials = name
+export function RiderMark({ name, own }: { name?: string; own: boolean }) {
+  const initials = name
       ?.split(/\s+/)
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase())
@@ -68,9 +69,11 @@ function RiderMark({ order, own }: { order: Order; own: boolean }) {
 export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
   return (
     <Box sx={{ ...cardSx, p: 0, overflow: "hidden", alignSelf: "start", minHeight: 320 }}>
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
         <Box
           sx={{
+            flex: 1,
+            minWidth: 0,
             display: "flex",
             alignItems: "center",
             gap: 1,
@@ -89,11 +92,27 @@ export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
           />
           <SearchRounded sx={{ fontSize: 20, color: tokens.color.textMuted }} />
         </Box>
+        {/* Dates only matter for the history; the live tabs hold what needs doing now. */}
+        {ws.tab === "past" && <OrderDateFilter value={ws.range} onChange={ws.setRange} />}
       </Box>
+      {ws.tab === "past" && ws.range && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, pb: 1.5, mt: -0.5 }}>
+          <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+            Showing <b style={{ color: tokens.color.text }}>{rangeLabel(ws.range)}</b>
+          </Typography>
+          <ButtonBase onClick={() => ws.setRange(null)} sx={{ fontSize: 12, fontWeight: 600, color: tokens.color.primary }}>
+            Clear
+          </ButtonBase>
+        </Box>
+      )}
       {ws.list.length === 0 ? (
         <Typography sx={{ px: 2.5, pb: 3, fontSize: 14, color: tokens.color.textMuted }}>
-          {ws.search
+          {ws.tab === "past" && ws.pastLoading
+            ? "Loading past orders…"
+            : ws.search
             ? "No orders match your search."
+            : ws.tab === "past" && ws.range
+            ? "No past orders in these dates."
             : ws.tab === "new"
               ? "No new orders right now."
               : ws.tab === "preparing"
@@ -140,7 +159,7 @@ export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
                   {ago(order.placedAt, now)}
                 </Typography>
               </Box>
-              {ws.tab === "preparing" && <RiderMark order={order} own={!ws.trainDhabaRiders} />}
+              {ws.tab === "preparing" && <RiderMark name={order.rider?.name} own={!ws.trainDhabaRiders} />}
             </ButtonBase>
           );
         })

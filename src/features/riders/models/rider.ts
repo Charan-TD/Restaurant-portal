@@ -6,7 +6,15 @@ export interface Rider {
   /** A (signed) link to the profile picture, when the rider has one. */
   photoUrl?: string;
   addedAt?: string;
+  /** From the server when it reports it; otherwise the restaurant's own switch. */
+  onDuty?: boolean;
+  /** True while the rider is out on a delivery. */
+  onDelivery?: boolean;
+  deliveriesToday?: number;
 }
+export type RiderStatus = "available" | "delivering" | "off";
+export const riderStatus = (r: Rider, onDuty: boolean): RiderStatus =>
+  !onDuty ? "off" : r.onDelivery ? "delivering" : "available";
 /** What the add rider form collects. */
 export interface RiderForm {
   name: string;

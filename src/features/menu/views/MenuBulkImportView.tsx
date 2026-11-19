@@ -7,7 +7,6 @@ import { cardSx, tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { ScreenSurface } from "@/shared/components/layout/ScreenSurface";
 import { ImportCheckStep } from "../components/ImportCheckStep";
-import { ImportColumnsStep } from "../components/ImportColumnsStep";
 import { ImportReviewStep } from "../components/ImportReviewStep";
 import { ImportStepper } from "../components/ImportStepper";
 import { ImportUploadStep } from "../components/ImportUploadStep";
@@ -15,7 +14,7 @@ import { useOwnFileImportViewModel } from "../viewmodels/useOwnFileImportViewMod
 
 /**
  * Bulk menu import from the vendor's own spreadsheet:
- * Upload → (Column setup) → Review & edit → Check menu → Done.
+ * Upload → Review & edit → Check menu → Done.
  */
 export function MenuBulkImportView() {
   const vm = useOwnFileImportViewModel();
@@ -35,7 +34,6 @@ export function MenuBulkImportView() {
         </Box>
         <ImportStepper stage={vm.stage} />
         {vm.stage === "choose" && <ImportUploadStep vm={vm} />}
-        {vm.stage === "columns" && <ImportColumnsStep vm={vm} />}
         {vm.stage === "review" && <ImportReviewStep vm={vm} />}
         {vm.stage === "check" && <ImportCheckStep vm={vm} />}
         {vm.stage === "done" && vm.result && (

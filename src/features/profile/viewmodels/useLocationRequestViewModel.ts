@@ -75,7 +75,7 @@ export function useLocationRequestViewModel(onSent: () => void) {
     if (!picked) return setError("Search and pick the new location first.");
     if (!values.building.trim())
       return setError("Enter the shop number or building name.");
-    if (!/^\d{6}$/.test(values.pincode.trim()))
+    if (!/^[1-9][0-9]{5}$/.test(values.pincode.trim()))
       return setError("Enter a valid 6-digit pincode.");
     setBusy(true);
     setError("");

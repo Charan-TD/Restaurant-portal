@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchMenuExcelTemplate,
   useImportMenuExcelMutation,
+  useCreateQtyTypeMutation,
   useListQtyTypesQuery,
   usePreviewMenuExcelMutation,
   type ExcelImportResult,
@@ -12,15 +13,17 @@ import {
   buildDraft,
   emptyAddon,
   emptyDraftItem,
+  newQtyTypes,
   validateDraft,
 } from "../import/buildDraft";
 import {
+  describeDetection,
   detectSheet,
   detectWorkbook,
-  mappingProblem,
   type Detection,
 } from "../import/detectColumns";
-import { matchPhotos, preparePhoto } from "../import/photos";
+import { takeHandedOffFile } from "../import/handoff";
+import { preparePhoto } from "../import/photos";
 import { readSpreadsheet } from "../import/readSpreadsheet";
 import {
   buildTemplateFile,
@@ -33,24 +36,25 @@ import {
 import {
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
-  type ColumnMapping,
   type DraftAddon,
   type DraftItem,
   type RawWorkbook,
 } from "../import/types";
 import { menuErrorMessage } from "./menuErrors";
 
-/** Where the vendor is: choosing a file, confirming columns, checking dishes, or finished. */
-export type OwnFileStage = "choose" | "columns" | "review" | "check" | "done";
+/** Where the vendor is: choosing a file, fixing dishes, checking them, or finished. */
+export type OwnFileStage = "choose" | "review" | "check" | "done";
 
 /** A server complaint about a row, with the dish it belongs to. */
 export interface ServerRowError extends ExcelRowError {
   dish?: string;
+  /** The dish on screen this error belongs to, so its row can show it. */
+  itemId?: string;
 }
 
 /**
  * Imports a menu in the vendor's own layout. The sheet is read in the browser,
- * its columns are matched (or confirmed by the vendor), the dishes are checked
+ * its columns are matched from their headings and values, the dishes are checked
  * and fixed on screen, and then they are sent through the server's Excel import
  * in its own template format, so the server still checks every row and saves
  * all of them or none.
@@ -58,6 +62,7 @@ export interface ServerRowError extends ExcelRowError {
 export function useOwnFileImportViewModel() {
   const [preview, { isLoading: checking }] = usePreviewMenuExcelMutation(),
     [runImport, { isLoading: importing }] = useImportMenuExcelMutation(),
+    [createQtyType, { isLoading: savingSizes }] = useCreateQtyTypeMutation(),
     [stage, setStage] = useState<OwnFileStage>("choose"),
     [book, setBook] = useState<RawWorkbook | null>(null),
     [detection, setDetection] = useState<Detection | null>(null),
@@ -67,14 +72,24 @@ export function useOwnFileImportViewModel() {
     [problem, setProblem] = useState(""),
     [photoNote, setPhotoNote] = useState(""),
     [serverErrors, setServerErrors] = useState<ServerRowError[]>([]),
+    // The dishes the server last accepted; any edit after that makes it out of date.
+    [accepted, setAccepted] = useState<DraftItem[] | null>(null),
     [result, setResult] = useState<ExcelImportResult | null>(null),
     [layout, setLayout] = useState<TemplateLayout | null>(null);
 
   const sheet = book && detection ? book.sheets[detection.sheetIndex] : null,
     { data: qtyNames = [] } = useListQtyTypesQuery(),
-    issues = validateDraft(items, qtyNames),
+    issues = validateDraft(items),
+    // Sizes the restaurant does not have yet; saved as quantity types before the server check.
+    newSizes = newQtyTypes(items, qtyNames),
+    columns = sheet && detection ? describeDetection(sheet, detection) : null,
     issuesById = Map.groupBy(issues, (issue) => issue.itemId),
-    tooMany = items.length > MAX_IMPORT_ROWS;
+    tooMany = items.length > MAX_IMPORT_ROWS,
+    serverOk = accepted !== null && accepted === items,
+    serverById = Map.groupBy(
+      serverErrors.filter((e) => e.itemId),
+      (e) => e.itemId as string,
+    );
 
   const reset = () => {
     setStage("choose");
@@ -84,22 +99,26 @@ export function useOwnFileImportViewModel() {
     setProblem("");
     setPhotoNote("");
     setServerErrors([]);
+    setAccepted(null);
     setResult(null);
   };
 
   const startReview = (from: RawWorkbook, found: Detection) => {
     const rows = buildDraft(from.sheets[found.sheetIndex], found.headerRow, found.mapping);
     if (!rows.length) {
-      setProblem("No dishes were found below the headings. Check the heading row.");
+      setProblem(`No dishes were found in "${from.sheets[found.sheetIndex].name}". Check that the file has one dish per row.`);
       return false;
     }
+    setDetection(found);
     setItems(rows);
     setBaseline(rows);
+    setServerErrors([]);
+    setAccepted(null);
     setStage("review");
     return true;
   };
 
-  /** Reads the chosen file; clear headings go straight to the dishes, otherwise the columns are confirmed first. */
+  /** Reads the chosen file and goes straight to the dishes; anything not found shows as missing on each dish. */
   const pick = async (file: File | undefined) => {
     if (!file) return;
     reset();
@@ -112,9 +131,7 @@ export function useOwnFileImportViewModel() {
       const read = await readSpreadsheet(file),
         found = detectWorkbook(read);
       setBook(read);
-      setDetection(found);
-      if (found.automatic && found.records > 0) startReview(read, found);
-      else setStage("columns");
+      startReview(read, found);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "The file could not be read.");
     } finally {
@@ -122,34 +139,21 @@ export function useOwnFileImportViewModel() {
     }
   };
 
-  /** Another sheet of the workbook; its columns are detected again. */
+  /** Reads the dishes from another sheet of the workbook; edits made so far are replaced. */
   const chooseSheet = (index: number) => {
-    if (!book) return;
-    setDetection(detectSheet(book.sheets[index], index));
+    if (!book || index === detection?.sheetIndex) return;
     setProblem("");
+    startReview(book, detectSheet(book.sheets[index], index));
   };
-  const chooseHeaderRow = (row: number) => {
-    if (!book || !detection) return;
-    const records = book.sheets[detection.sheetIndex].rows.filter(
-      (r) => r.sourceRow > row && r.values.some((v) => v !== null && String(v).trim() !== ""),
-    ).length;
-    // Keep the columns the vendor already chose; only the heading row moves.
-    setDetection({ ...detection, headerRow: row, records });
-  };
-  const setMapping = (mapping: ColumnMapping) =>
-    detection && setDetection({ ...detection, mapping });
 
-  const mapProblem = detection ? mappingProblem(detection.mapping) : null,
-    canExtract =
-      !!detection &&
-      !mapProblem &&
-      detection.mapping.name !== null &&
-      detection.mapping.price !== null;
-  const extract = () => {
-    if (!book || !detection || !canExtract) return;
-    setProblem("");
-    startReview(book, detection);
-  };
+  // A file chosen in the template dialog that is not in the template's
+  // layout arrives here, and is read as if chosen on this page.
+  useEffect(() => {
+    const handed = takeHandedOffFile();
+    if (handed) queueMicrotask(() => void pick(handed));
+    // Once, on opening the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const editItem = (id: string, patch: Partial<DraftItem>) =>
     setItems((all) => all.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -199,30 +203,6 @@ export function useOwnFileImportViewModel() {
     }
   };
   const removePhoto = (id: string) => editItem(id, { photo: null });
-  /** Many pictures at once, matched to dishes by the sheet's photo-file column or by dish name. */
-  const attachPhotos = async (files: File[]) => {
-    if (!files.length) return;
-    const found = matchPhotos(items, files),
-      prepared = new Map<string, File>(),
-      failed: string[] = [];
-    for (const [id, file] of found.matches) {
-      try {
-        prepared.set(id, await preparePhoto(file));
-      } catch {
-        failed.push(file.name);
-      }
-    }
-    setItems((all) =>
-      all.map((i) => (prepared.has(i.id) ? { ...i, photo: prepared.get(i.id)! } : i)),
-    );
-    const notes = [
-      `${prepared.size} of ${files.length} ${files.length === 1 ? "picture" : "pictures"} matched.`,
-      found.unmatched.length && `No dish found for: ${found.unmatched.join(", ")}.`,
-      found.ambiguous.length && `Could fit more than one dish or file: ${found.ambiguous.join(", ")}.`,
-      [...found.invalid, ...failed].length && `Not usable as pictures: ${[...found.invalid, ...failed].join(", ")}.`,
-    ].filter(Boolean);
-    setPhotoNote(notes.join(" "));
-  };
   /** Fills a detail for every dish that has none, e.g. one prep time for the whole menu. */
   const fillBlank = (patch: Partial<Pick<DraftItem, "prepMinutes" | "foodType" | "category">>) =>
     setItems((all) =>
@@ -254,33 +234,60 @@ export function useOwnFileImportViewModel() {
         const found = addonForTemplateRow(items, e.row);
         return {
           ...e,
+          itemId: found?.item.id,
           dish: found?.item.name,
           column: `Add-on "${found?.addon.name || "?"}" · ${e.column}`,
         };
       }
-      return { ...e, dish: itemForTemplateRow(items, e.row)?.name };
+      const dish = itemForTemplateRow(items, e.row);
+      return { ...e, itemId: dish?.id, dish: dish?.name };
     });
 
-  /** Checks the dishes with the server, then adds them if it finds nothing wrong. */
+  /**
+   * Sends the dishes to the server's excel-preview check without saving anything.
+   * Its complaints land on the matching rows; when it finds none the vendor
+   * can go on to the final check.
+   */
+  const validate = async () => {
+    if (importing || checking || savingSizes || tooMany || !items.length) return;
+    setProblem("");
+    setServerErrors([]);
+    setAccepted(null);
+    try {
+      // New sizes go into the restaurant's quantity types first, so the server knows them.
+      for (const name of newSizes) await createQtyType(name).unwrap();
+      const checked = await preview(await buildTemplateFile(items, await loadLayout())).unwrap();
+      if (!checked.valid) {
+        const found = explain(checked.errors);
+        setServerErrors(found);
+        setProblem(
+          `The server found ${found.length} ${found.length === 1 ? "problem" : "problems"}. Fix the highlighted dishes and validate again.`,
+        );
+        return;
+      }
+      setAccepted(items);
+      if (!issues.length) setStage("check");
+    } catch (e) {
+      setProblem(menuErrorMessage(e));
+    }
+  };
+
+  /** Adds the dishes the server has accepted; the server still checks every row again. */
   const send = async () => {
-    if (importing || checking || issues.length || tooMany || !items.length) return;
+    if (importing || checking || issues.length || tooMany || !items.length || !serverOk) return;
     setProblem("");
     setServerErrors([]);
     try {
       const file = await buildTemplateFile(items, await loadLayout()),
-        checked = await preview(file).unwrap();
-      if (!checked.valid) {
-        setServerErrors(explain(checked.errors));
-        setProblem("The server found problems. Fix the dishes below and try again.");
-        return;
-      }
-      const done = await runImport(file).unwrap();
+        done = await runImport(file).unwrap();
       if (done.imported) {
         setResult(done);
         setStage("done");
       } else {
         setServerErrors(explain(done.errors));
-        setProblem("Nothing was imported. Fix the dishes below and try again.");
+        setAccepted(null);
+        setProblem("Nothing was imported. Fix the highlighted dishes, validate again and retry.");
+        setStage("review");
       }
     } catch (e) {
       setProblem(menuErrorMessage(e));
@@ -290,34 +297,34 @@ export function useOwnFileImportViewModel() {
   return {
     stage,
     qtyNames,
+    newSizes,
     book,
     sheet,
     detection,
+    columns,
     items,
     issues,
     issuesById,
     tooMany,
     problem,
     serverErrors,
+    serverById,
+    serverOk,
+    validate,
     result,
     reading,
     checking,
     importing,
-    busy: reading || checking || importing,
-    mapProblem,
-    canExtract,
+    savingSizes,
+    busy: reading || checking || importing || savingSizes,
     pick,
     chooseSheet,
-    chooseHeaderRow,
-    setMapping,
-    extract,
     editItem,
     removeItem,
     addItem,
     fillBlank,
     setPhoto,
     removePhoto,
-    attachPhotos,
     photoNote,
     editMany,
     renameCategory,
@@ -328,7 +335,6 @@ export function useOwnFileImportViewModel() {
     backToReview: () => setStage("review"),
     send,
     reset,
-    backToColumns: () => book && setStage("columns"),
   };
 }
 

@@ -35,7 +35,7 @@ const badge: Record<string, { fg: string; bg: string }> = {
   Ready: { fg: tokens.color.success, bg: tokens.color.successBg },
 };
 
-const box = {
+export const box = {
   display: "flex",
   alignItems: "center",
   gap: 1.5,
@@ -46,7 +46,7 @@ const box = {
 } as const;
 
 /** A round icon at the start of a bar. */
-const Disc = ({ children, tint }: { children: ReactNode; tint?: string }) => (
+export const Disc = ({ children, tint }: { children: ReactNode; tint?: string }) => (
   <Box
     sx={{
       width: 34,
@@ -65,7 +65,7 @@ const Disc = ({ children, tint }: { children: ReactNode; tint?: string }) => (
 );
 
 /** A bar of the footer: icon, a title with its line, and something at the right. */
-function Bar({
+export function Bar({
   icon,
   title,
   note,
@@ -90,7 +90,7 @@ function Bar({
   );
 }
 
-const big = (bg: string, color = "#fff") => ({
+export const big = (bg: string, color = "#fff") => ({
   height: 48,
   borderRadius: "10px",
   fontSize: 14,
@@ -116,7 +116,7 @@ function printKot(order: Order) {
   win.print();
 }
 
-function Info({ label, value, sub, late }: { label: string; value?: string; sub?: string; late?: boolean }) {
+export function Info({ label, value, sub, late }: { label: string; value?: string; sub?: string; late?: boolean }) {
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.4px", color: tokens.color.textMuted }}>

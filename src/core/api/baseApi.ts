@@ -7,7 +7,7 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { API_BASE_URL } from "@/core/constants/config";
 import { errorMessage } from "@/shared/utils/errors";
-import { getAccessToken } from "./session";
+import { getAccessToken, getRegistrationToken } from "./session";
 /** What a failed request looks like to RTK Query consumers. */
 export interface ApiError {
   status?: number;
@@ -56,7 +56,11 @@ function toApiError(error: FetchBaseQueryError, timeout = TIMEOUT_MS): ApiError 
 }
 /** Adds the bearer token when one is saved (never on the server render). */
 const authorize = (headers: Headers) => {
-  const token = typeof window === "undefined" ? null : getAccessToken();
+  // A vendor still registering has no login yet: the draft's own token stands in.
+  const token =
+    typeof window === "undefined"
+      ? null
+      : (getAccessToken() ?? getRegistrationToken());
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return headers;
 };

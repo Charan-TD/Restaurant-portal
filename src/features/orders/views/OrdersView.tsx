@@ -1,5 +1,5 @@
 "use client";
-import { Box, ButtonBase, Typography } from "@mui/material";
+import { Box, ButtonBase } from "@mui/material";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { tokens } from "@/core/theme/tokens";
@@ -87,10 +87,18 @@ export function OrdersView() {
             </ButtonBase>
           );
         })}
-        <Box sx={{ flex: 1 }} />
-        <Typography sx={{ display: { xs: "none", sm: "block" }, whiteSpace: "nowrap", fontSize: 12, color: tokens.color.textMuted }}>
-          Today · <b style={{ color: tokens.color.text }}>{ws.todayOrders} orders</b> · {formatRupees(ws.todaySales)} sales
-        </Typography>
+        {ws.tab !== "past" && (
+          <Box
+            aria-label="Today's orders and sales"
+            sx={{ ml: "auto", pl: 2, fontSize: 13, whiteSpace: "nowrap", color: tokens.color.textMuted }}
+          >
+            Today ·{" "}
+            <Box component="b" sx={{ color: tokens.color.text }}>
+              {ws.today.orders} {ws.today.orders === 1 ? "order" : "orders"}
+            </Box>{" "}
+            · {formatRupees(ws.today.sales)} sales
+          </Box>
+        )}
       </Box>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         {ws.error && (

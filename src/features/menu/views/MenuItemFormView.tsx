@@ -499,9 +499,12 @@ function AddOnsField({
 function QuantitiesField({
   control,
   options,
+  onCreateType,
 }: {
   control: Control<MenuItemForm>;
   options: string[];
+  /** Saves a new quantity type to the restaurant's list; resolves to an error message or "". */
+  onCreateType: (name: string) => Promise<string>;
 }) {
   return (
     <Controller
@@ -604,18 +607,117 @@ function QuantitiesField({
                 );
               })}
             </Box>
-            <Button
-              size="small"
-              startIcon={<AddOutlined />}
-              onClick={() => field.onChange([...rows, { name: "", price: null }])}
-              sx={linkButtonSx}
-            >
-              Add quantity
-            </Button>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Button
+                size="small"
+                startIcon={<AddOutlined />}
+                onClick={() => field.onChange([...rows, { name: "", price: null }])}
+                sx={linkButtonSx}
+              >
+                Add quantity
+              </Button>
+              <NewQtyType
+                options={options}
+                onCreate={onCreateType}
+                onCreated={(name) => {
+                  // Fill an empty row if there is one, otherwise add a row for it.
+                  const empty = rows.findIndex((r) => !r.name.trim());
+                  field.onChange(
+                    empty >= 0
+                      ? rows.map((r, j) => (j === empty ? { ...r, name } : r))
+                      : [...rows, { name, price: null }],
+                  );
+                }}
+              />
+            </Box>
           </div>
         );
       }}
     />
+  );
+}
+/**
+ * "+ New quantity type": names a way of selling not in the list yet (e.g.
+ * Family Pack), saves it to the restaurant's list at once and adds it to the dish.
+ */
+function NewQtyType({
+  options,
+  onCreate,
+  onCreated,
+}: {
+  options: string[];
+  onCreate: (name: string) => Promise<string>;
+  onCreated: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false),
+    [name, setName] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  if (!open)
+    return (
+      <Button size="small" startIcon={<AddOutlined />} onClick={() => setOpen(true)} sx={linkButtonSx}>
+        New quantity type
+      </Button>
+    );
+  const existing = options.find((o) => o.toLowerCase() === name.trim().toLowerCase());
+  const save = async () => {
+    const clean = name.trim();
+    if (!clean || busy) return;
+    setBusy(true);
+    const problem = await onCreate(clean);
+    setBusy(false);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    onCreated(existing ?? clean);
+    setName("");
+    setError("");
+    setOpen(false);
+  };
+  return (
+    <Box sx={{ flexBasis: "100%", mt: 1.25, p: 1.5, border: 1, borderColor: tokens.color.border, borderRadius: tokens.radius.input, display: "grid", gap: 1 }}>
+      <CommonTextField
+        autoFocus
+        value={name}
+        placeholder="e.g. Family Pack, 750 ml"
+        onChange={(e) => {
+          setName(e.target.value);
+          setError("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void save();
+          }
+        }}
+        error={!!error}
+        helperText={
+          error ||
+          (existing
+            ? `${existing} is already in your list; it will be added to this dish.`
+            : "Saved to your quantity types now, for this and other dishes.")
+        }
+        slotProps={{ htmlInput: { maxLength: 255, "aria-label": "New quantity type name" } }}
+      />
+      <Box sx={{ display: "flex", gap: 1 }}>
+        <CommonButton variant="contained" size="small" disabled={!name.trim() || busy} onClick={() => void save()}>
+          {busy ? "Saving…" : existing ? "Use it" : "Save quantity type"}
+        </CommonButton>
+        <CommonButton
+          variant="text"
+          size="small"
+          disabled={busy}
+          onClick={() => {
+            setOpen(false);
+            setName("");
+            setError("");
+          }}
+        >
+          Cancel
+        </CommonButton>
+      </Box>
+    </Box>
   );
 }
 /** A small blue text button, e.g. Add new category. */
@@ -1334,6 +1436,7 @@ export function MenuItemFormView({
                 <QuantitiesField
                   control={control}
                   options={vm.qtyOptions.length ? vm.qtyOptions : [...qtyTypes]}
+                  onCreateType={vm.addQtyType}
                 />
                 <AddOnsField
                   control={control}

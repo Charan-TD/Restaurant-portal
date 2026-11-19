@@ -3,11 +3,19 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
-import { stepIndex } from "@/core/constants/onboarding";
 import { rememberedRegistration } from "@/features/onboarding/services/registrationApi";
 import { useLazyGetApprovalQuery } from "../services/approvalApi";
 import type { ApprovalStatus } from "../models/approval";
 import { errorMessage } from "@/shared/utils/errors";
+// The status screen runs on the registration token (valid for two hours, and
+// only for the status lookup). Approval does not change this screen: it gives
+// the vendor a real login, which comes from verifying the number again. So a
+// 401 here means "sign in again", and that sign-in opens the dashboard if the
+// restaurant has been approved.
+const SIGN_IN_AGAIN =
+  "Your session has ended. If your restaurant has been approved, sign in with your mobile number to open your dashboard.";
+const statusError = (e: unknown) =>
+  (e as { status?: number })?.status === 401 ? SIGN_IN_AGAIN : errorMessage(e);
 export function useApprovalViewModel() {
   const [loadApproval] = useLazyGetApprovalQuery(),
     portal = usePortal(),
@@ -35,7 +43,7 @@ export function useApprovalViewModel() {
         if (!active) return;
         // 409: it was never submitted, so carry on with the steps instead.
         if ((e as { status?: number })?.status === 409) router.replace("/register");
-        else setError(errorMessage(e));
+        else setError(statusError(e));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -51,7 +59,7 @@ export function useApprovalViewModel() {
     try {
       portal.setApproval(await loadApproval(registrationId).unwrap());
     } catch (e) {
-      setError(errorMessage(e));
+      setError(statusError(e));
     } finally {
       setBusy(false);
     }
@@ -67,12 +75,8 @@ export function useApprovalViewModel() {
             : undefined,
       });
   };
-  const updateDocuments = () => {
-    const documents = stepIndex("documents");
-    portal.setCurrentStep(documents);
-    portal.setCompleted((old) => old.filter((i) => i !== documents));
-    router.push("/register");
-  };
+  /** The review page: every step as saved, each with its own Edit button. */
+  const editRegistration = () => router.push("/review");
   /** Opens a step of the registration to change it. */
   const editStep = (step: number) => {
     portal.setCurrentStep(step);
@@ -90,7 +94,7 @@ export function useApprovalViewModel() {
     busy,
     refresh,
     preview,
-    updateDocuments,
+    editRegistration,
     editStep,
     continueToDashboard,
   };

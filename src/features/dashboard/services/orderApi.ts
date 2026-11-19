@@ -257,7 +257,7 @@ export const orderApi = baseApi.injectEndpoints({
       providesTags: ["Orders"],
     }),
     /**
-     * PATCH /orders/{orderNumber}/status. Moving READY → OUT_FOR_DELIVERY
+     * PATCH /orders/{orderNumber}/status. Moving PREPARING → READY
      * requires assign_rider: the rider's public code (e.g. RID-A7K9M2) from
      * GET /restaurant/riders. The endpoint rejects any other field.
      */
@@ -281,6 +281,7 @@ export const orderApi = baseApi.injectEndpoints({
 export const {
   useGetOrdersQuery,
   useGetOrderPageQuery,
+  useLazyGetOrderPageQuery,
   useGetOrderCountQuery,
   useSearchOrdersQuery,
   useGetOrderQuery,

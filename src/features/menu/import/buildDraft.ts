@@ -2,6 +2,7 @@ import { sizePriceColumns } from "./detectColumns";
 import {
   parseAvailability,
   parseFoodType,
+  parseNamedPrices,
   parseNumber,
   parsePrice,
 } from "./parse";
@@ -58,6 +59,26 @@ export function emptyAddon(overrides: Partial<DraftAddon> = {}): DraftAddon {
   };
 }
 
+/**
+ * Sizes from a quantity cell: "Half:120, Full:220" as written, or "Half / Full"
+ * paired with a price cell "120 / 220". A single quantity is not a size.
+ */
+function quantitySizes(quantity: RawValue, price: RawValue) {
+  const named = parseNamedPrices(quantity),
+    none = { sizes: [] as { name: string; price: number }[], usedPrice: false };
+  if (named.length < 2) return none;
+  if (named.every((s) => s.price !== null))
+    return { sizes: named.map((s) => ({ name: s.name, price: s.price! })), usedPrice: false };
+  const prices = String(price ?? "")
+    .split(/\s*[\/,;|]\s*(?!-)/)
+    .map((p) => parsePrice(p.trim()));
+  return named.every((s) => s.price === null) &&
+    prices.length === named.length &&
+    prices.every((p) => p !== null)
+    ? { sizes: named.map((s, i) => ({ name: s.name, price: prices[i]! })), usedPrice: true }
+    : none;
+}
+
 const columnName = (i: number) => `Column ${String.fromCharCode(65 + (i % 26))}`;
 const isBlank = (v: RawValue | undefined) =>
   v === null || v === undefined || String(v).trim() === "";
@@ -71,7 +92,9 @@ export function buildDraft(
   const headings = sheet.rows.find((r) => r.sourceRow === headerRow)?.values ?? [],
     // Half / Full style columns become sizes with their own prices.
     sizeCols = sizePriceColumns(headings),
-    items: DraftItem[] = [];
+    items: DraftItem[] = [],
+    // The single quantity a row names ("Half", "Ghee"), for dishes written one row per size.
+    rowSize = new Map<string, string>();
   // The first spelling of a category wins, so "biryani" and "Biryani" are one category.
   const spelling = new Map<string, string>();
   const canonical = (value: string) => {
@@ -93,12 +116,24 @@ export function buildDraft(
             ? []
             : [{ name: String(headings[i]).trim(), price }];
         });
+    // Without Half / Full columns, a quantity column can hold the sizes:
+    // "Half:120, Full:220", or "Half / Full" with the price column "120 / 220".
+    const fromQuantity = sizeCols.length
+      ? { sizes: [], usedPrice: false }
+      : quantitySizes(raw("quantity"), raw("price"));
+    sizes.push(...fromQuantity.sizes);
+    const single = parseNamedPrices(raw("quantity")),
+      sizeName = single.length === 1 && single[0].price === null ? single[0].name : "";
     let price = parsePrice(raw("price"));
-    if (price === null && isBlank(raw("price")) && sizes.length === 1)
-      price = sizes[0].price;
+    // No single price: the last size is the price, as with Half / Full columns (Full).
+    if (price === null && sizes.length && (isBlank(raw("price")) || fromQuantity.usedPrice))
+      price = sizes[sizes.length - 1].price;
     const kind = text("discountType").toLowerCase(),
-      percent = parseNumber(raw("discPercent")) ?? 0,
-      flat = parsePrice(raw("flatAmount")) ?? 0,
+      discountText = text("discPercent"),
+      // A "Discount" column holding "₹20" is a flat discount, not a percentage.
+      flatInPercent = /^(rs\.?|inr|₹)|(rs|\/-|₹)$/i.test(discountText),
+      percent = flatInPercent ? 0 : (parseNumber(raw("discPercent")) ?? 0),
+      flat = parsePrice(raw("flatAmount")) ?? (flatInPercent ? parsePrice(discountText) ?? 0 : 0),
       discountType: DraftItem["discountType"] = /^(percent|%|pct)/.test(kind)
         ? "percent"
         : /^(flat|amount|rs|inr|₹)/.test(kind)
@@ -109,41 +144,96 @@ export function buildDraft(
               ? "flat"
               : null,
       available = parseAvailability(raw("available"));
-    items.push(
-      emptyDraftItem({
-        sourceRow: row.sourceRow,
-        name: text("name"),
-        category: canonical(text("category")),
-        subCategory: text("subCategory"),
-        price,
-        prepMinutes: parseNumber(raw("prepMinutes")),
-        foodType: parseFoodType(raw("foodType")),
-        foodTypeText: parseFoodType(raw("foodType")) ? "" : text("foodType"),
-        description: text("description"),
-        // An unrecognised availability word is treated as available; the vendor can switch it off later.
-        available: available === false ? false : true,
-        discountType,
-        discPercent: discountType === "percent" ? percent : 0,
-        flatAmount: discountType === "flat" ? flat : 0,
-        // One size price is just the price; sizes only matter from two up.
-        sizes: sizes.length >= 2 ? sizes : [],
-        photoFile: text("photoFile"),
-        sourceSheet: sheet.name,
-        original: row.values.flatMap((value, i) =>
-          isBlank(value)
-            ? []
-            : [{ heading: isBlank(headings[i]) ? columnName(i) : String(headings[i]).trim(), value: String(value) }],
-        ),
-      }),
-    );
+    const item = emptyDraftItem({
+      sourceRow: row.sourceRow,
+      name: text("name"),
+      category: canonical(text("category")),
+      subCategory: text("subCategory"),
+      price,
+      prepMinutes: parseNumber(raw("prepMinutes")),
+      foodType: parseFoodType(raw("foodType")),
+      foodTypeText: parseFoodType(raw("foodType")) ? "" : text("foodType"),
+      description: text("description"),
+      // An unrecognised availability word is treated as available; the vendor can switch it off later.
+      available: available === false ? false : true,
+      discountType,
+      discPercent: discountType === "percent" ? percent : 0,
+      flatAmount: discountType === "flat" ? flat : 0,
+      // One size price is just the price; sizes only matter from two up.
+      sizes: sizes.length >= 2 ? sizes : [],
+      photoFile: text("photoFile"),
+      // "Raita:20, Papad 10": each becomes an add-on; one without a price shows as needing one.
+      addons: parseNamedPrices(raw("addons")).map((a) =>
+        emptyAddon({ name: a.name, price: a.price }),
+      ),
+      sourceSheet: sheet.name,
+      original: row.values.flatMap((value, i) =>
+        isBlank(value)
+          ? []
+          : [{ heading: isBlank(headings[i]) ? columnName(i) : String(headings[i]).trim(), value: String(value) }],
+      ),
+    });
+    if (sizeName && !sizeCols.length) rowSize.set(item.id, sizeName);
+    items.push(item);
   }
-  return items;
+  return mergeSizeRows(items, rowSize);
+}
+
+/**
+ * Dishes written one row per size ("Plain Dosa · Regular · 70", then
+ * "Plain Dosa · Ghee · 95") become one dish with those sizes. Rows join when
+ * they share the dish name and category, each names one quantity, and each
+ * has a price; a quantity already on the dish stays a row of its own, so the
+ * duplicate is reported. The price is the last size's, as with Half / Full columns.
+ */
+function mergeSizeRows(items: DraftItem[], rowSize: Map<string, string>) {
+  if (!rowSize.size) return items;
+  const merged: DraftItem[] = [],
+    byDish = new Map<string, DraftItem>();
+  for (const item of items) {
+    const size = rowSize.get(item.id),
+      key = `${item.name.trim().toLowerCase()}|${item.category.trim().toLowerCase()}`,
+      joinable = !!size && !!item.name.trim() && item.price !== null,
+      first = joinable ? byDish.get(key) : undefined;
+    if (first && size && item.price !== null) {
+      if (!first.sizes.length)
+        first.sizes = [{ name: rowSize.get(first.id)!, price: first.price! }];
+      if (!first.sizes.some((s) => s.name.toLowerCase() === size.toLowerCase())) {
+        first.sizes.push({ name: size, price: item.price });
+        first.price = item.price;
+        // Add-ons listed on any of the rows belong to the dish once.
+        for (const addon of item.addons)
+          if (!first.addons.some((a) => a.name.toLowerCase() === addon.name.toLowerCase()))
+            first.addons.push(addon);
+        continue;
+      }
+    }
+    if (joinable && !first) byDish.set(key, item);
+    merged.push(item);
+  }
+  return merged;
+}
+
+/**
+ * Size names the dishes use that the restaurant's quantity types do not have
+ * yet, spelled as first written. They are saved as new types before import.
+ */
+export function newQtyTypes(items: DraftItem[], known: string[]): string[] {
+  const have = new Set(known.map((n) => n.trim().toLowerCase())),
+    found = new Map<string, string>();
+  for (const item of items)
+    for (const size of item.sizes) {
+      const name = size.name.trim(),
+        key = name.toLowerCase();
+      if (name && !have.has(key) && !found.has(key)) found.set(key, name);
+    }
+  return [...found.values()];
 }
 
 const decimals = (n: number) => Math.round(n * 100) / 100 === n;
 
 /** What must be fixed before an item can be sent. */
-export function validateItem(item: DraftItem, knownSizes: string[] = []): ImportIssue[] {
+export function validateItem(item: DraftItem): ImportIssue[] {
   const issues: ImportIssue[] = [],
     add = (field: ImportIssue["field"], message: string) =>
       issues.push({ itemId: item.id, field, message });
@@ -154,7 +244,6 @@ export function validateItem(item: DraftItem, knownSizes: string[] = []): Import
   else if (!decimals(item.price)) add("price", "Price can have at most 2 decimals.");
   if (!item.foodType)
     add("foodType", "Choose Veg, Non-veg or Egg.");
-  if (!item.photo) add("photo", "Add a photo of the dish.");
   if (
     item.prepMinutes === null ||
     !Number.isInteger(item.prepMinutes) ||
@@ -174,16 +263,12 @@ export function validateItem(item: DraftItem, knownSizes: string[] = []): Import
   const names = item.sizes.map((s) => s.name.toLowerCase());
   if (new Set(names).size !== names.length)
     add("sizes", "Two sizes have the same name.");
-  // The server only takes quantity types it already has (GET /menu-items/qty-types).
-  const known = new Set(knownSizes.map((n) => n.toLowerCase()));
-  const unknown = item.sizes.filter(
-    (s) => !s.name.trim() || (known.size > 0 && !known.has(s.name.trim().toLowerCase())),
-  );
-  if (unknown.length)
-    add(
-      "sizes",
-      `Size "${unknown[0].name || "(empty)"}" is not a quantity type we have. Choose one from the list.`,
-    );
+  // A size name the restaurant does not have yet is fine: it is saved as a new
+  // quantity type before the dishes are sent (see newQtyTypes).
+  if (item.sizes.some((s) => !s.name.trim()))
+    add("sizes", "Every size needs a name.");
+  if (item.sizes.some((s) => !(s.price >= 0)))
+    add("sizes", "A size price cannot be negative.");
   // Add-ons: a name, a price of 0 or more, and each name once per dish.
   const addons = item.addons ?? [];
   if (addons.some((a) => !a.name.trim()))
@@ -197,8 +282,8 @@ export function validateItem(item: DraftItem, knownSizes: string[] = []): Import
 }
 
 /** Item problems plus dishes that repeat a name within one category. */
-export function validateDraft(items: DraftItem[], knownSizes: string[] = []): ImportIssue[] {
-  const issues = items.flatMap((i) => validateItem(i, knownSizes)),
+export function validateDraft(items: DraftItem[]): ImportIssue[] {
+  const issues = items.flatMap((i) => validateItem(i)),
     seen = new Map<string, string>();
   for (const item of items) {
     if (!item.name.trim()) continue;

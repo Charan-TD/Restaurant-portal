@@ -145,7 +145,9 @@ export const menuItemFormSchema: z.ZodType<MenuItemForm> = z
       .string()
       .trim()
       .max(255, "Keep the sub category under 255 characters."),
-    price: wholeNumber("price").positive("Enter a price above ₹0."),
+    price: wholeNumber("price")
+      .positive("Enter a price above ₹0.")
+      .max(99999999, "The price cannot be above ₹9,99,99,999."),
     discountedPrice: wholeNumber("offer price").nullable(),
     taxRate: z
       .number({ invalid_type_error: "Enter the tax rate." })

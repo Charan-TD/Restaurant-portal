@@ -45,13 +45,15 @@ const FOOD_TYPES: readonly FoodType[] = ["Veg", "Egg", "Non-veg"];
 const phone = z
   .string()
   .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number.");
-// The restaurant phone: a mobile, or a landline with its area code, as 10 digits
-// (no leading 0 or +91). The backend takes 10 to 15 digits starting 1–9.
+// The restaurant phone: a mobile, or a landline with its area code. The
+// backend takes 10 digits, and a landline may start with the domestic 0.
+// Kept local like the rest of this file, so the model stays dependency-free for
+// tests (the same rule is in shared/utils/contactNumber).
 const contact = z
   .string()
   .regex(
-    /^[1-9]\d{9}$/,
-    "Enter a 10-digit mobile, or a landline with its area code.",
+    /^0?[0-9]{10}$/,
+    "Enter a 10-digit number, or a landline with its area code (a leading 0 is fine).",
   );
 // Typed with "" to match the unselected form state; "" still fails the check.
 const oneOf = <T extends string>(allowed: readonly T[], message: string) =>
@@ -134,7 +136,10 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
     landmark: required,
     city: required,
     state: required,
-    pincode: z.string().regex(/^\d{6}$/, "Enter a 6-digit pin code."),
+    // The backend takes a 6-digit pin code that does not start with 0.
+    pincode: z
+      .string()
+      .regex(/^[1-9][0-9]{5}$/, "Enter a valid 6-digit pin code."),
     // The exact pin is sent to the backend, so a location must be placed.
     latitude: z
       .number()

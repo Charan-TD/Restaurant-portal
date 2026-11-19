@@ -37,6 +37,39 @@ export function parseAvailability(
   return String(value);
 }
 
+/**
+ * A list of names with optional prices in one cell, the way vendors write
+ * sizes and add-ons: "Half:120, Full:220", "Half - 120 / Full - 220",
+ * "Raita (₹20); Papad 10", "Extra cheese". Empty when the cell is blank.
+ */
+export function parseNamedPrices(
+  value: RawValue | undefined,
+): { name: string; price: number | null }[] {
+  if (value === null || value === undefined || typeof value === "boolean") return [];
+  const text = String(value).trim();
+  if (!text) return [];
+  return text
+    // Commas, semicolons, pipes, new lines, " / ", and "/" or "+" before a
+    // word split the list; "40/-" and the "+50" of "Cheese +50" do not.
+    .split(/\s*(?:[,;|\n]|\+(?!\s*(?:₹|rs\.?)?\s*\d)|\s\/\s|\/(?=\s*[a-z]))\s*/i)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const found = part.match(
+        /^(.*?[^\s:=(@–+-])\s*(?:[:=@–-]|\()?\s*\+?\s*(-?\s*(?:rs\.?|inr)?\s*[₹$]?\s*\d+(?:\.\d+)?)\s*\)?\s*(?:\/-|rs\.?|only)?$/i,
+      );
+      // "120" alone is not "1" for ₹20: a name needs a letter.
+      if (!found || !/[a-z]/i.test(found[1])) return { name: part, price: null };
+      return { name: found[1].trim(), price: parsePrice(found[2].trim()) };
+    });
+}
+
+/** Size names vendors use for quantities: Half, Full Plate, 250 ml, 2 pcs, Small… */
+export const looksLikeSize = (name: string) =>
+  /\b(half|full|quarter|small|medium|large|regular|single|double|mini|jumbo|family|plate|portion|bowl|glass|cup|piece|pieces|pcs?|nos?|ml|ltr?|litre|liter|kg|gm?s?|grams?)\b|^\d/i.test(
+    name.trim(),
+  );
+
 /** Veg, Non-veg or Egg from the many ways vendors write them. "" when unknown. */
 export function parseFoodType(value: RawValue | undefined): ImportFoodType {
   const text = String(value ?? "")

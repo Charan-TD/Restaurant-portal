@@ -15,6 +15,7 @@ import {
 import {
   extrasFor,
   forgetExtras,
+  rememberExtras,
   setSavedFiles,
 } from "../services/registrationExtras";
 
@@ -67,7 +68,7 @@ export function useRestoreRegistration({
     queueMicrotask(() => setRestoring(true));
     loadRegistration(savedId)
       .unwrap()
-      .then(({ completed, values, files }) => {
+      .then(({ completed, values, files, previews }) => {
         // A registration saved here for another mobile number is not this
         // vendor's: start a fresh one instead of showing it.
         const phone = verifiedPhone();
@@ -85,6 +86,12 @@ export function useRestoreRegistration({
           riderOwner: values.riderOwner || extras?.riderOwner || "",
         });
         setSavedFiles(files);
+        // Show the saved logo and cover from the links the backend sent.
+        if (previews.logoPreview || previews.coverPreview)
+          rememberExtras(savedId, {
+            ...(previews.logoPreview ? { logoPreview: previews.logoPreview } : {}),
+            ...(previews.coverPreview ? { coverPreview: previews.coverPreview } : {}),
+          });
         const done = steps
           .map((step, i) => (completed.includes(step.id) ? i : -1))
           .filter((i) => i >= 0);
@@ -120,8 +127,16 @@ export function useRestoreRegistration({
       .catch((e) => {
         // Only a registration the server no longer knows is dropped; any
         // other failure keeps it so a refresh can try again.
-        if ((e as { status?: number })?.status === 404) forgetRegistration();
-        else {
+        const status = (e as { status?: number })?.status;
+        if (status === 404) forgetRegistration();
+        else if (status === 401) {
+          // The registration token lasts two hours; verifying the number
+          // again gives a new one for the same draft.
+          setLoadFailed(true);
+          setError(
+            "Your mobile verification has expired. Please sign in again with your mobile number.",
+          );
+        } else {
           setLoadFailed(true);
           setError(
             `We could not load your saved registration. ${errorMessage(e)} Refresh to try again.`,
@@ -145,9 +160,20 @@ export function useRestoreRegistration({
     loadRegistration,
     loadApproval,
   ]);
+  // A saved registration that loads at once (or an empty draft) needs no banner.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!restoring) {
+      queueMicrotask(() => setSlow(false));
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 600);
+    return () => clearTimeout(timer);
+  }, [restoring]);
   return {
     error,
     restoring,
+    slow,
     restored,
     loadFailed,
     settled,

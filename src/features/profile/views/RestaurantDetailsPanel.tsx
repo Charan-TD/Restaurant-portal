@@ -10,6 +10,7 @@ import { CommonTextField } from "@/shared/components/form/CommonTextField";
 import { FormField, prefixAdornment } from "@/shared/components/form/FormField";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
 import { DEMO_MODE } from "@/core/constants/config";
+import { CONTACT_MAX } from "@/shared/utils/contactNumber";
 import type { ProfileViewModel } from "../viewmodels/useProfileViewModel";
 import { useChangeRequests } from "../viewmodels/useChangeRequests";
 import { DeliveryRidersRequest } from "./DeliveryRidersRequest";
@@ -156,6 +157,8 @@ export function RestaurantDetailsPanel({ vm }: { vm: ProfileViewModel }) {
     ownerDigits = details?.mobile?.replace(/\D/g, "").slice(-10),
     ownerMobile = ownerDigits ? `${COUNTRY_CODE} ${ownerDigits}` : undefined;
   /** The editable phone: the restaurant's number, or the mobile in demo mode. */
+  // The sign-in mobile is 10 digits; the restaurant phone may be 10 or 11 (a landline's leading 0).
+  const phoneMax = DEMO_MODE ? 10 : CONTACT_MAX;
   const phoneField = (label: string) => (
     <Controller
       name="phone"
@@ -175,10 +178,12 @@ export function RestaurantDetailsPanel({ vm }: { vm: ProfileViewModel }) {
             error={!!fieldState.error}
             helperText={fieldState.error?.message}
             onChange={(e) =>
-              field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
+              field.onChange(
+                e.target.value.replace(/\D/g, "").slice(0, phoneMax),
+              )
             }
             slotProps={{
-              htmlInput: { inputMode: "numeric", maxLength: 10 },
+              htmlInput: { inputMode: "numeric", maxLength: phoneMax },
               input: {
                 readOnly: !phoneOpen,
                 startAdornment: prefixAdornment(COUNTRY_CODE),

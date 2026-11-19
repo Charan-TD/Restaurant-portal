@@ -108,6 +108,23 @@ export function useMenuItemFormViewModel(id?: string) {
     }
   };
   const qtyOptions = qtyQuery.data ?? NO_NAMES;
+  /**
+   * Saves a new quantity type (e.g. "Family Pack") to the restaurant's list
+   * straight away, so it can be chosen on this and any other dish. A name the
+   * list already has is not sent again. Resolves to an error message, or "".
+   */
+  const addQtyType = async (name: string) => {
+    const clean = name.trim();
+    if (!clean) return "Type a name for the quantity type.";
+    if (qtyOptions.some((q) => q.toLowerCase() === clean.toLowerCase())) return "";
+    try {
+      await createQtyType(clean).unwrap();
+      toast.success(`Quantity type ${clean} added.`);
+      return "";
+    } catch (e) {
+      return menuErrorMessage(e);
+    }
+  };
   const submit = form.handleSubmit(async (values) => {
     setError("");
     setCreated(null);
@@ -149,6 +166,7 @@ export function useMenuItemFormViewModel(id?: string) {
     subsByCategory,
     addOns,
     qtyOptions,
+    addQtyType,
     createAddOn: createNewAddOn,
     created,
     dismissCreated: () => setCreated(null),

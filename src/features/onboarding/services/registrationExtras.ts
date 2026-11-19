@@ -81,6 +81,9 @@ export function setSavedFiles(files: SavedFile[]) {
   notify();
 }
 
+/** True when the backend already holds this file, so it need not be chosen again. */
+export const isFileSaved = (file: SavedFile) => !!savedFiles[file];
+
 export function markSavedFiles(files: SavedFile[]) {
   savedFiles = {
     ...savedFiles,

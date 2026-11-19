@@ -4,6 +4,7 @@ import {
   clearTokens,
   claimsOf,
   getRefreshToken,
+  registrationIdOf,
 } from "@/core/api/session";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type {
@@ -29,13 +30,14 @@ function toSession(body: Payload): AuthSession {
   const restaurant = data?.restaurant as Payload,
     // A restaurant's "name" is the restaurant, not the person signed in.
     people = [
+      data?.restaurantUser,
       data?.user,
       data?.owner,
       data?.profile,
       data,
       claimsOf(accessToken),
     ] as Payload[],
-    contacts = [...people.slice(0, 3), restaurant, ...people.slice(3)];
+    contacts = [...people.slice(0, 4), restaurant, ...people.slice(4)];
   return {
     accessToken,
     refreshToken: pick(tokens, "refreshToken", "refresh_token"),
@@ -121,7 +123,14 @@ async function verifyOtp(
   // or carry on with the saved registration the server names.
   // A submitted registration is answered with nextStep "review" and its id,
   // and may not say registrationRequired at all.
-  const id = pick(inner, "registrationId", "registration_id");
+  const registrationToken =
+    pick(inner, "registrationAccessToken", "registration_access_token") ||
+    undefined;
+  // The server no longer sends the registration id: the token names the draft,
+  // so a token alone (with the verified phone as the local key) is enough.
+  const id =
+    pick(inner, "registrationId", "registration_id") ??
+    registrationIdOf(registrationToken, phone);
   if (
     !pick(tokens, "accessToken", "access_token", "token") &&
     (isNewVendor(data, inner) ||
@@ -132,6 +141,7 @@ async function verifyOtp(
     return {
       accessToken: "",
       profile: { phone },
+      registrationAccessToken: registrationToken,
       isNewUser: !id,
       registration: id
         ? { id, next: inner?.nextStep === "review" ? "review" : "registration" }
