@@ -1,4 +1,5 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
+import { getRegistrationToken, registrationIdOf } from "@/core/api/session";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
 import type { StepId } from "@/core/constants/onboarding";
 import type { SavedFile } from "./registrationExtras";
@@ -8,8 +9,9 @@ import {
   type RegistrationForm,
   type RestaurantType,
 } from "../models/registration";
-// The backend saves registration one step at a time. Step 1 creates the
-// registration and returns its id; the other steps update it by that id.
+// The backend saves registration one step at a time. Verifying the OTP opens a
+// draft and returns a registration access token; every call below names the
+// draft only through that token (the Bearer header), never in the URL.
 const restaurantTypeValues: Record<RestaurantType, string> = {
   Restaurant: "restaurant",
   "Cloud kitchen": "cloud_kitchen",
@@ -28,8 +30,7 @@ const dayKeys: Record<string, string> = {
   Saturday: "sat",
   Sunday: "sun",
 };
-const stepPath = (registrationId: string, step: string) =>
-  `${endpoint(API_PATHS.register)}/${registrationId}/${step}`;
+const stepPath = (step: string) => `${endpoint(API_PATHS.register)}/${step}`;
 function multipart(fields: Record<string, string | File | null>) {
   const body = new FormData();
   Object.entries(fields).forEach(([key, value]) => {
@@ -64,8 +65,6 @@ function randomPassword() {
 async function createRegistration(
   form: RegistrationForm,
   send: Send,
-  /** The draft the server opened when the number was verified, if any. */
-  draftId?: string | null,
 ): Promise<string> {
   // Multipart, so the optional logo and cover picture go in the same request.
   // List fields are sent as one entry per value.
@@ -73,8 +72,7 @@ async function createRegistration(
     restaurant_name: form.restaurantName,
     owner_name: form.ownerName,
     // Exactly 10 digits: the server refuses a country code or symbols.
-    mobile: form.mobile.replace(/D/g, "").slice(-10),
-    registrationId: draftId ?? null,
+    mobile: form.mobile.replace(/\D/g, "").slice(-10),
     restaurant_type: form.restaurantType
       ? restaurantTypeValues[form.restaurantType]
       : "",
@@ -92,24 +90,25 @@ async function createRegistration(
   form.foodServed.forEach((type) =>
     data.append("food_served", foodTypeValues[type]),
   );
-  const body = await send<{ data: { registrationId: string } }>({
-    url: `${endpoint(API_PATHS.register)}/restaurant-details`,
-    method: "post",
-    data,
-  });
-  return body.data.registrationId;
+  await send({ url: stepPath("restaurant-details"), method: "post", data });
+  // The response no longer carries an id; the token names the draft.
+  const id = registrationIdOf(
+    getRegistrationToken(),
+    form.mobile.replace(/\D/g, "").slice(-10),
+  );
+  if (!id)
+    throw new Error(
+      "Your mobile verification has expired. Please sign in again.",
+    );
+  return id;
 }
 /**
- * PUT /registration/{id}/restaurant-details: edits the details saved in step 1.
+ * PUT /registration/restaurant-details: edits the details saved in step 1.
  * The mobile number is never sent (it was verified by OTP and cannot change);
  * the password only when the vendor typed a new one; the pictures only when
  * new ones were chosen.
  */
-async function updateRegistrationDetails(
-  id: string,
-  form: RegistrationForm,
-  send: Send,
-) {
+async function updateRegistrationDetails(form: RegistrationForm, send: Send) {
   const data = multipart({
     restaurant_name: form.restaurantName,
     owner_name: form.ownerName,
@@ -129,7 +128,7 @@ async function updateRegistrationDetails(
   );
   try {
     await send({
-      url: stepPath(id, "restaurant-details"),
+      url: stepPath("restaurant-details"),
       method: "put",
       data,
     });
@@ -147,12 +146,12 @@ async function updateRegistrationDetails(
 const savers: Partial<
   Record<
     StepId,
-    (id: string, form: RegistrationForm, send: Send) => Promise<unknown>
+    (form: RegistrationForm, send: Send) => Promise<unknown>
   >
 > = {
-  location: (id, form, send) =>
+  location: (form, send) =>
     send({
-      url: stepPath(id, "location"),
+      url: stepPath("location"),
       method: "put",
       data: {
         lat: form.latitude,
@@ -164,9 +163,9 @@ const savers: Partial<
         house_no: form.building,
       },
     }),
-  documents: (id, { documentNumbers: numbers, documents }, send) =>
+  documents: ({ documentNumbers: numbers, documents }, send) =>
     send({
-      url: stepPath(id, "business-documents"),
+      url: stepPath("business-documents"),
       method: "put",
       data: multipart({
         fssai_number: numbers.fssai,
@@ -182,9 +181,9 @@ const savers: Partial<
         aadhaar_document: documents.identity,
       }),
     }),
-  bank: (id, form, send) =>
+  bank: (form, send) =>
     send({
-      url: stepPath(id, "bank-account"),
+      url: stepPath("bank-account"),
       method: "put",
       data: multipart({
         account_holder_name: form.accountHolder,
@@ -194,9 +193,9 @@ const savers: Partial<
         bank_proof: form.bankProof,
       }),
     }),
-  hours: (id, form, send) =>
+  hours: (form, send) =>
     send({
-      url: stepPath(id, "operating-hours"),
+      url: stepPath("operating-hours"),
       method: "put",
       data: Object.fromEntries(
         form.hours.map((day) => {
@@ -247,28 +246,27 @@ async function saveRegistrationStep(
   if (DEMO_MODE) return registrationId;
   if (step === "details") {
     // A draft is opened when the number is verified, so the first save of the
-    // details goes to the create endpoint with that draft's id; only details
-    // already saved are edited.
+    // details goes to the create endpoint; only details already saved are edited.
     if (registrationId && detailsSaved) {
-      await updateRegistrationDetails(registrationId, form, send);
+      await updateRegistrationDetails(form, send);
       return registrationId;
     }
-    return createRegistration(form, send, registrationId);
+    return createRegistration(form, send);
   }
   const save = savers[step];
   if (!save) return registrationId;
   if (!registrationId)
     throw new Error("Please complete the restaurant details step first.");
-  await save(registrationId, form, send);
+  await save(form, send);
   return registrationId;
 }
 /**
  * Tells the backend every section is done. It re-checks completeness and
  * answers 400 with the missing sections if something was not saved.
  */
-async function submitRegistration(registrationId: string, send: Send) {
+async function submitRegistration(_registrationId: string, send: Send) {
   if (DEMO_MODE) return;
-  await send({ url: stepPath(registrationId, "submit"), method: "post" });
+  await send({ url: stepPath("submit"), method: "post" });
 }
 // The registration id is kept across reloads so a vendor can pick up where
 // they left off. It is dropped once the registration is submitted.
@@ -326,6 +324,11 @@ function reverse<T extends string>(values: Record<T, string>, raw: unknown) {
 /** The uploaded files a section says it holds, by the id the backend keeps for each. */
 const held = (row: Row, ids: [SavedFile, string][]) =>
   ids.filter(([, key]) => !!row[key]).map(([file]) => file);
+/** A picture link (not a storage path) from one of the given fields. */
+const link = (row: Row, ...keys: string[]) => {
+  const value = str(row, ...keys);
+  return /^(https?:|data:image\/)/i.test(value) ? value : undefined;
+};
 const loaders: Record<
   string,
   {
@@ -333,6 +336,8 @@ const loaders: Record<
     path: string;
     read: (row: Row) => Partial<RegistrationForm>;
     files?: (row: Row) => SavedFile[];
+    /** Links to the saved pictures, when the backend sends them. */
+    previews?: (row: Row) => { logoPreview?: string; coverPreview?: string };
   }
 > = {
   restaurant_details: {
@@ -343,6 +348,10 @@ const loaders: Record<
         ["logo", "logo_id"],
         ["cover", "cover_id"],
       ]),
+    previews: (row) => ({
+      logoPreview: link(row, "logo_url", "logo"),
+      coverPreview: link(row, "cover_url", "cover_photo", "cover"),
+    }),
     read: (row) => {
       const type = reverse(restaurantTypeValues, row.restaurant_type),
         food = Array.isArray(row.food_served) ? row.food_served : [],
@@ -466,34 +475,40 @@ export interface SavedRegistration {
   values: Partial<RegistrationForm>;
   /** Files the backend already holds, so they show as uploaded. */
   files: SavedFile[];
+  /** Links to the saved logo and cover, when the backend sends them. */
+  previews: { logoPreview?: string; coverPreview?: string };
 }
 /**
  * Reads back every section the backend marks as saved, using the progress
  * endpoint to know which ones to ask for.
  */
 async function loadRegistration(
-  registrationId: string,
+  _registrationId: string,
   send: Send,
 ): Promise<SavedRegistration> {
-  const data = await send({ url: stepPath(registrationId, "progress") });
+  const data = await send({ url: stepPath("progress") });
   const sections = asRow(unwrap(data).sections),
     done = Object.keys(loaders).filter((name) => sections[name] === true);
   const parts = await Promise.all(
     done.map(async (name) => {
       const loader = loaders[name];
       try {
-        const response = await send({
-          url: stepPath(registrationId, loader.path),
-        });
+        const response = await send({ url: stepPath(loader.path) });
         const row = unwrap(response);
         return {
           step: loader.step,
           values: loader.read(row),
           files: loader.files?.(row) ?? [],
+          previews: loader.previews?.(row) ?? {},
         };
       } catch {
         // A section that fails to load is still saved; it just stays empty.
-        return { step: loader.step, values: {}, files: [] as SavedFile[] };
+        return {
+          step: loader.step,
+          values: {},
+          files: [] as SavedFile[],
+          previews: {},
+        };
       }
     }),
   );
@@ -501,6 +516,7 @@ async function loadRegistration(
     completed: parts.map((part) => part.step),
     values: Object.assign({}, ...parts.map((part) => part.values)),
     files: parts.flatMap((part) => part.files),
+    previews: Object.assign({}, ...parts.map((part) => part.previews)),
   };
 }
 

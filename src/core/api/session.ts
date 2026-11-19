@@ -43,6 +43,25 @@ export function getRegistrationToken(): string | null {
     return null;
   }
 }
+/**
+ * A local key for the registration the token is bound to. The server no longer
+ * puts a registration id in URLs or responses, and the token's claims are not
+ * documented, so the id is read from them when present and otherwise falls
+ * back to the verified phone (a number has one registration at a time). It is
+ * only a marker for this browser: the server finds the draft from the token.
+ */
+export function registrationIdOf(
+  token?: string | null,
+  fallback?: string,
+): string | undefined {
+  if (!token) return undefined;
+  const claims = claimsOf(token);
+  for (const key of ["registration_id", "registrationId"]) {
+    const id = claims?.[key];
+    if (typeof id === "string" && id) return id;
+  }
+  return fallback || undefined;
+}
 export function setRegistrationToken(token?: string | null) {
   try {
     if (token) localStorage.setItem(REGISTRATION_TOKEN_KEY, token);

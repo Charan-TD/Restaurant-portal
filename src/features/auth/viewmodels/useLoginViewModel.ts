@@ -14,7 +14,10 @@ import {
   forgetRegistration,
   rememberRegistration,
 } from "@/features/onboarding/services/registrationApi";
-import { forgetExtras } from "@/features/onboarding/services/registrationExtras";
+import {
+  extrasFor,
+  forgetExtras,
+} from "@/features/onboarding/services/registrationExtras";
 import {
   forgetVerifiedPhone,
   rememberVerifiedPhone,
@@ -113,7 +116,8 @@ export function useLoginViewModel() {
         setRegistrationToken(session.registrationAccessToken);
         // What this browser kept belongs to whoever used it last.
         if (!saved || saved.id !== portal.registrationId) {
-          forgetExtras();
+          // Keep the pictures and choices kept for this same registration.
+          if (!saved || !extrasFor(saved.id)) forgetExtras();
           portal.setRegistrationId(null);
           portal.setCompleted([]);
           portal.setCurrentStep(0);
@@ -126,6 +130,7 @@ export function useLoginViewModel() {
       }
       // A signed-in restaurant has nothing left to register.
       forgetRegistration();
+      setRegistrationToken(null);
       forgetExtras();
       forgetVerifiedPhone();
       const profile = session?.profile ?? {};

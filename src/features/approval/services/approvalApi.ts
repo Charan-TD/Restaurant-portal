@@ -6,13 +6,13 @@ const STATUS: Record<string, ApprovalStatus> = {
   accepted: "Approved",
   rejected: "Rejected",
 };
-/** GET /restaurants/registration/{id}/review-status. */
+/** GET /restaurants/registration/review-status (the token names the registration). */
 async function getApproval(
-  registrationId: string,
+  _registrationId: string,
   send: Send,
 ): Promise<ApprovalResult> {
   const data = await send({
-    url: `${endpoint(API_PATHS.approval)}/${encodeURIComponent(registrationId)}/review-status`,
+    url: `${endpoint(API_PATHS.approval)}/review-status`,
   });
   const review = data?.data ?? data;
   return {
