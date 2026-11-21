@@ -4,7 +4,7 @@ import { Box, ButtonBase, Typography } from "@mui/material";
 import CheckOutlined from "@mui/icons-material/CheckOutlined";
 import LockOutlined from "@mui/icons-material/LockOutlined";
 import { usePortal } from "@/core/providers/PortalProvider";
-import { steps } from "@/core/constants/onboarding";
+import { STEP_GATE_ENABLED, steps } from "@/core/constants/onboarding";
 import { cardSx, tokens } from "@/core/theme/tokens";
 
 /** The setup list: a progress bar and the steps, each marked done or in progress. */
@@ -44,7 +44,8 @@ export function SetupSidebar() {
         {steps.map(({ id, title, hint }, i) => {
           const complete = portal.completed.includes(i),
             current = portal.currentStep === i,
-            locked = !complete && firstOpen !== -1 && i > firstOpen;
+            locked =
+              STEP_GATE_ENABLED && !complete && firstOpen !== -1 && i > firstOpen;
           return (
             <Box key={id} sx={{ position: "relative" }}>
               {i < steps.length - 1 && (

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ORDER_PREP } from "@/core/constants/orderPrep";
 import {
   riderOwners,
   type FoodType,
@@ -8,6 +9,36 @@ import {
   type RiderOwner,
 } from "./registration";
 const required = z.string().trim().min(1, "This field is required.");
+
+// Tax IDs, as the backend checks them: both are upper case, and the PAN is the
+// 10 characters inside the GSTIN (characters 3 to 12).
+const GSTIN_FORMAT = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const PAN_FORMAT = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const STATE_CODES = new Set([
+  ...Array.from({ length: 38 }, (_, i) => String(i + 1).padStart(2, "0")),
+  "97",
+  "99",
+]);
+const STATE_MESSAGE = "The state code in this GSTIN is not valid.";
+/** Either number could be the wrong one, so the message names both. */
+export const PAN_MISMATCH = "Check the GSTIN and PAN.";
+const clean = (value: string) => value.trim().toUpperCase();
+
+/** Why a GSTIN and PAN cannot be used together, or "" when they can. */
+function gstPanProblem(gstin: string, pan: string) {
+  const gst = clean(gstin),
+    panValue = clean(pan);
+  if (gst.length !== 15 || !GSTIN_FORMAT.test(gst))
+    return "Enter a valid 15-character GSTIN.";
+  if (!STATE_CODES.has(gst.slice(0, 2))) return STATE_MESSAGE;
+  if (panValue.length !== 10 || !PAN_FORMAT.test(panValue))
+    return "Enter a valid PAN (e.g. ABCDE1234F).";
+  if (gst.slice(2, 12) !== panValue) return PAN_MISMATCH;
+  return "";
+}
+/** True when both numbers are well formed but the GSTIN holds a different PAN. */
+export const taxIdsMismatch = (gstin: string, pan: string) =>
+  gstPanProblem(gstin, pan) === PAN_MISMATCH;
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const isFile = (value: unknown, types: string[]): value is File =>
   typeof File !== "undefined" &&
@@ -157,15 +188,15 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
     bankName: required,
     documentNumbers: z.object({
       // The backend asks for the GSTIN and its certificate like the rest.
+      // Typed in any case; checked in upper case.
       gst: z
         .string()
-        .regex(
-          /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/,
-          "Enter a valid 15-character GSTIN.",
-        ),
+        .transform(clean)
+        .pipe(z.string().regex(GSTIN_FORMAT, "Enter a valid 15-character GSTIN.")),
       pan: z
         .string()
-        .regex(/^[A-Z]{5}\d{4}[A-Z]$/, "Enter a valid PAN (e.g. ABCDE1234F)."),
+        .transform(clean)
+        .pipe(z.string().regex(PAN_FORMAT, "Enter a valid PAN (e.g. ABCDE1234F).")),
       fssai: z
         .string()
         .regex(/^\d{14}$/, "Enter a valid 14-digit FSSAI licence number."),
@@ -234,6 +265,15 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
           });
         });
       }),
+    orderPrepMinutes: z
+      .number()
+      .int("Enter whole minutes.")
+      .min(ORDER_PREP.min, `Prep time is at least ${ORDER_PREP.min} minutes.`)
+      .max(ORDER_PREP.max, `Prep time is at most ${ORDER_PREP.max} minutes.`)
+      .refine(
+        (value) => value % ORDER_PREP.step === 0,
+        `Use steps of ${ORDER_PREP.step} minutes.`,
+      ),
     // The menu step is hidden for now; add `.min(1, "Add at least one menu
     // item.")` back when it is re-enabled.
     menuItems: z.array(menuItemSchema),
@@ -252,6 +292,21 @@ export const registrationSchema: z.ZodType<RegistrationForm> = z
         path: ["menuItems"],
         message: "Menu items must match the food types you serve.",
       });
+    // The format errors above already name a bad GSTIN or PAN; these two are
+    // the checks that need both numbers together.
+    const taxIdProblem = gstPanProblem(
+      data.documentNumbers.gst,
+      data.documentNumbers.pan,
+    );
+    if (taxIdProblem === STATE_MESSAGE)
+      ctx.addIssue({
+        code: "custom",
+        path: ["documentNumbers", "gst"],
+        message: STATE_MESSAGE,
+      });
+    // A GSTIN/PAN mismatch is not a field error (either number could be the
+    // wrong one): the form checks it with taxIdsMismatch and shows PAN_MISMATCH
+    // as the page message.
     if (data.password !== data.confirmPassword)
       ctx.addIssue({
         code: "custom",

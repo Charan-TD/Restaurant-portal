@@ -74,6 +74,14 @@ const allSteps: StepDefinition[] = [
 ];
 export const steps = allSteps.filter((step) => step.enabled);
 export const LAST_STEP = steps.length - 1;
+
+/**
+ * TEMPORARY, for editing: false lets every step in the setup list be opened
+ * without saving the ones before it. Set to true (or delete this flag and its
+ * use in SetupSidebar.tsx) before committing, so steps are locked again.
+ */
+export const STEP_GATE_ENABLED = false;
+
 export const stepIndex = (id: StepId) =>
   steps.findIndex((step) => step.id === id);
 const digits = (value: string) => value.replace(/\D/g, "");

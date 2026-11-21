@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller } from "react-hook-form";
 import {
   Alert,
@@ -22,13 +22,31 @@ import { LocationMap } from "./LocationMap";
 export function LocationSearch() {
   const vm = useLocationSearchViewModel();
   const pinned = vm.latitude != null && vm.longitude != null;
-  // Puts the pin where this device is, when the browser allows it.
-  const useMyLocation = () =>
-    navigator.geolocation?.getCurrentPosition(
+  const [locateError, setLocateError] = useState<string | null>(null);
+  // Puts the pin where this device is. A click asks the browser for permission
+  // (it shows the prompt while the site is still undecided); a fresh request is
+  // made each time, so a click after allowing works without reloading.
+  const useMyLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocateError("This browser can't share your location. Search for your restaurant instead.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setLocateError("Location needs https or localhost. Open the portal at http://localhost:3000 to use it.");
+      return;
+    }
+    setLocateError(null);
+    navigator.geolocation.getCurrentPosition(
       ({ coords }) => void vm.placePin(coords.latitude, coords.longitude),
-      () => undefined,
-      { enableHighAccuracy: true, timeout: 10_000 },
+      (err) =>
+        setLocateError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location access is blocked. Allow location for this site in your browser settings, then click Use my location again."
+            : "Could not get your location. Please try again.",
+        ),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
+  };
   // The first step already asked for the device's location: start the pin there.
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +205,11 @@ export function LocationSearch() {
             ) : (
               <>
                 {locate}
+                {locateError && (
+                  <Alert severity="warning" sx={{ mt: 1.5 }}>
+                    {locateError}
+                  </Alert>
+                )}
                 {fieldState.error && (
                   <FormHelperText error>
                     {fieldState.error.message}

@@ -19,6 +19,7 @@ import { requestDevicePosition } from "../services/locationService";
 import { errorMessage } from "@/shared/utils/errors";
 import { verifiedPhone } from "@/features/auth/services/verifiedPhone";
 import type { RegistrationForm } from "../models/registration";
+import { PAN_MISMATCH, taxIdsMismatch } from "../models/validation";
 import {
   isFileSaved,
   makePreview,
@@ -233,6 +234,16 @@ export function useOnboardingViewModel() {
         return;
       }
     }
+    // The GSTIN and PAN must belong together; either could be the wrong one,
+    // so this is the page message, not an error under one field.
+    if (toCheck.includes("documents")) {
+      const numbers = portal.form.getValues("documentNumbers");
+      if (taxIdsMismatch(numbers.gst, numbers.pan)) {
+        if (isLast) portal.setCurrentStep(stepIndex("documents"));
+        setError(PAN_MISMATCH);
+        return;
+      }
+    }
     setBusy(true);
     try {
       if (!isLast) {
@@ -270,7 +281,9 @@ export function useOnboardingViewModel() {
       portal.setCompleted(steps.map((_, i) => i));
       router.push("/review");
     } catch (e) {
-      setError(errorMessage(e));
+      const message = errorMessage(e);
+      // The backend's GSTIN/PAN mismatch gets the same message as ours.
+      setError(/pan_number does not match/i.test(message) ? PAN_MISMATCH : message);
     } finally {
       setBusy(false);
     }

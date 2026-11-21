@@ -29,6 +29,12 @@ export function useHoursViewModel() {
     updateDay(dayIndex, {
       shifts: days[dayIndex].shifts.filter((_, i) => i !== shiftIndex),
     });
+  const prepMinutes = useWatch({ control: form.control, name: "orderPrepMinutes" });
+  const setPrepMinutes = (minutes: number) =>
+    form.setValue("orderPrepMinutes", minutes, {
+      shouldDirty: true,
+      shouldValidate: form.formState.isSubmitted,
+    });
   // 00:00 to 23:59 is sent as a 24-hour day; single days can be edited after.
   const openAllDay = () =>
     form.setValue(
@@ -48,5 +54,7 @@ export function useHoursViewModel() {
     addShift,
     removeShift,
     openAllDay,
+    prepMinutes,
+    setPrepMinutes,
   };
 }

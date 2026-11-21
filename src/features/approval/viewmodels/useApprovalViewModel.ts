@@ -3,7 +3,16 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
-import { rememberedRegistration } from "@/features/onboarding/services/registrationApi";
+import { setRegistrationToken } from "@/core/api/session";
+import { forgetVerifiedPhone } from "@/features/auth/services/verifiedPhone";
+import {
+  forgetRegistration,
+  rememberedRegistration,
+} from "@/features/onboarding/services/registrationApi";
+import {
+  forgetExtras,
+  setSavedFiles,
+} from "@/features/onboarding/services/registrationExtras";
 import { useLazyGetApprovalQuery } from "../services/approvalApi";
 import type { ApprovalStatus } from "../models/approval";
 import { errorMessage } from "@/shared/utils/errors";
@@ -14,8 +23,29 @@ import { errorMessage } from "@/shared/utils/errors";
 // restaurant has been approved.
 const SIGN_IN_AGAIN =
   "Your session has ended. If your restaurant has been approved, sign in with your mobile number to open your dashboard.";
+// Once approved, the backend refuses the registration token and asks for the
+// restaurant's own access ("This restaurant is approved; use restaurant access
+// to continue"): signing in with the mobile number gives it.
+const APPROVED_SIGN_IN =
+  "Your restaurant is approved. Sign in with your mobile number to open your dashboard.";
+const isApproved = (e: unknown) =>
+  /approved.*restaurant access/i.test(errorMessage(e));
 const statusError = (e: unknown) =>
-  (e as { status?: number })?.status === 401 ? SIGN_IN_AGAIN : errorMessage(e);
+  isApproved(e)
+    ? APPROVED_SIGN_IN
+    : (e as { status?: number })?.status === 401
+      ? SIGN_IN_AGAIN
+      : errorMessage(e);
+// An approved restaurant has no draft left: drop what is saved for it and go
+// to sign in, which gives the restaurant's own access.
+function signInToContinue(router: { replace: (url: string) => void }) {
+  forgetRegistration();
+  forgetExtras();
+  setSavedFiles([]);
+  setRegistrationToken(null);
+  forgetVerifiedPhone();
+  router.replace("/login");
+}
 export function useApprovalViewModel() {
   const [loadApproval] = useLazyGetApprovalQuery(),
     portal = usePortal(),
@@ -43,6 +73,7 @@ export function useApprovalViewModel() {
         if (!active) return;
         // 409: it was never submitted, so carry on with the steps instead.
         if ((e as { status?: number })?.status === 409) router.replace("/register");
+        else if (isApproved(e)) signInToContinue(router);
         else setError(statusError(e));
       })
       .finally(() => {
@@ -59,7 +90,8 @@ export function useApprovalViewModel() {
     try {
       portal.setApproval(await loadApproval(registrationId).unwrap());
     } catch (e) {
-      setError(statusError(e));
+      if (isApproved(e)) signInToContinue(router);
+      else setError(statusError(e));
     } finally {
       setBusy(false);
     }
