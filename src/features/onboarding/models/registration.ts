@@ -1,3 +1,5 @@
+import { ORDER_PREP } from "@/core/constants/orderPrep";
+
 export const restaurantTypes = ["Restaurant", "Cloud kitchen"] as const;
 export type RestaurantType = (typeof restaurantTypes)[number];
 export const foodTypes = ["Veg", "Egg", "Non-veg"] as const;
@@ -77,6 +79,8 @@ export interface RegistrationForm extends RestaurantRegistration {
   coverPhoto: File | null;
   logo: File | null;
   hours: OperatingDay[];
+  /** Minutes the kitchen takes for one order (see ORDER_PREP). */
+  orderPrepMinutes: number;
   menuItems: MenuItem[];
   agreement: boolean;
 }
@@ -136,6 +140,7 @@ export const initialRegistration: RegistrationForm = {
     open: true,
     shifts: [{ start: "", end: "" }],
   })),
+  orderPrepMinutes: ORDER_PREP.fallback,
   menuItems: [],
   // Agreed on the sign-in page ("By continuing you agree to the Partner terms").
   agreement: true,

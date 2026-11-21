@@ -1,5 +1,6 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
+import { ORDER_PREP, ORDER_PREP_KEY, clampPrep } from "@/core/constants/orderPrep";
 import { fetchCuisines } from "@/features/onboarding/services/cuisineApi";
 export interface RestaurantSummary {
   name?: string;
@@ -285,14 +286,23 @@ function readDay(day: string, raw: unknown): WorkingDay {
     end = hhmm(row.close) ?? hhmm(slots[slots.length - 1]?.closing_time);
   return start && end ? { day, open: true, start, end } : closed;
 }
+/** The weekly hours plus the fixed prep time every order takes. */
+export interface WorkingHours {
+  days: WorkingDay[];
+  orderPrepMinutes: number;
+}
+
 /** GET /restaurant/profile/operating-hours: the weekly hours the restaurant is open. */
-async function getWorkingHours(send: Send): Promise<WorkingDay[]> {
+async function getWorkingHours(send: Send): Promise<WorkingHours> {
   const data = await send({ url: profilePath("operating-hours") });
   const body = (data?.data ?? data) as Row;
-  return hoursOf(
-    (body?.operating_hours ?? body?.opening_hours ?? body) as Row,
-    true,
-  );
+  const schedule = (body?.operating_hours ?? body?.opening_hours ?? body) as Row;
+  // The prep time is a number (or a numeric string) next to the week's hours.
+  const prep = Number(body[ORDER_PREP_KEY] ?? schedule?.[ORDER_PREP_KEY]);
+  return {
+    days: hoursOf(schedule, true),
+    orderPrepMinutes: prep > 0 ? clampPrep(prep) : ORDER_PREP.fallback,
+  };
 }
 type Row = Record<string, unknown>;
 async function fetchRestaurantRow(send: Send): Promise<Row> {
@@ -325,8 +335,13 @@ const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
  * PATCH /restaurant/profile/operating-hours: the weekly schedule keyed mon to
  * sun, in the registration format. Saved immediately.
  */
-async function updateWorkingHours(days: WorkingDay[], send: Send) {
-  const schedule: Record<string, unknown> = {};
+async function updateWorkingHours(
+  { days, orderPrepMinutes }: WorkingHours,
+  send: Send,
+) {
+  const schedule: Record<string, unknown> = {
+    [ORDER_PREP_KEY]: clampPrep(orderPrepMinutes),
+  };
   days.forEach((d, index) => {
     const around = d.open && d.start === "00:00" && d.end === "23:59";
     schedule[DAY_KEYS[index]] = {
@@ -572,7 +587,7 @@ export const restaurantApi = baseApi.injectEndpoints({
       queryFn: flow((_: void, send: Send) => getRidersOwner(send)),
       providesTags: ["Profile"],
     }),
-    getWorkingHours: build.query<WorkingDay[], void>({
+    getWorkingHours: build.query<WorkingHours, void>({
       queryFn: flow((_: void, send: Send) => getWorkingHours(send)),
       providesTags: ["Hours"],
     }),
@@ -594,7 +609,7 @@ export const restaurantApi = baseApi.injectEndpoints({
       queryFn: flow(requestProfileChange),
       invalidatesTags: ["ChangeRequests"],
     }),
-    updateWorkingHours: build.mutation<void, WorkingDay[]>({
+    updateWorkingHours: build.mutation<void, WorkingHours>({
       queryFn: flow(updateWorkingHours),
       invalidatesTags: ["Hours", "Profile"],
     }),

@@ -42,7 +42,7 @@ export function GoOfflineDialog({
   onClose: () => void;
   onConfirm: (offline: GoOffline) => void;
 }) {
-  const { data: hours = [] } = useGetWorkingHoursQuery(undefined, {
+  const { data: { days: hours = [] } = {} } = useGetWorkingHoursQuery(undefined, {
       skip: !open || DEMO_MODE,
     }),
     [reason, setReason] = useState(""),

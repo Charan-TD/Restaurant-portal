@@ -1,6 +1,7 @@
 import { baseApi, flow, type Send } from "@/core/api/baseApi";
 import { getRegistrationToken, registrationIdOf } from "@/core/api/session";
 import { API_PATHS, endpoint, DEMO_MODE } from "@/core/constants/config";
+import { ORDER_PREP_KEY, clampPrep } from "@/core/constants/orderPrep";
 import type { StepId } from "@/core/constants/onboarding";
 import type { SavedFile } from "./registrationExtras";
 import { contactDigits } from "@/shared/utils/contactNumber";
@@ -104,14 +105,16 @@ async function createRegistration(
 }
 /**
  * PUT /registration/restaurant-details: edits the details saved in step 1.
- * The mobile number is never sent (it was verified by OTP and cannot change);
- * the password only when the vendor typed a new one; the pictures only when
- * new ones were chosen.
+ * The mobile number is sent as it was verified by OTP (it cannot be changed,
+ * but the backend requires it on every save); the password only when the
+ * vendor typed a new one; the pictures only when new ones were chosen.
  */
 async function updateRegistrationDetails(form: RegistrationForm, send: Send) {
   const data = multipart({
     restaurant_name: form.restaurantName,
     owner_name: form.ownerName,
+    // Exactly 10 digits, like the first save.
+    mobile: form.mobile.replace(/\D/g, "").slice(-10),
     restaurant_type: form.restaurantType
       ? restaurantTypeValues[form.restaurantType]
       : "",
@@ -171,9 +174,10 @@ const savers: Partial<
         fssai_number: numbers.fssai,
         fssai_expiry_date: numbers.fssaiExpiry,
         fssai_document: documents.fssai,
-        pan_number: numbers.pan,
+        // Checked trimmed and in upper case, so sent the same way.
+        pan_number: numbers.pan.trim().toUpperCase(),
         pan_document: documents.pan,
-        gst_number: numbers.gst,
+        gst_number: numbers.gst.trim().toUpperCase(),
         gst_document: documents.gst,
         business_proof_document_number: numbers.businessProof,
         business_proof_document: documents.businessProof,
@@ -197,7 +201,8 @@ const savers: Partial<
     send({
       url: stepPath("operating-hours"),
       method: "put",
-      data: Object.fromEntries(
+      data: {
+        ...Object.fromEntries(
         form.hours.map((day) => {
           const around =
             day.open &&
@@ -222,7 +227,10 @@ const savers: Partial<
             },
           ];
         }),
-      ),
+        ),
+        // One prep time for every order, sent with the week's hours.
+        [ORDER_PREP_KEY]: form.orderPrepMinutes,
+      },
     }),
 };
 /**
@@ -447,7 +455,9 @@ const loaders: Record<
       const list = Array.isArray(row.days ?? row.hours)
         ? ((row.days ?? row.hours) as unknown[]).map(asRow)
         : null;
+      const prep = num(row, ORDER_PREP_KEY, "prep_time_minutes");
       return {
+        ...(prep ? { orderPrepMinutes: clampPrep(prep) } : {}),
         hours: Object.entries(dayKeys).map(([day, key]) => {
           const saved = list
             ? list.find((d) => enumKey(d.day).startsWith(key))

@@ -54,8 +54,12 @@ function toApiError(error: FetchBaseQueryError, timeout = TIMEOUT_MS): ApiError 
   if (error.status === "FETCH_ERROR") return { message: "Network Error" };
   return { message: error.error };
 }
+/** The draft's own routes: the backend ties these to the registration token. */
+const REGISTRATION_ROUTE = "/restaurants/registration";
 /** Adds the bearer token when one is saved (never on the server render). */
 const authorize = (headers: Headers) => {
+  // Registration routes pass their token in the request's headers already.
+  if (headers.has("Authorization")) return headers;
   // A vendor still registering has no login yet: the draft's own token stands in.
   const token =
     typeof window === "undefined"
@@ -79,9 +83,24 @@ const rawBaseQuery = fetchBaseQuery({
  */
 export const apiBaseQuery: BaseQueryFn<ApiQueryArgs, unknown, ApiError> =
   async ({ url, method = "get", data, params, headers, timeout }, api, extra) => {
+    // A saved login must not stand in for the draft's token on registration
+    // routes (they answer for the registration the token names).
+    const registrationToken =
+      typeof window !== "undefined" && url.includes(REGISTRATION_ROUTE)
+        ? getRegistrationToken()
+        : null;
     const result = await rawBaseQuery(
       // fetch only normalises some verbs, so "patch" must be upper-cased.
-      { url, method: method.toUpperCase(), body: data, params, headers, timeout },
+      {
+        url,
+        method: method.toUpperCase(),
+        body: data,
+        params,
+        headers: registrationToken
+          ? { ...headers, Authorization: `Bearer ${registrationToken}` }
+          : headers,
+        timeout,
+      },
       // RTK's own signal is dropped on purpose: signing out resets the API
       // cache, which would cancel the logout request itself. Requests always
       // finish (or time out), as they did before.

@@ -5,6 +5,7 @@ import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
+import { PrepTimeStepper } from "@/shared/components/form/PrepTimeStepper";
 import { TimeField } from "@/shared/components/form/TimeField";
 import { useWorkingHoursViewModel } from "../viewmodels/useWorkingHoursViewModel";
 import { PaneFooter, SubHeading } from "./PaneParts";
@@ -156,6 +157,15 @@ export function HoursPane() {
               )}
             </Box>
           ))
+        )}
+        {!vm.loading && (
+          <Box sx={{ mt: 2.5, pt: 2.5, borderTop: `1px solid ${tokens.color.borderSubtle}` }}>
+            <SubHeading>Order prep time</SubHeading>
+            <Typography sx={{ mb: 1.5, fontSize: 13, color: tokens.color.textMuted }}>
+              One fixed time for every order. Passengers and riders see food ready time based on this.
+            </Typography>
+            <PrepTimeStepper value={vm.prep} onChange={vm.editPrep} />
+          </Box>
         )}
       </Box>
       <PaneFooter>

@@ -7,13 +7,15 @@ const source=await readFile(new URL('../src/features/onboarding/models/validatio
 const compile=text=>ts.transpileModule(text,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const dataUrl=js=>`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`;
 // validation.ts imports ./registration, so that model is compiled and linked in too.
-const registration=compile(await readFile(new URL('../src/features/onboarding/models/registration.ts',import.meta.url),'utf8'));
-const code=compile(source).replace(/from ["']zod["']/g,`from "${import.meta.resolve('zod')}"`).replace(/from ["']\.\/registration["']/g,`from "${dataUrl(registration)}"`);
-const {registrationSchema,menuItemSchema,passwordRules}=await import(dataUrl(code));
+// The prep-time constants are imported by both models through the @/ alias.
+const orderPrep=compile(await readFile(new URL('../src/core/constants/orderPrep.ts',import.meta.url),'utf8'));
+const registration=compile(await readFile(new URL('../src/features/onboarding/models/registration.ts',import.meta.url),'utf8')).replace(/from ["']@\/core\/constants\/orderPrep["']/g,`from "${dataUrl(orderPrep)}"`);
+const code=compile(source).replace(/from ["']zod["']/g,`from "${import.meta.resolve('zod')}"`).replace(/from ["']@\/core\/constants\/orderPrep["']/g,`from "${dataUrl(orderPrep)}"`).replace(/from ["']\.\/registration["']/g,`from "${dataUrl(registration)}"`);
+const {registrationSchema,menuItemSchema,passwordRules,taxIdsMismatch}=await import(dataUrl(code));
 const image=new File(['demo'],'demo.png',{type:'image/png'});
 const pdf=new File(['demo'],'demo.pdf',{type:'application/pdf'});const document=pdf;
 const item=()=>({type:'Non-veg',name:'Biryani',price:160,description:'Hyderabadi dum biryani',image:image});
-const valid=()=>({restaurantName:'Demo Kitchen',ownerName:'Demo Owner',mobile:'9000000000',restaurantType:'Restaurant',foodServed:['Veg','Egg','Non-veg'],riderOwner:'Traindhaba',email:'demo@example.com',cuisines:['Indian'],customerContact:'9000000000',password:'Secret@123',confirmPassword:'Secret@123',address:'Demo Road',building:'Shop 1',landmark:'Demo Station',city:'Bengaluru',state:'Karnataka',pincode:'560001',latitude:12.9716,longitude:77.5946,accountHolder:'Demo',accountNumber:'000000000001',confirmAccountNumber:'000000000001',ifsc:'TEST0000001',bankName:'Demo Bank',documentNumbers:{gst:'29ABCDE1234F1Z5',pan:'ABCDE1234F',fssai:'12345678901234',fssaiExpiry:'2027-08-31',identity:'123412341234',businessProof:'SHOP/2024/001'},documents:{gst:pdf,pan:document,fssai:document,identity:document,businessProof:document},bankProof:document,coverPhoto:image,logo:image,hours:[{day:'Monday',open:true,shifts:[{start:'11:00',end:'15:30'}]}],menuItems:[item()],agreement:true});
+const valid=()=>({restaurantName:'Demo Kitchen',ownerName:'Demo Owner',mobile:'9000000000',restaurantType:'Restaurant',foodServed:['Veg','Egg','Non-veg'],riderOwner:'Traindhaba',email:'demo@example.com',cuisines:['Indian'],customerContact:'9000000000',password:'Secret@123',confirmPassword:'Secret@123',address:'Demo Road',building:'Shop 1',landmark:'Demo Station',city:'Bengaluru',state:'Karnataka',pincode:'560001',latitude:12.9716,longitude:77.5946,accountHolder:'Demo',accountNumber:'000000000001',confirmAccountNumber:'000000000001',ifsc:'TEST0000001',bankName:'Demo Bank',documentNumbers:{gst:'29ABCDE1234F1Z5',pan:'ABCDE1234F',fssai:'12345678901234',fssaiExpiry:'2027-08-31',identity:'123412341234',businessProof:'SHOP/2024/001'},documents:{gst:pdf,pan:document,fssai:document,identity:document,businessProof:document},bankProof:document,coverPhoto:image,logo:image,hours:[{day:'Monday',open:true,shifts:[{start:'11:00',end:'15:30'}]}],menuItems:[item()],orderPrepMinutes:20,agreement:true});
 const fails=(change)=>assert.equal(registrationSchema.safeParse({...valid(),...change}).success,false,JSON.stringify(Object.keys(change)));
 test('complete application validates and trims text',()=>{const data=valid();data.restaurantName=' Demo Kitchen ';assert.equal(registrationSchema.parse(data).restaurantName,'Demo Kitchen')});
 test('bank mismatch points to confirmation',()=>{const data=valid();data.confirmAccountNumber='2';const result=registrationSchema.safeParse(data);assert.equal(result.success,false);assert.ok(result.error.issues.some(i=>i.path.join('.')==='confirmAccountNumber'))});
@@ -25,8 +27,25 @@ const txt=new File(['x'],'unsafe.txt',{type:'text/plain'}),gif=new File(['x'],'a
 test('missing and unsupported documents are rejected',()=>{for(const value of [null,txt,gif]){const data=valid();data.documents.gst=value;assert.equal(registrationSchema.safeParse(data).success,false);fails({bankProof:value})}});
 test('documents and bank proof take a PDF, JPG, PNG or WEBP, like the backend',()=>{for(const type of ['application/pdf','image/jpeg','image/png','image/webp']){const file=new File(['x'],'doc',{type}),data=valid();data.documents={gst:file,pan:file,fssai:file,identity:file,businessProof:file};data.bankProof=file;assert.equal(registrationSchema.safeParse(data).success,true,type)}});
 test('GSTIN and its certificate are both required, as the backend requires them',()=>{fails({documentNumbers:{...valid().documentNumbers,gst:''}});const data=valid();data.documents.gst=null;assert.equal(registrationSchema.safeParse(data).success,false)});
+test('the PAN inside the GSTIN must be the PAN entered',()=>{
+  const docs=(gst,pan)=>({...valid().documentNumbers,gst,pan});
+  assert.equal(registrationSchema.safeParse({...valid(),documentNumbers:docs('29ABCDE1234F1Z5','ABCDE1234F')}).success,true);
+  const mismatch=registrationSchema.safeParse({...valid(),documentNumbers:docs('29ABCDE1234F1Z5','ABCDE1234G')});
+  // Not a field error: the form shows "Check the GSTIN and PAN." as the page message.
+  assert.equal(mismatch.success,true);
+  assert.equal(taxIdsMismatch('29ABCDE1234F1Z5','ABCDE1234G'),true);
+  assert.equal(taxIdsMismatch('29ABCDE1234F1Z5','ABCDE1234F'),false);
+  assert.equal(taxIdsMismatch('29abcde1234f1z5','abcde1234f'),false);
+  assert.equal(taxIdsMismatch('INVALID','ABCDE1234F'),false);
+  // Typed in lower case, checked in upper case.
+  assert.equal(registrationSchema.safeParse({...valid(),documentNumbers:docs('29abcde1234f1z5','abcde1234f')}).success,true);
+  // State codes must be 01 to 38, 97 or 99.
+  const state=registrationSchema.safeParse({...valid(),documentNumbers:docs('40ABCDE1234F1Z5','ABCDE1234F')});
+  assert.ok(state.error.issues.some(i=>i.path.join('.')==='documentNumbers.gst'));
+});
 test('document numbers are required and formatted',()=>{for(const change of [{gst:'INVALID'},{pan:'12345'},{fssai:'123'},{fssaiExpiry:''},{fssaiExpiry:'2020-01-01'},{identity:''},{identity:'ABC123456789'},{identity:'12341234'},{businessProof:''}])fails({documentNumbers:{...valid().documentNumbers,...change}})});
 test('overlapping, reversed and fully closed hours are rejected',()=>{for(const hours of [[{day:'Monday',open:true,shifts:[{start:'11:00',end:'15:30'},{start:'13:00',end:'17:00'}]}],[{day:'Monday',open:true,shifts:[{start:'15:30',end:'11:00'}]}],[{day:'Monday',open:false,shifts:[]}]])fails({hours})});
+test('order prep time is 5 to 240 minutes in steps of 5',()=>{for(const orderPrepMinutes of [5,20,240])assert.equal(registrationSchema.safeParse({...valid(),orderPrepMinutes}).success,true,String(orderPrepMinutes));for(const orderPrepMinutes of [0,4,22,245,241,20.5])fails({orderPrepMinutes})});
 test('restaurant phone is 10 digits, or a landline with a leading 0',()=>{for(const c of ['9000000000','0866234567','08662345678'])assert.equal(registrationSchema.safeParse({...valid(),customerContact:c}).success,true,c);for(const c of ['1234567','123456789012','+919000000000'])fails({customerContact:c})});
 test('pin code is 6 digits and does not start with 0',()=>{assert.equal(registrationSchema.safeParse({...valid(),pincode:'560001'}).success,true);fails({pincode:'060001'})});
 test('invalid phone, pin code, IFSC and missing agreement block submission',()=>{for(const change of [{mobile:'123'},{mobile:'90000000001'},{customerContact:'+919000000000'},{customerContact:'12345'},{pincode:'56000'},{pincode:'5600011'},{ifsc:'INVALID'},{ifsc:'TEST-000001'},{agreement:false}])fails(change)});

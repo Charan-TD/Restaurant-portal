@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { steps, LAST_STEP } from "@/core/constants/onboarding";
-import { API_PATHS, DEMO_MODE } from "@/core/constants/config";
-import { useLazyGetApprovalQuery } from "@/features/approval/services/approvalApi";
+import { DEMO_MODE } from "@/core/constants/config";
 import { errorMessage } from "@/shared/utils/errors";
-import { verifiedPhone } from "@/features/auth/services/verifiedPhone";
+import { setRegistrationToken } from "@/core/api/session";
+import {
+  forgetVerifiedPhone,
+  verifiedPhone,
+} from "@/features/auth/services/verifiedPhone";
 import {
   forgetRegistration,
   rememberedRegistration,
@@ -37,7 +40,6 @@ export function useRestoreRegistration({
   const portal = usePortal(),
     router = useRouter(),
     [loadRegistration] = useLazyLoadRegistrationQuery(),
-    [loadApproval] = useLazyGetApprovalQuery(),
     [error, setError] = useState(""),
     [restoring, setRestoring] = useState(false),
     [restored, setRestored] = useState(false),
@@ -46,7 +48,7 @@ export function useRestoreRegistration({
     [settled, setSettled] = useState(false),
     started = useRef(false);
   const { form, registrationId, setRegistrationId, setCompleted } = portal,
-    { setCurrentStep, setApproval } = portal;
+    { setCurrentStep } = portal;
   useEffect(() => {
     const savedId = rememberedRegistration();
     // Browser storage is only read here; state is set from a microtask.
@@ -109,25 +111,27 @@ export function useRestoreRegistration({
           setCurrentStep(next === -1 ? LAST_STEP : next);
           setRestored(done.length > 0);
         };
-        if (!all || DEMO_MODE || !API_PATHS.approval) return carryOn();
-        // Everything is filled in: if it was already sent for approval, show
-        // where it stands. Only a rejected one goes back to be changed.
-        return loadApproval(savedId)
-          .unwrap()
-          .then(
-            (status) => {
-              if (status.status === "Rejected") return carryOn();
-              setApproval(status);
-              router.replace("/status");
-            },
-            // 409: not submitted yet, so the review screen is next.
-            () => carryOn(),
-          );
+        // A saved registration here is a draft: /review-status answers 409
+        // until the registration is submitted, so it is not asked for. A
+        // submitted one is shown on the status page, which asks for it.
+        carryOn();
       })
       .catch((e) => {
         // Only a registration the server no longer knows is dropped; any
         // other failure keeps it so a refresh can try again.
         const status = (e as { status?: number })?.status;
+        // An approved restaurant no longer has a draft: the backend asks for
+        // the restaurant's own access, which signing in gives. Drop what is
+        // saved for the draft so a refresh does not ask again.
+        if (/approved.*restaurant access/i.test(errorMessage(e))) {
+          forgetRegistration();
+          forgetExtras();
+          setSavedFiles([]);
+          setRegistrationToken(null);
+          forgetVerifiedPhone();
+          router.replace("/login");
+          return;
+        }
         if (status === 404) forgetRegistration();
         else if (status === 401) {
           // The registration token lasts two hours; verifying the number
@@ -156,9 +160,7 @@ export function useRestoreRegistration({
     setRegistrationId,
     setCompleted,
     setCurrentStep,
-    setApproval,
     loadRegistration,
-    loadApproval,
   ]);
   // A saved registration that loads at once (or an empty draft) needs no banner.
   const [slow, setSlow] = useState(false);

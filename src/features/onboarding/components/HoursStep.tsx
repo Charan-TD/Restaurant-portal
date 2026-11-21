@@ -12,6 +12,7 @@ import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import RadioButtonChecked from "@mui/icons-material/RadioButtonChecked";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
 import { tokens } from "@/core/theme/tokens";
+import { PrepTimeStepper } from "@/shared/components/form/PrepTimeStepper";
 import { TimeField } from "@/shared/components/form/TimeField";
 import { ToggleSwitch } from "@/shared/components/form/ToggleSwitch";
 import type { Shift } from "../models/registration";
@@ -26,6 +27,19 @@ const DEFAULT_SHIFT: Shift = { start: "", end: "" },
 const sameShifts = (a: Shift[], b: Shift[]) =>
   a.length === b.length &&
   a.every((s, i) => s.start === b[i].start && s.end === b[i].end);
+
+/** Hours open in a day, from its slots: "9 hours", "9.5 hours" or "" when a slot is unfinished. */
+function hoursOpen(shifts: Shift[]) {
+  if (!shifts.every((s) => s.start && s.end)) return "";
+  const minutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const total =
+    shifts.reduce((sum, s) => sum + minutes(s.end) - minutes(s.start), 0) / 60;
+  const text = Number.isInteger(total) ? String(total) : total.toFixed(1);
+  return `${text} ${total === 1 ? "hour" : "hours"}`;
+}
 
 function Radio({
   checked,
@@ -152,8 +166,24 @@ export function HoursStep() {
   );
   const slotError = (i: number, j: number, key: "start" | "end") =>
     errors?.[i]?.shifts?.[j]?.[key]?.message;
+  const openHours = hoursOpen(reference);
   return (
     <Box sx={{ display: "grid", gap: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1.25,
+          p: 1.75,
+          fontSize: 13,
+          borderRadius: "12px",
+          bgcolor: tokens.color.muted,
+          color: tokens.color.textMuted,
+        }}
+      >
+        <InfoOutlined sx={{ fontSize: 18, mt: "1px" }} />
+        Longer opening hours bring more orders from passing trains and help you
+        avoid cancellations. Cover lunch (12–3 PM) and dinner (7–10 PM) at least.
+      </Box>
       <Box>
         <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 0.5 }}>
           <Typography sx={{ fontSize: 16, fontWeight: 700 }}>
@@ -207,7 +237,14 @@ export function HoursStep() {
             </Box>
           </Box>
           <Box>
-            <Typography sx={{ mb: 1.25, fontSize: 16, fontWeight: 700 }}>Time slots</Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 700 }}>Time slots</Typography>
+            <Typography sx={{ mb: 1.5, fontSize: 12, color: tokens.color.textMuted }}>
+              {around
+                ? "Open 24 hours a day"
+                : openHours
+                  ? `Open ${openHours} a day`
+                  : "Pick your opening and closing times"}
+            </Typography>
             {around ? (
               <ButtonBase
                 onClick={() => setAll([DEFAULT_SHIFT])}
@@ -292,11 +329,11 @@ export function HoursStep() {
                   <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{day.day}</Typography>
                 </Box>
                 {day.open ? (
-                  <Box sx={{ flex: 1, minWidth: 260, display: "grid", gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 260, display: "grid", gap: 1.5 }}>
                     {day.shifts.map((shift, j) => (
                       <SlotRow
-                        key={j}
                         variant="day"
+                        key={j}
                         label={`${day.day} slot ${j + 1}`}
                         start={shift.start}
                         end={shift.end}
@@ -309,10 +346,10 @@ export function HoursStep() {
                     ))}
                     <ButtonBase
                       onClick={() => vm.addShift(i)}
-                      sx={{ justifySelf: "start", gap: 0.5, fontSize: 13, fontWeight: 600 }}
+                      sx={{ justifySelf: "start", gap: 0.5, fontSize: 13, fontWeight: 600, color: tokens.color.link, textDecoration: "underline" }}
                     >
                       <AddOutlined sx={{ fontSize: 16 }} />
-                      Add slot
+                      Add another slot
                     </ButtonBase>
                   </Box>
                 ) : (
@@ -323,20 +360,25 @@ export function HoursStep() {
           </Box>
         </Box>
       )}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1.25,
-          p: 1.75,
-          fontSize: 13,
-          borderRadius: "12px",
-          bgcolor: tokens.color.muted,
-          color: tokens.color.textMuted,
-        }}
-      >
-        <InfoOutlined sx={{ fontSize: 18, mt: "1px" }} />
-        Longer opening hours bring more orders from passing trains and help you
-        avoid cancellations. Cover lunch (12:00–15:00) and dinner (19:00–22:00) at least.
+      <Box sx={{ pt: 3, borderTop: `1px solid ${tokens.color.borderSubtle}` }}>
+        <Typography sx={{ fontSize: 16, fontWeight: 700 }}>Order prep time</Typography>
+        <Typography sx={{ mb: 1.5, fontSize: 12, color: tokens.color.textMuted }}>
+          One fixed time for every order. Passengers and riders see food ready time based on this.
+        </Typography>
+        <PrepTimeStepper fullWidth value={vm.prepMinutes} onChange={vm.setPrepMinutes} />
+        {/* Amber, as in the design (the same amber as the group order panel). */}
+        <Box sx={{ mt: 1.25, display: "flex", gap: 1, alignItems: "flex-start", fontSize: 12, color: "#8a5a00" }}>
+          <InfoOutlined sx={{ fontSize: 16, mt: "1px", color: "#8a5a00" }} />
+          If you selected your own riders for delivery, include the delivery time in the order prep time.
+        </Box>
+        <Typography sx={{ mt: 0.75, fontSize: 12, color: tokens.color.textMuted }}>
+          You can change this later in Profile · Operating hours.
+        </Typography>
+        {vm.form.formState.errors.orderPrepMinutes && (
+          <FormHelperText error>
+            {vm.form.formState.errors.orderPrepMinutes.message}
+          </FormHelperText>
+        )}
       </Box>
       {vm.form.formState.errors.hours && (
         <FormHelperText error>
