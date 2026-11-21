@@ -6,6 +6,7 @@ import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { ToastAlert } from "@/core/providers/ToastProvider";
 import { tokens } from "@/core/theme/tokens";
 import { useNow } from "@/features/orders/viewmodels/useOrdersWorkspace";
+import { CompletedGroupOrders } from "../components/CompletedGroupOrders";
 import { GroupOrderDrawer } from "../components/GroupOrderDrawer";
 import { GroupOrderList } from "../components/GroupOrderList";
 import { GroupOrderPanel } from "../components/GroupOrderPanel";
@@ -119,6 +120,20 @@ export function GroupOrdersView() {
             <GroupOrderPanel order={chosen} now={tick} busy={!!chosen && vm.busyKey === chosen.key} {...handlers} />
           </Box>
         </Box>
+      ) : tab === "completed" ? (
+        <>
+          {vm.error && (
+            <Box sx={{ maxWidth: 1040, mx: "auto", px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 } }}>
+              <ToastAlert severity="error">{vm.error}</ToastAlert>
+            </Box>
+          )}
+          <CompletedGroupOrders
+            orders={shown}
+            now={vm.now}
+            loading={vm.loading}
+            onOpen={(order) => setOpenKey(order.key)}
+          />
+        </>
       ) : (
         <Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, md: 3 }, display: "grid", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderRadius: "10px", color: tokens.color.info, bgcolor: tokens.color.infoBg }}>

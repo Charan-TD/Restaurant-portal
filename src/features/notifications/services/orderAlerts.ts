@@ -120,9 +120,20 @@ export function vibrate() {
 export const notificationPermission = (): NotificationPermission | "unsupported" =>
   typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 
-/** Asks once for system notifications; must run inside a tap or click. */
+const ASKED_KEY = "td.askedNotifications";
+/**
+ * Asks for system notifications, once per browser; must run inside a tap or
+ * click. Closing the browser's prompt without choosing leaves the permission
+ * on "default", which would otherwise ask again on every page load.
+ */
 export async function askNotificationPermission() {
   if (notificationPermission() !== "default") return notificationPermission();
+  try {
+    if (localStorage.getItem(ASKED_KEY)) return "default";
+    localStorage.setItem(ASKED_KEY, "1");
+  } catch {
+    // Storage blocked: ask anyway.
+  }
   try {
     return await Notification.requestPermission();
   } catch {

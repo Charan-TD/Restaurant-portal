@@ -2,16 +2,15 @@
 import { useState, type ReactNode } from "react";
 import { Box, ButtonBase, Typography } from "@mui/material";
 import AccessTimeOutlined from "@mui/icons-material/AccessTimeOutlined";
-import AddRounded from "@mui/icons-material/AddRounded";
 import CallOutlined from "@mui/icons-material/CallOutlined";
 import PrintOutlined from "@mui/icons-material/PrintOutlined";
-import RemoveRounded from "@mui/icons-material/RemoveRounded";
 import TwoWheelerOutlined from "@mui/icons-material/TwoWheelerOutlined";
 import { cardSx, tokens } from "@/core/theme/tokens";
 import { formatRupees } from "@/shared/utils/format";
 import { FoodTypeMark } from "@/shared/components/feedback/FoodTypeMark";
-import { orderNumber } from "@/features/dashboard/components/OrderCard";
+import { orderNumber } from "@/features/orders/models/orderNumber";
 import { stateLabel, type Order } from "@/features/dashboard/models/order";
+import { NotDeliveredDialog } from "./NotDeliveredDialog";
 import { AssignRiderDialog } from "@/features/riders/components/AssignRiderDialog";
 import type { OrdersWorkspace } from "../viewmodels/useOrdersWorkspace";
 import { ago } from "./OrderList";
@@ -23,16 +22,13 @@ const clock = (ms: number) =>
     return at
       ? `${new Date(at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${clock(at)}`
       : "";
-  },
-  mmss = (ms: number) => {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   };
 
 const badge: Record<string, { fg: string; bg: string }> = {
-  New: { fg: tokens.color.info, bg: tokens.color.infoBg },
   Preparing: { fg: "#8a5a00", bg: "#fff4d6" },
   Ready: { fg: tokens.color.success, bg: tokens.color.successBg },
+  HandedOver: { fg: "#8a5a00", bg: "#fff4d6" },
+  NotDelivered: { fg: tokens.color.error, bg: tokens.color.errorBg },
 };
 
 export const box = {
@@ -133,8 +129,8 @@ export function Info({ label, value, sub, late }: { label: string; value?: strin
 /** The order open on the right: what was ordered, then what to do next. */
 export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
   const order = ws.open,
-    [prep, setPrep] = useState(15),
     [picking, setPicking] = useState(false),
+    [notDelivered, setNotDelivered] = useState(false),
     busy = !!order && ws.busyId === order.id;
   if (!order)
     return (
@@ -144,15 +140,9 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
     );
   const tone = badge[order.state],
     own = !ws.trainDhabaRiders,
-    prepMinutes = order.prepMinutes ?? 15,
-    deadline =
-      Date.parse(order.prepDeadline ?? "") ||
-      Date.parse(order.acceptedAt ?? "") + prepMinutes * 60000,
-    left = Number.isFinite(deadline) ? deadline - now : prepMinutes * 60000,
     arrival = Date.parse(order.deliveryBy ?? ""),
     arrives = arrival ? clock(arrival) : "",
-    count = order.items.length || 1,
-    code = order.stationName?.split(/\s+/)[0]?.toUpperCase();
+    count = order.items.length || 1;
   const rider = order.rider;
   return (
     <Box sx={{ ...cardSx, p: 2, display: "flex", flexDirection: "column", gap: 1.5, minHeight: 560 }}>
@@ -186,7 +176,7 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
                 bgcolor: tone?.bg ?? tokens.color.muted,
               }}
             >
-              {stateLabel[order.state]}
+              {order.state === "HandedOver" && own ? "Confirm delivery" : stateLabel[order.state]}
             </Box>
           </Box>
           <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
@@ -195,7 +185,7 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
           </Typography>
         </Box>
         <Typography sx={{ fontSize: 12 }}>
-          {order.state === "New" ? "Placed" : stateLabel[order.state]} {stamp(order.placedAt)}
+          {stateLabel[order.state]} {stamp(order.placedAt)}
         </Typography>
         <ButtonBase
           onClick={() => printKot(order)}
@@ -227,7 +217,11 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
         <Info label="PASSENGER" value={order.customer} />
         <Info label="TRAIN" value={[order.trainNumber, order.trainName].filter(Boolean).join(" ")} />
         <Info label="COACH · SEAT" value={[order.coach, order.seat].filter(Boolean).join(" · ")} />
-        <Info label="DELIVER AT" value={order.stationName} sub={arrives ? `Arrives ${arrives}` : undefined} />
+        {order.state === "HandedOver" && own ? (
+          <Info label="RIDER" value={order.rider?.name} sub={order.rider?.phone} />
+        ) : (
+          <Info label="DELIVER AT" value={order.stationName} sub={arrives ? `Arrives ${arrives}` : undefined} />
+        )}
       </Box>
       {/* The dishes */}
       {order.items.map((item, i) => (
@@ -259,65 +253,8 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
       )}
       <Box sx={{ flex: 1 }} />
       {/* What to do next */}
-      {order.state === "New" && (
-        <>
-          <Bar
-            icon={<Disc><TwoWheelerOutlined sx={{ fontSize: 18 }} /></Disc>}
-            title="Delivery executive"
-            note={own ? "You choose a rider after you confirm" : "TrainDhaba finds the rider after you confirm"}
-            end={
-              <Box sx={{ textAlign: "right" }}>
-                <Typography sx={{ fontSize: 10, color: tokens.color.textMuted }}>Grand total</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, justifyContent: "flex-end" }}>
-                  {(order.paymentStatus === "PAID" || order.paymentMethod === "COD") && (
-                    <Box component="span" sx={{ px: 0.75, fontSize: 10, lineHeight: "16px", fontWeight: 700, borderRadius: "4px", color: tokens.color.success, bgcolor: tokens.color.successBg }}>
-                      {order.paymentStatus === "PAID" ? "PAID" : "COD"}
-                    </Box>
-                  )}
-                  <Typography sx={{ fontSize: 16, fontWeight: 700 }}>{formatRupees(order.amount)}</Typography>
-                </Box>
-              </Box>
-            }
-          />
-          <Bar
-            icon={<Disc><AccessTimeOutlined sx={{ fontSize: 18 }} /></Disc>}
-            title="Prep time"
-            note={
-              <>
-                Food ready by <b>{clock(now + prep * 60000)}</b>
-                {arrives && code ? ` · train reaches ${code} ${arrives}` : ""}
-              </>
-            }
-            end={
-              <Box sx={{ display: "flex", alignItems: "center", height: 44, borderRadius: "10px", border: `1px solid ${tokens.color.borderInput}` }}>
-                <ButtonBase aria-label="Less prep time" onClick={() => setPrep((p) => Math.max(5, p - 5))} sx={{ width: 40, height: "100%" }}>
-                  <RemoveRounded sx={{ fontSize: 18 }} />
-                </ButtonBase>
-                <Typography sx={{ minWidth: 56, textAlign: "center", fontSize: 14, fontWeight: 600 }}>{prep} min</Typography>
-                <ButtonBase aria-label="More prep time" onClick={() => setPrep((p) => Math.min(120, p + 5))} sx={{ width: 40, height: "100%" }}>
-                  <AddRounded sx={{ fontSize: 18 }} />
-                </ButtonBase>
-              </Box>
-            }
-          />
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 1.5 }}>
-            <ButtonBase disabled={busy} onClick={() => void ws.changeOrder(order.id, "Rejected")} sx={big(tokens.color.muted, tokens.color.text)}>
-              Mark out of stock
-            </ButtonBase>
-            <ButtonBase disabled={busy} onClick={() => void ws.changeOrder(order.id, "Preparing", undefined, prep)} sx={big(tokens.color.success)}>
-              Confirm order
-            </ButtonBase>
-          </Box>
-        </>
-      )}
       {order.state === "Preparing" && (
         <>
-          <Bar
-            icon={<Disc><AccessTimeOutlined sx={{ fontSize: 18 }} /></Disc>}
-            title="Time left to prep"
-            note={arrives ? `Food due ${clock(deadline)} · train reaches ${code ?? ""} ${arrives}` : `Food due ${clock(deadline)}`}
-            end={<Typography sx={{ fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{mmss(left)}</Typography>}
-          />
           {own ? (
             <Bar
               sx={{ bgcolor: tokens.color.primarySubtle, borderColor: tokens.color.primarySubtleBorder }}
@@ -346,7 +283,7 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
             onClick={() => void ws.changeOrder(order.id, "Ready", rider)}
             sx={big(tokens.color.success)}
           >
-            Order ready ({mmss(left)})
+            Order ready
           </ButtonBase>
           <AssignRiderDialog
             open={picking}
@@ -427,6 +364,40 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
               Handed over{rider ? ` to ${rider.name.split(/\s+/)[0]}` : ""}
             </ButtonBase>
           ) : null}
+        </>
+      )}
+      {order.state === "HandedOver" && own && (
+        <>
+          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Was this order delivered?</Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+            <ButtonBase
+              disabled={busy}
+              onClick={() => setNotDelivered(true)}
+              sx={{ ...big(tokens.color.card, tokens.color.error), border: `1px solid ${tokens.color.error}` }}
+            >
+              ✕ Not delivered
+            </ButtonBase>
+            <ButtonBase
+              disabled={busy}
+              onClick={() => void ws.changeOrder(order.id, "Delivered")}
+              sx={big(tokens.color.success)}
+            >
+              ✓ Delivered
+            </ButtonBase>
+          </Box>
+          <NotDeliveredDialog
+            open={notDelivered}
+            busy={busy}
+            subtitle={[
+              orderNumber(order.id),
+              order.customer,
+              [order.coach, order.seat].filter(Boolean).join(" "),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            onClose={() => setNotDelivered(false)}
+            onSubmit={() => void ws.changeOrder(order.id, "NotDelivered")}
+          />
         </>
       )}
     </Box>

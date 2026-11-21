@@ -87,15 +87,9 @@ export function SettingsPane() {
           <Box sx={group}>
             <SwitchRow
               title="Sound for new orders"
-              hint="A buzz on every page of the portal; phones also vibrate"
+              hint="A 5-second buzz on every page of the portal when a new order arrives; phones also vibrate"
               checked={preferences.sound}
               onChange={(on) => set("sound", on)}
-            />
-            <SwitchRow
-              title="Keep ringing"
-              hint="For 20 seconds, or until the order is accepted"
-              checked={preferences.keepRinging}
-              onChange={(on) => set("keepRinging", on)}
             />
           </Box>
         </Box>

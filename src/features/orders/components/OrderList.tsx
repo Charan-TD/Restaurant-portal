@@ -4,7 +4,7 @@ import SearchRounded from "@mui/icons-material/SearchRounded";
 import TwoWheelerOutlined from "@mui/icons-material/TwoWheelerOutlined";
 import { cardSx, tokens } from "@/core/theme/tokens";
 import { formatRupees } from "@/shared/utils/format";
-import { orderNumber } from "@/features/dashboard/components/OrderCard";
+import { orderNumber } from "@/features/orders/models/orderNumber";
 import type { Order } from "@/features/dashboard/models/order";
 import type { OrdersWorkspace } from "../viewmodels/useOrdersWorkspace";
 import { rangeLabel } from "../models/dateRange";
@@ -113,12 +113,12 @@ export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
             ? "No orders match your search."
             : ws.tab === "past" && ws.range
             ? "No past orders in these dates."
-            : ws.tab === "new"
-              ? "No new orders right now."
-              : ws.tab === "preparing"
-                ? "Nothing is being prepared."
-                : ws.tab === "ready"
-                  ? "No orders waiting for a rider."
+            : ws.tab === "preparing"
+              ? "Nothing is being prepared."
+              : ws.tab === "ready"
+                ? "No orders waiting for a rider."
+                : ws.tab === "delivery"
+                  ? "No orders waiting for delivery confirmation."
                   : "No past orders yet."}
         </Typography>
       ) : (
@@ -158,6 +158,11 @@ export function OrderList({ ws, now }: { ws: OrdersWorkspace; now: number }) {
                   {ws.tab === "past" ? "" : "Received "}
                   {ago(order.placedAt, now)}
                 </Typography>
+                {ws.tab === "delivery" && (
+                  <Typography sx={{ mt: 0.25, fontSize: 11, fontWeight: 600, color: "#8a5a00" }}>
+                    Confirm delivery
+                  </Typography>
+                )}
               </Box>
               {ws.tab === "preparing" && <RiderMark name={order.rider?.name} own={!ws.trainDhabaRiders} />}
             </ButtonBase>

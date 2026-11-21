@@ -125,15 +125,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             py: 1.25,
             borderRadius: "12px",
             color: "#fff",
-            bgcolor: alerts.waiting ? tokens.color.primary : tokens.color.text,
+            bgcolor: tokens.color.text,
             boxShadow: "0 8px 24px rgba(0,0,0,.2)",
           }}
         >
           <NotificationsActiveOutlined sx={{ fontSize: 20 }} />
           <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
-            {alerts.waiting
-              ? `${alerts.waiting} new ${alerts.waiting === 1 ? "order" : "orders"} waiting. Turn on sound so you hear the next one.`
-              : "Turn on sound to hear new orders."}
+            Turn on sound to hear new orders.
           </Typography>
           <ButtonBase
             onClick={() => void alerts.enableSound()}

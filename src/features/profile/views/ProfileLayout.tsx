@@ -10,18 +10,22 @@ import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
+import FlagOutlined from "@mui/icons-material/FlagOutlined";
 import StarBorderOutlined from "@mui/icons-material/StarBorderOutlined";
 import TuneOutlined from "@mui/icons-material/TuneOutlined";
 import { cardSx, tokens } from "@/core/theme/tokens";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { useLogoutMutation } from "@/features/auth/services/authApi";
+import { useGetRatingSummaryQuery } from "@/features/customers/services/reviewApi";
 import { DEMO_MODE } from "@/core/constants/config";
 import type { ProfileViewModel } from "../viewmodels/useProfileViewModel";
 import { useChangeRequests } from "../viewmodels/useChangeRequests";
 import { BankPane } from "./BankPane";
 import { DocumentsPane, WARN_DAYS, daysLeft } from "./DocumentsPane";
 import { HoursPane } from "./HoursPane";
+import { ComplaintsPane, openComplaints } from "./ComplaintsPane";
 import { LocationPane } from "./LocationPane";
+import { ReviewsPane } from "./ReviewsPane";
 import { SettingsPane } from "./SettingsPane";
 import { RestaurantDetailsPanel } from "./RestaurantDetailsPanel";
 
@@ -31,6 +35,8 @@ type SectionId =
   | "documents"
   | "bank"
   | "hours"
+  | "reviews"
+  | "complaints"
   | "settings";
 
 /** Times are shown in 24 hours, like 09:00. */
@@ -119,6 +125,7 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
     [logoutRequest] = useLogoutMutation(),
     [section, setSection] = useState<SectionId>("details"),
     changes = useChangeRequests(),
+    { data: ratings } = useGetRatingSummaryQuery(undefined, { skip: DEMO_MODE }),
     // Fields whose change is waiting for an admin; the outcome comes as a notification.
     pending = new Set(
       changes.requests
@@ -265,8 +272,20 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
           <NavRow
             icon={<StarBorderOutlined />}
             title="Ratings & reviews"
-            hint="What customers said about their orders"
-            href="/customers/feedback"
+            hint={
+              ratings?.average == null
+                ? "What customers said about their orders"
+                : `${ratings.average.toFixed(1)} ★ · ${ratings.total.toLocaleString("en-IN")} ${ratings.total === 1 ? "rating" : "ratings"}`
+            }
+            selected={section === "reviews"}
+            onClick={pick("reviews")}
+          />
+          <NavRow
+            icon={<FlagOutlined />}
+            title="Complaints"
+            hint={`${openComplaints()} open · handled by TrainDhaba`}
+            selected={section === "complaints"}
+            onClick={pick("complaints")}
           />
           <NavRow
             icon={<TuneOutlined />}
@@ -314,6 +333,8 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
           <BankPane details={details} onSaved={vm.reloadDetails} />
         )}
         {section === "hours" && <HoursPane />}
+        {section === "reviews" && <ReviewsPane />}
+        {section === "complaints" && <ComplaintsPane />}
         {section === "settings" && <SettingsPane />}
       </Box>
     </Box>
