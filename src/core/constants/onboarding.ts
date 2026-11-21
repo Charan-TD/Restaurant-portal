@@ -76,11 +76,11 @@ export const steps = allSteps.filter((step) => step.enabled);
 export const LAST_STEP = steps.length - 1;
 
 /**
- * TEMPORARY, for editing: false lets every step in the setup list be opened
- * without saving the ones before it. Set to true (or delete this flag and its
- * use in SetupSidebar.tsx) before committing, so steps are locked again.
+ * true: a step in the setup list opens only once it is saved, or once every
+ * step before it is (the vendor moves forward with Save and continue). Set to
+ * false only while editing, to open any step without saving the ones before.
  */
-export const STEP_GATE_ENABLED = false;
+export const STEP_GATE_ENABLED = true;
 
 export const stepIndex = (id: StepId) =>
   steps.findIndex((step) => step.id === id);

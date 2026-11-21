@@ -5,6 +5,8 @@ export interface RatingSummary {
   total: number;
   /** Null when nobody has rated yet. */
   average: number | null;
+  /** How many ratings each star (1 to 5) has. */
+  counts: Record<1 | 2 | 3 | 4 | 5, number>;
 }
 type Row = Record<string, unknown>;
 const asRow = (value: unknown): Row =>
@@ -83,7 +85,12 @@ export const reviewApi = baseApi.injectEndpoints({
             (sum, star) => sum + star * (Number(counts[star]) || 0),
             0,
           );
-        return { total, average: total ? stars / total : null };
+        const count = (star: number) => Number(counts[star]) || 0;
+        return {
+          total,
+          average: total ? stars / total : null,
+          counts: { 1: count(1), 2: count(2), 3: count(3), 4: count(4), 5: count(5) },
+        };
       }),
       providesTags: ["Reviews"],
     }),

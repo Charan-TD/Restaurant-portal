@@ -211,6 +211,11 @@ export function ApprovalView() {
                 Close
               </CommonButton>
             )}
+            {status === "Approved" && (
+              <CommonButton variant="contained" fullWidth onClick={vm.logIn}>
+                Log in
+              </CommonButton>
+            )}
             {status === "Rejected" && (
               // The admin may reject for any step, so every step can be changed, not just documents.
               <CommonButton variant="contained" fullWidth onClick={vm.editRegistration}>

@@ -2,10 +2,17 @@
  * New → Preparing (accepted) → Ready (food ready for the rider) → HandedOver
  * (picked up by the rider) → Delivered; Rejected is a cancelled order. With
  * TrainDhaba riders the restaurant stops at Ready: the rider updates the rest
- * from the rider app.
+ * from the rider app. With its own riders the restaurant also confirms the
+ * delivery: Delivered, or NotDelivered with a reason.
  */
 export type OrderStatus =
-  "New" | "Preparing" | "Ready" | "HandedOver" | "Delivered" | "Rejected";
+  | "New"
+  | "Preparing"
+  | "Ready"
+  | "HandedOver"
+  | "Delivered"
+  | "NotDelivered"
+  | "Rejected";
 /** How each status reads on the order screens. */
 export const stateLabel: Record<OrderStatus, string> = {
   New: "New",
@@ -13,6 +20,7 @@ export const stateLabel: Record<OrderStatus, string> = {
   Ready: "Ready",
   HandedOver: "Out for delivery",
   Delivered: "Delivered",
+  NotDelivered: "Not delivered",
   Rejected: "Rejected",
 };
 export interface OrderLine {
@@ -76,12 +84,6 @@ export interface Order {
   rider?: OrderRider;
   /** PAID, when the payment is known. */
   paymentStatus?: string;
-  /** When the order was accepted (preparation started). */
-  acceptedAt?: string;
-  /** Minutes the kitchen has to prepare it. */
-  prepMinutes?: number;
-  /** When the food must be ready, as the server sets it (ISO time). */
-  prepDeadline?: string;
   /** How the customer pays, e.g. COD. */
   paymentMethod?: string;
   /** The code the rider quotes at pickup. */

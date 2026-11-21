@@ -26,15 +26,8 @@ export const sidebarSections: NavSection[] = [
   {
     id: "orders",
     label: "Orders",
-    href: "/orders/all",
-    pages: [
-      {
-        label: "All orders",
-        href: "/orders/all",
-        description:
-          "Every order you have received, including completed and cancelled ones.",
-      },
-    ],
+    href: "/orders",
+    pages: [],
   },
   {
     id: "groupOrders",
@@ -70,11 +63,6 @@ export const sidebarSections: NavSection[] = [
         href: "/customers/list",
         description:
           "People who have ordered from you, and how much they have spent.",
-      },
-      {
-        label: "Customer feedback",
-        href: "/customers/feedback",
-        description: "What customers said about their orders.",
       },
     ],
   },

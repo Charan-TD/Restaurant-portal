@@ -1,4 +1,4 @@
-import { baseApi } from "@/core/api/baseApi";
+import { baseApi, flow } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
 import {
   lineLabel,
@@ -7,16 +7,17 @@ import {
   type OrderStatus,
 } from "../models/order";
 // The server's statuses: PLACED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED,
-// CANCELLED and FAILED. There is no separate accepted status: accepting an
-// order starts its preparation.
+// CANCELLED and FAILED. Orders are assigned to the restaurant automatically:
+// fetching the orders list moves every PLACED order to PREPARING, so a PLACED
+// one is shown as preparing too. FAILED is an order that was not delivered.
 const fromServer: Record<string, OrderStatus> = {
-  PLACED: "New",
+  PLACED: "Preparing",
   PREPARING: "Preparing",
   READY: "Ready",
   OUT_FOR_DELIVERY: "HandedOver",
   DELIVERED: "Delivered",
   CANCELLED: "Rejected",
-  FAILED: "Rejected",
+  FAILED: "NotDelivered",
 };
 const toServer: Record<OrderStatus, string> = {
   New: "PLACED",
@@ -24,6 +25,7 @@ const toServer: Record<OrderStatus, string> = {
   Ready: "READY",
   HandedOver: "OUT_FOR_DELIVERY",
   Delivered: "DELIVERED",
+  NotDelivered: "FAILED",
   Rejected: "CANCELLED",
 };
 type Row = Record<string, unknown>;
@@ -36,7 +38,13 @@ const text = (value: unknown) =>
       ? String(value)
       : undefined;
 const first = (...values: unknown[]) => values.map(text).find(Boolean);
-/** The GET /orders response is not documented, so likely names are all read. */
+/** The statuses the Orders screen works on; the rest is history. */
+const LIVE_STATUSES = ["PREPARING", "READY", "OUT_FOR_DELIVERY"];
+/** Orders asked for per page: the backend's agreed page size (page and limit are always sent). */
+export const PAGE_LIMIT = 50;
+/** The most pages read for one status, so a very long list cannot load forever. */
+const MAX_LIVE_PAGES = 10;
+/** One order of GET /orders (or GET /orders/{orderNumber}); the names are the Swagger ones, older names still read. */
 function toOrder(row: Row): Order {
   const lines = [row.order_items, row.items, row.line_items].find(
     Array.isArray,
@@ -55,7 +63,7 @@ function toOrder(row: Row): Order {
     const price = Number(
         item.total_price ?? item.line_total ?? item.price ?? item.unit_price,
       ),
-      type = first(item.food_type, item.item_type, item.type);
+      type = first(item.food_served, item.food_type, item.item_type, item.type);
     return [
       {
         name,
@@ -121,7 +129,9 @@ function toOrder(row: Row): Order {
             deliveryFee: Number(row.delivery_fee) || 0,
             discount: Number(row.discount) || 0,
           },
+    // When the train reaches the station (ISO UTC); null when unknown.
     deliveryBy: first(
+      row.scheduled_arrival_time,
       row.estimated_delivery_time,
       row.estimated_delivery_at,
       row.delivery_deadline,
@@ -132,10 +142,6 @@ function toOrder(row: Row): Order {
       first(row.payment_status, row.paymentStatus) ?? first(payment.status)
     )?.toUpperCase(),
     paymentMethod: first(payment.method)?.toUpperCase(),
-    prepDeadline: first(row.prep_deadline),
-    acceptedAt: first(row.accepted_at, row.preparing_at, row.updated_at),
-    prepMinutes:
-      Number(row.prep_time_limit) > 0 ? Number(row.prep_time_limit) : undefined,
     pickupOtp: first(row.pickup_otp, row.handover_otp, row.delivery_otp),
     note: first(row.customer_note, row.note),
     rider: riderName
@@ -173,7 +179,7 @@ function toOrderPage(
 ): OrderPage {
   const body = asRow(asRow(data).data ?? data),
     pagination = asRow(body.pagination),
-    // The orders list documents no filters, so a filter is applied here too.
+    // The server filters by status; the list is checked here too.
     orders = toOrders(data).filter(
       (o) => !status || status === "FAILED" || o.state === status,
     );
@@ -198,24 +204,45 @@ function updatePath(id: string) {
 }
 export const orderApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    /** GET /orders: the restaurant's most recent orders. */
+    /**
+     * GET /orders: the orders still to work on (preparing, ready, out for
+     * delivery). The list is ordered by the train's arrival, oldest first, not
+     * by newest, so the first page of everything would be old orders: each
+     * live status is asked for on its own, which the list now supports.
+     */
     getOrders: build.query<Order[], void>({
-      query: () => ({
-        url: endpoint(API_PATHS.orders),
-        params: { page: 1 },
+      queryFn: flow(async (_arg: void, send) => {
+        // One status at a time: page 1, then the rest while data.pagination.totalPages says there are more.
+        const ofStatus = async (status: string) => {
+          const rows: Order[] = [];
+          let totalPages = 1;
+          for (let page = 1; page <= Math.min(totalPages, MAX_LIVE_PAGES); page++) {
+            const data = await send({
+              url: endpoint(API_PATHS.orders),
+              params: { status, page, limit: PAGE_LIMIT },
+            });
+            rows.push(...toOrders(data));
+            totalPages = toOrderPage(data).totalPages;
+          }
+          return rows;
+        };
+        const seen = new Set<string>();
+        return (await Promise.all(LIVE_STATUSES.map(ofStatus)))
+          .flat()
+          .filter((o) => !seen.has(o.id) && !!seen.add(o.id));
       }),
-      transformResponse: toOrders,
       providesTags: ["Orders"],
     }),
     /** GET /orders: one page of every order the restaurant has received, optionally by status. */
     getOrderPage: build.query<
       OrderPage,
-      { page: number; status?: OrderStatus | "FAILED" }
+      { page: number; limit?: number; status?: OrderStatus | "FAILED" }
     >({
-      query: ({ page, status }) => ({
+      query: ({ page, limit = PAGE_LIMIT, status }) => ({
         url: endpoint(API_PATHS.orders),
         params: {
           page,
+          limit,
           ...(status && {
             status: status === "FAILED" ? status : toServer[status],
           }),
@@ -223,29 +250,6 @@ export const orderApi = baseApi.injectEndpoints({
       }),
       transformResponse: (data: unknown, _meta, arg) =>
         toOrderPage(data, arg.status),
-      providesTags: ["Orders"],
-    }),
-    /** GET /orders/search: orders matching the text (order number, customer, train or item). */
-    searchOrders: build.query<OrderPage, { q: string; page: number }>({
-      query: ({ q, page }) => ({
-        url: `${endpoint(API_PATHS.orders)}/search`,
-        params: { q, page },
-      }),
-      transformResponse: (data: unknown) => toOrderPage(data),
-      providesTags: ["Orders"],
-    }),
-    /** How many orders have a status (or all of them): the first page, read for its total. */
-    getOrderCount: build.query<number, OrderStatus | "FAILED" | undefined>({
-      query: (status) => ({
-        url: endpoint(API_PATHS.orders),
-        params: {
-          page: 1,
-          ...(status && {
-            status: status === "FAILED" ? status : toServer[status],
-          }),
-        },
-      }),
-      transformResponse: (data: unknown) => toOrderPage(data).total,
       providesTags: ["Orders"],
     }),
     /** The list has no items, so each order's detail is fetched for them. */
@@ -259,19 +263,23 @@ export const orderApi = baseApi.injectEndpoints({
     /**
      * PATCH /orders/{orderNumber}/status. Moving PREPARING → READY
      * requires assign_rider: the rider's public code (e.g. RID-A7K9M2) from
-     * GET /restaurant/riders. The endpoint rejects any other field.
+     * GET /restaurant/riders. The endpoint rejects any other field (400), so
+     * nothing else is sent: a not-delivered reason has no field to go in.
      */
     updateOrder: build.mutation<
       void,
-      { id: string; state: OrderStatus; riderId?: string; prepMinutes?: number }
+      {
+        id: string;
+        state: OrderStatus;
+        riderId?: string;
+      }
     >({
-      query: ({ id, state, riderId, prepMinutes }) => ({
+      query: ({ id, state, riderId }) => ({
         url: updatePath(id),
         method: "patch",
         data: {
           status: toServer[state],
           ...(riderId && { assign_rider: riderId }),
-          ...(prepMinutes && { prep_time_limit: prepMinutes }),
         },
       }),
       invalidatesTags: ["Orders"],
@@ -280,10 +288,7 @@ export const orderApi = baseApi.injectEndpoints({
 });
 export const {
   useGetOrdersQuery,
-  useGetOrderPageQuery,
   useLazyGetOrderPageQuery,
-  useGetOrderCountQuery,
-  useSearchOrdersQuery,
   useGetOrderQuery,
   useUpdateOrderMutation,
 } = orderApi;

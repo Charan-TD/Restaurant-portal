@@ -3,30 +3,41 @@ import { useEffect, useMemo, useState } from "react";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useOrdersViewModel } from "@/features/dashboard/viewmodels/useOrdersViewModel";
 import {
+  PAGE_LIMIT,
   useGetOrderQuery,
   useLazyGetOrderPageQuery,
 } from "@/features/dashboard/services/orderApi";
+import { useRidersOwner } from "@/features/riders/viewmodels/useRidersOwner";
 import { errorMessage } from "@/shared/utils/errors";
 import { inRange, type DateRange } from "../models/dateRange";
 import type { Order, OrderStatus } from "@/features/dashboard/models/order";
 
-export type OrdersTab = "new" | "preparing" | "ready" | "past";
+// Orders are assigned to the restaurant automatically and arrive already
+// preparing, so there is no tab for accepting them.
+export type OrdersTab = "preparing" | "ready" | "delivery" | "past";
 
 export const tabStates: Record<OrdersTab, OrderStatus[]> = {
-  new: ["New"],
   preparing: ["Preparing"],
   ready: ["Ready"],
-  past: ["HandedOver", "Delivered", "Rejected"],
+  // Only restaurants with their own riders confirm deliveries; for them the
+  // order waits here after handover. TrainDhaba's riders do it for the rest.
+  delivery: ["HandedOver"],
+  past: ["HandedOver", "Delivered", "NotDelivered", "Rejected"],
 };
 
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
 const placed = (o: Order) => Date.parse(o.placedAt ?? "") || 0;
 
-/** A clock that ticks every second while something on screen counts down. */
+/** A clock for the "5 min ago" and minutes-to-arrival texts; it only needs to tick every so often. */
 export function useNow(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, [active]);
   return now;
@@ -35,29 +46,34 @@ export function useNow(active: boolean) {
 /** The most pages read for past orders, so a long history cannot load forever. */
 const MAX_PAGES = 30;
 
+const DAY = 24 * 60 * 60 * 1000;
+
 /**
- * Past orders, beyond the first page the live list polls. The orders API has
- * no date filter and lists the newest first, so pages are read until one goes
- * past the start of the chosen range, or the list ends.
+ * Past orders, beyond the live ones. The orders API has no date filter and
+ * lists orders by the train's arrival, oldest first, so the newest are on the
+ * last page: the first page says how many pages there are, then pages are read
+ * from the last backwards until one is older than the start of the chosen
+ * range (a day of slack, as arrival and order time differ), or MAX_PAGES.
  */
-function usePastOrders(active: boolean, from: number | undefined) {
+function usePastOrders(from: number | undefined) {
   const [fetchPage] = useLazyGetOrderPageQuery(),
     [orders, setOrders] = useState<Order[]>([]),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
-    if (!active || DEMO_MODE) return;
+    if (DEMO_MODE) return;
     let live = true;
     void (async () => {
       setLoading(true);
       setError("");
       const all: Order[] = [];
       try {
-        for (let page = 1; page <= MAX_PAGES; page++) {
-          const got = await fetchPage({ page }, true).unwrap();
+        const first = await fetchPage({ page: 1, limit: PAGE_LIMIT }, true).unwrap();
+        for (let page = first.totalPages, n = 0; page >= 1 && n < MAX_PAGES; page--, n++) {
+          const got = page === 1 ? first : await fetchPage({ page, limit: PAGE_LIMIT }, true).unwrap();
           all.push(...got.orders);
-          const oldest = Math.min(...got.orders.map(placed));
-          if (!got.orders.length || page >= got.totalPages || (from !== undefined && oldest < from)) break;
+          const newest = Math.max(...got.orders.map(placed));
+          if (from !== undefined && got.orders.length && newest < from - DAY) break;
         }
         if (live) setOrders(all);
       } catch (e) {
@@ -69,19 +85,24 @@ function usePastOrders(active: boolean, from: number | undefined) {
     return () => {
       live = false;
     };
-  }, [active, from, fetchPage]);
+  }, [from, fetchPage]);
   return { orders, loading, error };
 }
 
 /** The Orders screen: a tab for each stage, the orders in it, and the one open on the right. */
 export function useOrdersWorkspace() {
   const orders = useOrdersViewModel(),
-    [tab, setTab] = useState<OrdersTab>("new"),
+    [tab, setTab] = useState<OrdersTab>("preparing"),
     [search, setSearch] = useState(""),
+    { ownRiders } = useRidersOwner(),
     [chosen, setChosen] = useState<string | null>(null),
     // The date filter of the Past orders tab; null shows them all.
     [range, setRange] = useState<DateRange | null>(null),
-    past = usePastOrders(tab === "past", range?.from);
+    // Today's figures need the finished orders too, so they are read on every tab.
+    past = usePastOrders(tab === "past" ? range?.from : startOfToday()),
+    // Restaurants with their own riders see the delivery tab and never see
+    // a stale one (a TrainDhaba restaurant has no delivery to confirm).
+    activeTab: OrdersTab = tab === "delivery" && !ownRiders ? "preparing" : tab;
   // The live list wins: it is polled, so its statuses are the newest.
   const known = useMemo(() => {
     const live = new Set(orders.orders.map((o) => o.id));
@@ -89,14 +110,19 @@ export function useOrdersWorkspace() {
   }, [orders.orders, past.orders]);
   const inTab = (t: OrdersTab) =>
     (t === "past" ? known : orders.orders)
-      .filter((o) => tabStates[t].includes(o.state))
+      .filter((o) =>
+        // With own riders an order out for delivery waits in its own tab, not in Past.
+        t === "past" && ownRiders && o.state === "HandedOver"
+          ? false
+          : tabStates[t].includes(o.state),
+      )
       .filter((o) => t !== "past" || inRange(o.placedAt, range))
       // Oldest waiting first while there is work to do; newest first in the past.
       .sort((a, b) => (t === "past" ? placed(b) - placed(a) : placed(a) - placed(b)));
   const counts = {
-    new: inTab("new").length,
     preparing: inTab("preparing").length,
     ready: inTab("ready").length,
+    delivery: inTab("delivery").length,
   };
   // Today's orders and sales, counted like the dashboard: placed today and not rejected.
   const today = useMemo(() => {
@@ -111,7 +137,7 @@ export function useOrdersWorkspace() {
     };
   }, [known]);
   const query = search.trim().toLowerCase(),
-    list = inTab(tab).filter(
+    list = inTab(activeTab).filter(
       (o) =>
         !query ||
         [o.id, o.customer, o.trainNumber, o.trainName, o.stationName, o.coach, o.seat]
@@ -140,7 +166,8 @@ export function useOrdersWorkspace() {
   );
   return {
     ...orders,
-    tab,
+    tab: activeTab,
+    ownRiders,
     setTab: (next: OrdersTab) => {
       setTab(next);
       setChosen(null);

@@ -4,7 +4,7 @@ import { DEMO_MODE } from "@/core/constants/config";
 import { usePortal } from "@/core/providers/PortalProvider";
 import { formatRupees } from "@/shared/utils/format";
 import { useGetOrdersQuery } from "@/features/dashboard/services/orderApi";
-import { orderNumber } from "@/features/dashboard/components/OrderCard";
+import { orderNumber } from "@/features/orders/models/orderNumber";
 import {
   askNotificationPermission,
   onSoundReady,
@@ -18,10 +18,12 @@ import { useAlertPreferences } from "./useAlertPreferences";
 
 /** How often the order list is checked, on every page of the portal. */
 const POLL_MS = 20_000;
-/** A ring (about 1.5 s) and a second of quiet before the next. */
-const RING_EVERY_MS = 2_500;
-/** How long a new order rings, about 8 rings, then it stops. */
-const RING_FOR_MS = 20_000;
+/**
+ * A new order rings for 5 seconds and then stops by itself: a ring lasts
+ * about 1.5 s, so three of them, 1.7 s apart (the last ends at about 4.9 s).
+ */
+const RING_EVERY_MS = 1_700;
+const RINGS = 3;
 
 const RUNG_KEY = "td.rungOrders";
 /** The orders that have already rung in this browser. */
@@ -44,9 +46,10 @@ function saveRung(rung: Set<string>, waiting: string[]) {
 
 /**
  * Rings for new orders on every page of the portal, not only the Orders
- * screen. A new order buzzes, vibrates the phone and, while the tab is
- * hidden, shows a system notification. With "Keep ringing" on, it rings
- * again every few seconds until every new order is accepted or rejected.
+ * screen. A new order buzzes for 5 seconds (then stops by itself), vibrates
+ * the phone and, while the tab is hidden, shows a system notification.
+ * Orders are assigned to the restaurant automatically and arrive already
+ * preparing, so there is nothing to accept to stop it.
  * The switches on Notifications and Profile → Settings are respected.
  */
 export function useNewOrderAlerts() {
@@ -57,8 +60,8 @@ export function useNewOrderAlerts() {
       pollingInterval: POLL_MS,
     }),
     seen = useRef<Set<string> | null>(null),
-    // When the current 20 seconds of ringing started; 0 when none has.
-    ringingSince = useRef(0),
+    // The pending rings of the current alert, so a newer order can restart it.
+    rings = useRef<ReturnType<typeof setTimeout>[]>([]),
     [ready, setReady] = useState(false);
   const { setOrders } = portal,
     sound = preferences.sound && preferences.ring;
@@ -85,7 +88,7 @@ export function useNewOrderAlerts() {
     };
   }, [preferences.popups]);
 
-  const waiting = portal.orders.filter((o) => o.state === "New"),
+  const waiting = portal.orders.filter((o) => o.state === "Preparing"),
     waitingKey = waiting.map((o) => o.id).join(",");
 
   // Each order the first time it is seen as new: ring, vibrate, pop up.
@@ -99,9 +102,14 @@ export function useNewOrderAlerts() {
     fresh.forEach((id) => seen.current!.add(id));
     if (!fresh.length) return;
     saveRung(seen.current, ids);
-    // Start (or restart) 20 seconds of ringing.
-    ringingSince.current = Date.now();
-    if (sound) playBuzz();
+    // Start (or restart) the 5 seconds of ringing.
+    rings.current.forEach(clearTimeout);
+    rings.current = [];
+    if (sound) {
+      playBuzz();
+      for (let i = 1; i < RINGS; i++)
+        rings.current.push(setTimeout(playBuzz, i * RING_EVERY_MS));
+    }
     vibrate();
     if (preferences.popups && document.visibilityState !== "visible") {
       const first = portal.orders.find((o) => o.id === fresh[0]);
@@ -109,24 +117,15 @@ export function useNewOrderAlerts() {
         fresh.length === 1 ? "New order" : `${fresh.length} new orders`,
         first
           ? [orderNumber(first.id), formatRupees(first.amount), first.trainName].filter(Boolean).join(" · ")
-          : "Open the portal to accept it.",
+          : "Open the portal to see it.",
       );
     }
     // Only a change in the waiting orders matters here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waitingKey]);
 
-  // With "Keep ringing", a new order rings every 2.5 s for 20 s and then
-  // stops; without it, it rings once. Accepting or rejecting every new order
-  // stops it at once.
-  useEffect(() => {
-    if (!sound || !preferences.keepRinging || !waitingKey) return;
-    const timer = setInterval(() => {
-      if (Date.now() - ringingSince.current < RING_FOR_MS) playBuzz();
-      else clearInterval(timer);
-    }, RING_EVERY_MS);
-    return () => clearInterval(timer);
-  }, [sound, preferences.keepRinging, waitingKey]);
+  // Stop a ring that is still going when the page is left.
+  useEffect(() => () => rings.current.forEach(clearTimeout), []);
 
   return {
     /** True when orders are waiting and the browser still blocks sound: show the "turn on sound" prompt. */
@@ -136,7 +135,6 @@ export function useNewOrderAlerts() {
       await unlockSound();
       if (preferences.popups) await askNotificationPermission();
       setReady(soundReady());
-      if (waitingKey) playBuzz();
     },
   };
 }

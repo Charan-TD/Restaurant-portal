@@ -2,7 +2,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 export const ALERT_PREFERENCES = [
-  { id: "ring", label: "Ring for new orders", hint: "A buzz for each new order, for up to 20 seconds", on: true },
+  { id: "ring", label: "Ring for new orders", hint: "A buzz for 5 seconds when a new order arrives", on: true },
   { id: "popups", label: "Desktop pop-ups", hint: "Shows even when this tab is hidden", on: true },
   { id: "late", label: "Late order reminders", hint: "When an order passes its ready time", on: true },
   { id: "payouts", label: "Payout updates", hint: "When money is sent to your bank", on: true },
@@ -10,7 +10,7 @@ export const ALERT_PREFERENCES = [
 ] as const;
 
 /** The two order-alert switches on Profile → Settings. */
-export type SettingsAlertId = "sound" | "keepRinging";
+export type SettingsAlertId = "sound";
 
 export type AlertPreferenceId =
   | (typeof ALERT_PREFERENCES)[number]["id"]
@@ -21,7 +21,6 @@ const KEY = "td.alertPreferences",
   defaults = {
     ...Object.fromEntries(ALERT_PREFERENCES.map((p) => [p.id, p.on])),
     sound: true,
-    keepRinging: true,
   } as Record<AlertPreferenceId, boolean>;
 
 let cache: { raw: string | null; value: Record<AlertPreferenceId, boolean> } = {

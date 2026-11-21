@@ -488,9 +488,14 @@ export interface SavedRegistration {
   /** Links to the saved logo and cover, when the backend sends them. */
   previews: { logoPreview?: string; coverPreview?: string };
 }
+/** The section asked for whether or not the progress marks it complete. */
+const ALWAYS_LOAD = "restaurant_details";
 /**
- * Reads back every section the backend marks as saved, using the progress
- * endpoint to know which ones to ask for.
+ * Reads back what the registration holds. The progress endpoint says which
+ * sections are complete (the step marks and whether it can be submitted), but
+ * not what is saved: a section can be incomplete and still hold details (a
+ * rejected registration's restaurant details, for one). So the restaurant
+ * details are always asked for, and a complete section is asked for too.
  */
 async function loadRegistration(
   _registrationId: string,
@@ -498,8 +503,10 @@ async function loadRegistration(
 ): Promise<SavedRegistration> {
   const data = await send({ url: stepPath("progress") });
   const sections = asRow(unwrap(data).sections),
-    done = Object.keys(loaders).filter((name) => sections[name] === true);
-  const parts = await Promise.all(
+    done = Object.keys(loaders).filter(
+      (name) => name === ALWAYS_LOAD || sections[name] === true,
+    );
+  const results = await Promise.all(
     done.map(async (name) => {
       const loader = loaders[name];
       try {
@@ -507,14 +514,18 @@ async function loadRegistration(
         const row = unwrap(response);
         return {
           step: loader.step,
+          saved: sections[name] === true,
           values: loader.read(row),
           files: loader.files?.(row) ?? [],
           previews: loader.previews?.(row) ?? {},
         };
       } catch {
+        // Nothing saved in a section that is not complete: leave it out.
+        if (sections[name] !== true) return null;
         // A section that fails to load is still saved; it just stays empty.
         return {
           step: loader.step,
+          saved: true,
           values: {},
           files: [] as SavedFile[],
           previews: {},
@@ -522,8 +533,10 @@ async function loadRegistration(
       }
     }),
   );
+  const parts = results.filter((part) => part !== null);
   return {
-    completed: parts.map((part) => part.step),
+    // Only a complete section is marked done; the others just fill the form.
+    completed: parts.filter((part) => part.saved).map((part) => part.step),
     values: Object.assign({}, ...parts.map((part) => part.values)),
     files: parts.flatMap((part) => part.files),
     previews: Object.assign({}, ...parts.map((part) => part.previews)),

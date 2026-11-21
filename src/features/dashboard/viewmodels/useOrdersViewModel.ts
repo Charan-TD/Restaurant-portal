@@ -97,7 +97,6 @@ export function useOrdersViewModel() {
     id: string,
     state: OrderStatus,
     rider?: OrderRider,
-    prepMinutes?: number,
   ) {
     setActionError("");
     setBusyId(id);
@@ -110,7 +109,6 @@ export function useOrdersViewModel() {
           // The server wants it when the order goes PREPARING → READY.
           riderId:
             state === "Ready" && !trainDhabaRiders ? rider?.id : undefined,
-          prepMinutes,
         }).unwrap();
       setOrders((old) =>
         old.map((o) =>
@@ -118,15 +116,12 @@ export function useOrdersViewModel() {
             ? {
                 ...o,
                 state,
-                ...(state === "Preparing"
-                  ? { acceptedAt: new Date().toISOString(), prepMinutes: prepMinutes ?? o.prepMinutes }
-                  : {}),
               }
             : o,
         ),
       );
       if (rider?.id) riders.pick(riderKey(id), { ...rider, id: rider.id });
-      if (state === "Delivered" || state === "Rejected")
+      if (state === "Delivered" || state === "NotDelivered" || state === "Rejected")
         riders.forget(riderKey(id));
       toast.success(
         state === "Preparing"
@@ -143,7 +138,9 @@ export function useOrdersViewModel() {
                 ? "Order rejected."
                 : state === "Delivered"
                   ? "Order marked as delivered."
-                  : "Order updated.",
+                  : state === "NotDelivered"
+                    ? "Order marked as not delivered."
+                    : "Order updated.",
       );
     } catch (e) {
       setActionError(errorMessage(e));

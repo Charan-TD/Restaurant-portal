@@ -12,9 +12,10 @@ import { OrderDetail } from "../components/OrderDetail";
 import { OrderList } from "../components/OrderList";
 
 const tabs: { id: OrdersTab; label: string; count?: boolean }[] = [
-  { id: "new", label: "New", count: true },
   { id: "preparing", label: "Preparing", count: true },
   { id: "ready", label: "Ready", count: true },
+  // Only for restaurants with their own riders: they confirm each delivery.
+  { id: "delivery", label: "Mark delivery", count: true },
   { id: "past", label: "Past orders" },
 ];
 
@@ -28,7 +29,7 @@ export function OrdersView() {
     setup = useGoLiveSetup(),
     { online } = usePortal(),
     { restaurantName } = useVendorProfile(),
-    now = useNow(ws.tab === "preparing" || ws.tab === "ready" || ws.tab === "new");
+    now = useNow(ws.tab === "preparing" || ws.tab === "ready");
   if (!online && !setup.loading && !setup.ready)
     return (
       <SetupChecklist setup={setup} restaurantName={restaurantName || "Your restaurant"} />
@@ -46,9 +47,9 @@ export function OrdersView() {
           overflowX: "auto",
         }}
       >
-        {tabs.map((tab) => {
+        {tabs.filter((tab) => tab.id !== "delivery" || ws.ownRiders).map((tab) => {
           const on = ws.tab === tab.id,
-            count = tab.count ? ws.counts[tab.id as "new" | "preparing" | "ready"] : undefined;
+            count = tab.count ? ws.counts[tab.id as "preparing" | "ready" | "delivery"] : undefined;
           return (
             <ButtonBase
               key={tab.id}
