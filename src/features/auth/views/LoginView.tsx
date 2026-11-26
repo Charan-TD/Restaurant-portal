@@ -16,7 +16,7 @@ const INK = "#1c1c1c",
   FONT = "Inter, 'Noto Sans Devanagari', system-ui, sans-serif";
 
 const perks = [
-  "Payouts available up to 3 times a week",
+  "Payouts available up to 2 times a month",
   "No joining fee",
   "Get started within 1 working day",
 ];

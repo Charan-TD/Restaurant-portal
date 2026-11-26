@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Box, ButtonBase, Typography } from "@mui/material";
 import AddOutlined from "@mui/icons-material/AddOutlined";
 import ChevronRight from "@mui/icons-material/ChevronRight";
+import PushPinOutlined from "@mui/icons-material/PushPinOutlined";
 import ExpandMoreOutlined from "@mui/icons-material/ExpandMoreOutlined";
 import { tokens } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
@@ -110,6 +111,9 @@ export function CategoryRail({
   addOnsCount,
   addOnsActive,
   onOpenAddOns,
+  pinnedCount,
+  pinnedActive,
+  onOpenPinned,
 }: {
   categories: CategoryNode[];
   selected: string | null;
@@ -122,6 +126,9 @@ export function CategoryRail({
   addOnsCount: number;
   addOnsActive: boolean;
   onOpenAddOns: () => void;
+  pinnedCount: number;
+  pinnedActive: boolean;
+  onOpenPinned: () => void;
 }) {
   const [addingCategory, setAddingCategory] = useState(false),
     [addingSub, setAddingSub] = useState(false);
@@ -147,9 +154,27 @@ export function CategoryRail({
           bgcolor: tokens.color.primary,
         }}
       />
+      <ButtonBase
+        onClick={onOpenPinned}
+        aria-current={pinnedActive}
+        sx={{
+          ...rowSx,
+          fontWeight: 600,
+          color: pinnedActive ? tokens.color.primary : tokens.color.text,
+          bgcolor: pinnedActive ? tokens.color.primarySubtle : "transparent",
+          "&:hover": { bgcolor: pinnedActive ? tokens.color.primarySubtle : tokens.color.muted },
+        }}
+      >
+        <PushPinOutlined sx={{ fontSize: 18 }} />
+        <Box component="span" sx={{ flex: 1 }}>
+          Pinned items
+        </Box>
+        <Count value={pinnedCount} />
+      </ButtonBase>
+      <Box sx={{ my: 1.5, borderTop: `1px solid ${tokens.color.borderSubtle}` }} />
       <Box sx={{ display: "grid", gap: 0.5 }}>
         {categories.map((category) => {
-          const open = !addOnsActive && selected === category.name;
+          const open = !addOnsActive && !pinnedActive && selected === category.name;
           return (
             <Box key={category.name}>
               <ButtonBase

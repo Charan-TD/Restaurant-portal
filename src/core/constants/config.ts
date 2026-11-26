@@ -32,8 +32,20 @@ export const API_PATHS = {
   orders: "/api/v1/restaurant/orders",
   /** A literal {id} segment is replaced with the order number. */
   updateOrder: "/api/v1/restaurant/orders/{id}/status",
+  /** PATCH { undelivered_reason }: takes the order number. {id} is replaced. */
+  undeliveredOrder: "/api/v1/restaurant/orders/{id}/undelivered",
+  /**
+   * TEMPORARY. Stands in for the TrainDhaba rider's "delivered" callback until
+   * the rider app exists: POST, only for restaurants on TrainDhaba riders, and
+   * only once the order is OUT_FOR_DELIVERY. A literal {id} segment is replaced
+   * with the order number. Delete it (and its use in orderApi) when riders confirm.
+   */
+  fakeRiderDelivered: "/api/v1/fake-apis/orders/{id}/delivered",
+  complaints: "/api/v1/restaurant/complaints",
+  offers: "/api/v1/restaurant/offers",
   reviews: "/api/v1/restaurant/reviews",
-  ratingSummary: "/api/v1/restaurant/reviews/rating-summary",
+  /** Average, spread of stars and reply counts; replaces the older /rating-summary. */
+  ratingSummary: "/api/v1/restaurant/reviews/metrics",
   /** GET lists the restaurant's riders; POST (multipart) adds one. */
   riders: "/api/v1/restaurant/riders",
   groupOrders: "/api/v1/restaurant/orders/group-orders",
@@ -41,6 +53,14 @@ export const API_PATHS = {
   updateGroupOrder: "/api/v1/restaurant/orders/group-orders/{id}/status",
   /** Accept or reject an ASSIGNED group order: POST { decision }. */
   respondGroupOrder: "/api/v1/restaurant/orders/group-orders/{id}/respond",
+  /**
+   * Insights: /metrics, /earnings-details, /settlement-breakdown,
+   * /payment-distribution (own riders only), /orders, /orders/{ord_id},
+   * /undelivered, /total-sale-value, /cod and /prepaid (own riders only).
+   */
+  insights: "/api/v1/restaurant/insights",
+  /** Payments: /summary, /breakdown, /history, /history/{id}, /regular-payout, /emergency-payout. */
+  payments: "/api/v1/restaurant/payments",
   // The backend has no notifications endpoint yet.
   notifications: undefined as string | undefined,
 } as const;

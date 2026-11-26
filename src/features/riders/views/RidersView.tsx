@@ -11,13 +11,14 @@ import {
 import { useRiderDuty } from "../viewmodels/useRiderDuty";
 import TwoWheelerOutlined from "@mui/icons-material/TwoWheelerOutlined";
 import { COUNTRY_CODE } from "@/features/onboarding/models/registration";
-import { ToastAlert } from "@/core/providers/ToastProvider";
+import { ToastAlert, useToast } from "@/core/providers/ToastProvider";
 import { cardHeaderSx, cardSx, tokens } from "@/core/theme/tokens";
 import { PageHeader } from "@/shared/components/layout/PageHeader";
 import { ScreenSurface } from "@/shared/components/layout/ScreenSurface";
 import { StatTile } from "@/shared/components/layout/StatTile";
 import { CountTabs } from "@/shared/components/navigation/CountTabs";
 import { AddRiderPanel } from "../components/AddRiderPanel";
+import { EditRiderDialog, RemoveRiderDialog } from "../components/RiderActionDialogs";
 import { useRidersViewModel } from "../viewmodels/useRidersViewModel";
 import { useRidersOwner } from "../viewmodels/useRidersOwner";
 /** The riders the restaurant has added. */
@@ -130,6 +131,9 @@ function OwnRidersView() {
     duty = useRiderDuty(),
     [tab, setTab] = useState<RiderTab>("all"),
     [menu, setMenu] = useState<{ el: HTMLElement; rider: Rider }>(),
+    [editing, setEditing] = useState<Rider>(),
+    [removing, setRemoving] = useState<Rider>(),
+    toast = useToast(),
     rows = vm.riders.map((rider) => {
       const on = duty.isOnDuty(rider);
       return { rider, on, status: riderStatus(rider, on) };
@@ -328,13 +332,41 @@ function OwnRidersView() {
         onClose={() => setMenu(undefined)}
       >
         <MenuItem
-          component="a"
-          href={`tel:${COUNTRY_CODE}${menu?.rider.phone ?? ""}`}
-          onClick={() => setMenu(undefined)}
+          onClick={() => {
+            setEditing(menu?.rider);
+            setMenu(undefined);
+          }}
         >
-          Call rider
+          Edit rider
+        </MenuItem>
+        <MenuItem
+          sx={{ color: tokens.color.error }}
+          onClick={() => {
+            setRemoving(menu?.rider);
+            setMenu(undefined);
+          }}
+        >
+          Remove rider
         </MenuItem>
       </Menu>
+      <EditRiderDialog
+        rider={editing}
+        onClose={() => setEditing(undefined)}
+        onSave={async (rider, change) => {
+          const failure = await vm.editRider(rider.id, change);
+          if (!failure) toast.success("Rider updated.");
+          return failure;
+        }}
+      />
+      <RemoveRiderDialog
+        rider={removing}
+        onClose={() => setRemoving(undefined)}
+        onConfirm={async (rider) => {
+          const failure = await vm.removeRider(rider.id);
+          if (!failure) toast.success(`${rider.name} removed.`);
+          return failure;
+        }}
+      />
     </ScreenSurface>
   );
 }

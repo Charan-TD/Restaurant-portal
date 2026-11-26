@@ -1,21 +1,19 @@
 "use client";
 import { useState } from "react";
-import NextLink from "next/link";
-import { Box, ButtonBase, Dialog, Typography } from "@mui/material";
-import CloseOutlined from "@mui/icons-material/CloseOutlined";
-import { tokens, tokenScopeSx } from "@/core/theme/tokens";
-import { CommonButton } from "@/shared/components/actions/CommonButton";
+import { Popover } from "@mui/material";
+import { tokenScopeSx } from "@/core/theme/tokens";
 import { TemplateImportPane } from "./TemplateImportPane";
 
 /**
- * Import menu from Excel with the server's template. A menu that is not in
- * that layout goes through the full-page import at /menu/import instead.
+ * Bulk upload: a panel under the "Bulk upload" button with the server's
+ * template in three steps. A menu that is not in that layout is handed to the
+ * full-page import at /menu/import, which matches its columns.
  */
 export function MenuImportDialog({
-  open,
+  anchorEl,
   onClose,
 }: {
-  open: boolean;
+  anchorEl: HTMLElement | null;
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false),
@@ -23,30 +21,17 @@ export function MenuImportDialog({
       if (!busy) onClose();
     };
   return (
-    <Dialog
-      open={open}
+    <Popover
+      open={!!anchorEl}
+      anchorEl={anchorEl}
       onClose={close}
-      fullWidth
-      maxWidth="md"
-      slotProps={{ paper: { sx: { ...tokenScopeSx, borderRadius: "16px" } } }}
+      anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      transformOrigin={{ vertical: "top", horizontal: "left" }}
+      slotProps={{
+        paper: { sx: { ...tokenScopeSx, mt: 1, borderRadius: "12px", maxWidth: "calc(100vw - 32px)" } },
+      }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 3, height: 64, borderBottom: `1px solid ${tokens.color.border}` }}>
-        <Typography component="h2" sx={{ flex: 1, fontSize: 18, fontWeight: 700 }}>
-          Import menu from Excel
-        </Typography>
-        <ButtonBase aria-label="Close" disabled={busy} onClick={close} sx={{ width: 32, height: 32, borderRadius: "50%" }}>
-          <CloseOutlined sx={{ fontSize: 20 }} />
-        </ButtonBase>
-      </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", px: 3, py: 1.5, bgcolor: tokens.color.primarySubtle, borderBottom: `1px solid ${tokens.color.primarySubtleBorder}` }}>
-        <Typography sx={{ flex: 1, minWidth: 220, fontSize: 14 }}>
-          <b>Menu not in our format?</b> Upload your own Excel or CSV file; we match the columns for you.
-        </Typography>
-        <CommonButton variant="contained" href="/menu/import" LinkComponent={NextLink}>
-          Upload my own file
-        </CommonButton>
-      </Box>
-      <TemplateImportPane onClose={close} onBusy={setBusy} />
-    </Dialog>
+      {anchorEl && <TemplateImportPane onClose={close} onBusy={setBusy} />}
+    </Popover>
   );
 }

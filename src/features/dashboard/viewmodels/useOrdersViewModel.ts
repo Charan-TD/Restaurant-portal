@@ -97,6 +97,7 @@ export function useOrdersViewModel() {
     id: string,
     state: OrderStatus,
     rider?: OrderRider,
+    reason?: string,
   ) {
     setActionError("");
     setBusyId(id);
@@ -109,6 +110,10 @@ export function useOrdersViewModel() {
           // The server wants it when the order goes PREPARING → READY.
           riderId:
             state === "Ready" && !trainDhabaRiders ? rider?.id : undefined,
+          reason,
+          // TEMPORARY: until the rider app exists, the owner confirms a
+          // TrainDhaba rider delivery through the fake rider callback.
+          viaRiderCallback: state === "Delivered" && trainDhabaRiders,
         }).unwrap();
       setOrders((old) =>
         old.map((o) =>

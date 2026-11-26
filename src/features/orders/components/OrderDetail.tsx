@@ -363,7 +363,88 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
             >
               Handed over{rider ? ` to ${rider.name.split(/\s+/)[0]}` : ""}
             </ButtonBase>
-          ) : null}
+          ) : (
+            // TEMPORARY: with no rider app yet, the owner records the
+            // handover to the TrainDhaba rider and, below, the delivery.
+            <ButtonBase
+              disabled={busy}
+              onClick={() => void ws.changeOrder(order.id, "HandedOver")}
+              sx={big(tokens.color.success)}
+            >
+              Handed to TrainDhaba rider
+            </ButtonBase>
+          )}
+        </>
+      )}
+      {order.state === "NotDelivered" && order.undeliveredReason && (
+        <Bar
+          sx={{ bgcolor: tokens.color.errorBg, borderColor: tokens.color.error }}
+          icon={<Disc tint="#fff"><TwoWheelerOutlined sx={{ fontSize: 18, color: tokens.color.error }} /></Disc>}
+          title="Not delivered"
+          note={order.undeliveredReason}
+        />
+      )}
+      {order.state === "HandedOver" && !own && (
+        <>
+          <Bar
+            sx={{ bgcolor: tokens.color.successBg, borderColor: "#cfe8da" }}
+            icon={<Disc tint="#fff"><TwoWheelerOutlined sx={{ fontSize: 18, color: tokens.color.primary }} /></Disc>}
+            title="With the TrainDhaba rider"
+            note="Confirm once the passenger has the food"
+          />
+          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Was this order delivered?</Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+            <ButtonBase
+              disabled={busy}
+              onClick={() => setNotDelivered(true)}
+              sx={{ ...big(tokens.color.card, tokens.color.error), border: `1px solid ${tokens.color.error}` }}
+            >
+              ✕ Not delivered
+            </ButtonBase>
+            <ButtonBase
+              disabled={busy}
+              onClick={() => void ws.changeOrder(order.id, "Delivered")}
+              sx={big(tokens.color.success)}
+            >
+              ✓ Delivered
+            </ButtonBase>
+          </Box>
+          <NotDeliveredDialog
+            open={notDelivered}
+            busy={busy}
+            subtitle={[orderNumber(order.id), order.customer, [order.coach, order.seat].filter(Boolean).join(" ")]
+              .filter(Boolean)
+              .join(" · ")}
+            onClose={() => setNotDelivered(false)}
+            onSubmit={(reason) => {
+              setNotDelivered(false);
+              void ws.changeOrder(order.id, "NotDelivered", rider, reason);
+            }}
+          />
+        </>
+      )}
+      {/* The server also lets an order be marked undelivered while it is being prepared or is ready. */}
+      {(order.state === "Preparing" || order.state === "Ready") && order.canMarkUndelivered !== false && (
+        <>
+          <ButtonBase
+            disabled={busy}
+            onClick={() => setNotDelivered(true)}
+            sx={{ ...big(tokens.color.card, tokens.color.error), border: `1px solid ${tokens.color.error}` }}
+          >
+            ✕ Not delivered
+          </ButtonBase>
+          <NotDeliveredDialog
+            open={notDelivered}
+            busy={busy}
+            subtitle={[orderNumber(order.id), order.customer, [order.coach, order.seat].filter(Boolean).join(" ")]
+              .filter(Boolean)
+              .join(" · ")}
+            onClose={() => setNotDelivered(false)}
+            onSubmit={(reason) => {
+              setNotDelivered(false);
+              void ws.changeOrder(order.id, "NotDelivered", rider, reason);
+            }}
+          />
         </>
       )}
       {order.state === "HandedOver" && own && (
@@ -396,7 +477,9 @@ export function OrderDetail({ ws, now }: { ws: OrdersWorkspace; now: number }) {
               .filter(Boolean)
               .join(" · ")}
             onClose={() => setNotDelivered(false)}
-            onSubmit={() => void ws.changeOrder(order.id, "NotDelivered")}
+            onSubmit={(reason) =>
+              void ws.changeOrder(order.id, "NotDelivered", rider, reason)
+            }
           />
         </>
       )}

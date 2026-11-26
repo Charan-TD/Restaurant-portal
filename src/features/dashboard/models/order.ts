@@ -42,6 +42,10 @@ export const lineLabel = ({ name, quantity }: OrderLine) =>
 
 export interface Order {
   id: string;
+  /** Whether the server says it can still be marked not delivered (undefined: not reported). */
+  canMarkUndelivered?: boolean;
+  /** Why the restaurant marked it not delivered, once it has. */
+  undeliveredReason?: string;
   /** Everything the customer ordered. */
   items: OrderLine[];
   /** Items summary, e.g. "2 × Chicken Biryani, Raita". */

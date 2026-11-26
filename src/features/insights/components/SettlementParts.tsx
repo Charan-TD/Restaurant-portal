@@ -85,6 +85,45 @@ export function StatCard({
   );
 }
 
+/** A line of text for a screen that is loading, empty or failed. */
+export function Notice({
+  children,
+  error,
+}: {
+  children: ReactNode;
+  error?: boolean;
+}) {
+  return (
+    <Typography
+      role={error ? "alert" : "status"}
+      sx={{
+        py: 3,
+        textAlign: "center",
+        fontSize: 14,
+        color: error ? tokens.color.error : tokens.color.textMuted,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+/** What went wrong, from an RTK Query error. */
+export const errorText = (error: unknown) =>
+  (error as { message?: string } | undefined)?.message ||
+  "Could not load Insights. Try again.";
+
+/** "▲ 6.6% vs last week" with its colour; plain when the period before had no orders. */
+export function changeNote(change: number | null, period: string) {
+  const versus = period === "today" ? "yesterday" : "previous period";
+  if (change === null) return { note: `No data for the ${versus}`, color: undefined };
+  const rounded = Math.abs(Math.round(change * 10) / 10);
+  return {
+    note: `${change >= 0 ? "▲" : "▼"} ${rounded}% vs ${versus}`,
+    color: change >= 0 ? tokens.color.success : tokens.color.error,
+  };
+}
+
 /** A white card with a bold title. */
 export function Card({
   title,

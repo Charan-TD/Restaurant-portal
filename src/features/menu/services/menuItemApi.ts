@@ -71,6 +71,7 @@ let demoItems: MenuItem[] = [
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
+    starred: false,
     images: [],
     createdAt: "2026-10-10T07:38:17.328Z",
   },
@@ -92,6 +93,7 @@ let demoItems: MenuItem[] = [
     available: true,
     adminAvailable: null,
     adminInactiveReason: "",
+    starred: false,
     images: [],
     createdAt: "2026-10-10T07:40:02.000Z",
   },
@@ -113,6 +115,7 @@ let demoItems: MenuItem[] = [
     available: false,
     adminAvailable: null,
     adminInactiveReason: "",
+    starred: false,
     images: [],
     createdAt: "2026-10-10T07:41:45.000Z",
   },
@@ -140,6 +143,7 @@ function demoSave(id: string, form: MenuItemForm): MenuItem {
     available: form.available,
     adminAvailable: current?.adminAvailable ?? null,
     adminInactiveReason: current?.adminInactiveReason ?? "",
+    starred: current?.starred ?? false,
     images: current?.images ?? [],
     createdAt: current?.createdAt ?? new Date().toISOString(),
   };
@@ -282,6 +286,21 @@ async function setMenuItemAvailable(
     data: { owner_is_available: available },
   });
   return { ...current, available };
+}
+/** PATCH /menu-items/{id}/starred: pins or unpins one dish. */
+async function setMenuItemStarred(
+  { id, starred }: { id: string; starred: boolean },
+  send: Send,
+): Promise<void> {
+  if (DEMO_MODE) {
+    demoItems = demoItems.map((i) => (i.id === id ? { ...i, starred } : i));
+    return;
+  }
+  await send({
+    url: `${itemPath(id)}/starred`,
+    method: "patch",
+    data: { is_starred: starred },
+  });
 }
 async function deleteMenuItem(id: string, send: Send): Promise<void> {
   if (DEMO_MODE) {
@@ -758,6 +777,23 @@ export const menuItemApi = baseApi.injectEndpoints({
         }
       },
     }),
+    /** Pins or unpins a dish; the list updates at once and rolls back on failure. */
+    setMenuItemStarred: build.mutation<void, { id: string; starred: boolean }>({
+      queryFn: flow(setMenuItemStarred),
+      async onQueryStarted({ id, starred }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          menuItemApi.util.updateQueryData("listMenuItems", undefined, (list) => {
+            const item = list.find((i) => i.id === id);
+            if (item) item.starred = starred;
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
+    }),
     previewMenuExcel: build.mutation<ExcelPreview, File>({
       queryFn: flow(previewMenuExcel),
     }),
@@ -828,6 +864,7 @@ export const {
   useCreateMenuItemMutation,
   useUpdateMenuItemMutation,
   useSetMenuItemAvailableMutation,
+  useSetMenuItemStarredMutation,
   useDeleteMenuItemMutation,
   useListMenuCategoriesQuery,
   useLazyListMenuCategoriesQuery,

@@ -40,8 +40,14 @@ export function useMenuImportViewModel() {
   const pick = async (chosen: File | undefined) => {
     if (!chosen) return;
     reset();
+    // A CSV is never in the server template's format: it goes to the import that matches its columns.
+    if (/\.csv$/i.test(chosen.name)) {
+      handOffFile(chosen);
+      router.push("/menu/import");
+      return;
+    }
     if (!/\.xlsx$/i.test(chosen.name)) {
-      setProblem("Choose an Excel file ending in .xlsx.");
+      setProblem("Choose an .xlsx or .csv file.");
       return;
     }
     if (chosen.size > EXCEL_MAX_BYTES) {

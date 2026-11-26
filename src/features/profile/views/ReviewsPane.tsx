@@ -1,36 +1,32 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Box, ButtonBase, InputBase, Menu, MenuItem, Typography } from "@mui/material";
 import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
 import ReplyRounded from "@mui/icons-material/ReplyRounded";
+import SearchRounded from "@mui/icons-material/SearchRounded";
 import StarRounded from "@mui/icons-material/StarRounded";
 import { DEMO_MODE } from "@/core/constants/config";
 import { tokens } from "@/core/theme/tokens";
 import { errorMessage } from "@/shared/utils/errors";
 import { ToastAlert } from "@/core/providers/ToastProvider";
-import type { ReviewRow } from "@/features/customers/models/review";
+import type { ReplyFilter, ReviewRow, ReviewSort } from "@/features/customers/models/review";
 import {
   useGetRatingSummaryQuery,
   useGetReviewsQuery,
+  useReplyToReviewMutation,
+  useResubmitReviewReplyMutation,
 } from "@/features/customers/services/reviewApi";
 import { PaneHeading } from "./PaneHeading";
 
-type Filter = "all" | "needs" | "positive" | "negative";
-type Sort = "newest" | "oldest" | "highest" | "lowest";
-const SORTS: { id: Sort; label: string }[] = [
+type Filter = ReplyFilter | "ALL";
+const SORTS: { id: ReviewSort; label: string }[] = [
   { id: "newest", label: "Newest" },
   { id: "oldest", label: "Oldest" },
-  { id: "highest", label: "Highest rating" },
-  { id: "lowest", label: "Lowest rating" },
+  { id: "highest_rating", label: "Highest rating" },
+  { id: "lowest_rating", label: "Lowest rating" },
 ];
-const sorters: Record<Sort, (a: ReviewRow, b: ReviewRow) => number> = {
-  newest: (a, b) => b.at.localeCompare(a.at),
-  oldest: (a, b) => a.at.localeCompare(b.at),
-  highest: (a, b) => b.rating - a.rating,
-  lowest: (a, b) => a.rating - b.rating,
-};
 const QUICK_REPLIES = ["Sorry for the delay", "We will fix this", "Thank you for the feedback"];
-const MAX_REPLY = 500;
+const MAX_REPLY = 5000;
 /** Bar colour for each star count. */
 const BAR: Record<number, string> = { 5: tokens.color.success, 4: tokens.color.success, 3: "#e8a317", 2: tokens.color.error, 1: tokens.color.error };
 
@@ -77,12 +73,6 @@ function Stars({ value, size = 14 }: { value: number; size?: number }) {
   );
 }
 
-/** What the vendor wrote back to a review. Replies are not saved on the server yet. */
-interface Reply {
-  text: string;
-  at: number;
-}
-
 function Chip({ children, on, onClick }: { children: string; on?: boolean; onClick: () => void }) {
   return (
     <ButtonBase
@@ -108,11 +98,13 @@ function Chip({ children, on, onClick }: { children: string; on?: boolean; onCli
 function ReplyBox({
   name,
   initial,
+  busy,
   onPost,
   onCancel,
 }: {
   name: string;
   initial: string;
+  busy?: boolean;
   onPost: (text: string) => void;
   onCancel: () => void;
 }) {
@@ -149,14 +141,14 @@ function ReplyBox({
         }}
       >
         <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>
-          Replies are public. Keep it polite. {text.length}/{MAX_REPLY}
+          A TrainDhaba admin approves replies before they show. Keep it polite.
         </Typography>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <ButtonBase onClick={onCancel} sx={{ px: 1.5, height: 36, fontSize: 13, fontWeight: 700 }}>
             Cancel
           </ButtonBase>
           <ButtonBase
-            disabled={!text.trim()}
+            disabled={!text.trim() || busy}
             onClick={() => onPost(text.trim())}
             sx={{
               px: 2,
@@ -169,7 +161,7 @@ function ReplyBox({
               "&.Mui-disabled": { opacity: 0.5, color: "#fff" },
             }}
           >
-            Post reply
+            {busy ? "Sending…" : "Send for approval"}
           </ButtonBase>
         </Box>
       </Box>
@@ -177,37 +169,74 @@ function ReplyBox({
   );
 }
 
+const REPLY_TAG = {
+  APPROVED: { label: "APPROVED", fg: tokens.color.success, bg: tokens.color.successBg },
+  REJECTED: { label: "NOT APPROVED", fg: tokens.color.error, bg: tokens.color.errorBg },
+  PENDING_APPROVAL: { label: "AWAITING APPROVAL", fg: "#8a5a00", bg: "#fff4d6" },
+} as const;
+
+function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
+  const btn = { px: 1.5, height: 34, fontSize: 13, fontWeight: 600, "&.Mui-disabled": { opacity: 0.4 } };
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+      <ButtonBase disabled={page <= 1} onClick={() => onPage(page - 1)} sx={btn}>
+        Previous
+      </ButtonBase>
+      <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+        Page {page} of {pages}
+      </Typography>
+      <ButtonBase disabled={page >= pages} onClick={() => onPage(page + 1)} sx={btn}>
+        Next
+      </ButtonBase>
+    </Box>
+  );
+}
+
 /**
  * Ratings & reviews: the average and how the stars spread, then each review
- * with a reply box. Ratings and reviews come from the server
- * (GET /restaurant/reviews and /reviews/rating-summary). DESIGN ONLY: the
- * server has no endpoint to post a reply yet, so replies live in this page
- * and are gone on refresh.
+ * with its reply. Everything comes from GET /restaurant/reviews and
+ * /reviews/metrics, filtered and paged on the server. A reply goes to the
+ * server and waits for admin approval; a rejected one can be reworded.
  */
 export function ReviewsPane() {
-  const { data, isLoading, error } = useGetReviewsQuery(undefined, { skip: DEMO_MODE }),
-    { data: summary } = useGetRatingSummaryQuery(undefined, { skip: DEMO_MODE }),
-    reviews = useMemo(() => data ?? [], [data]),
-    [filter, setFilter] = useState<Filter>("all"),
-    [sort, setSort] = useState<Sort>("newest"),
+  const [filter, setFilter] = useState<Filter>("ALL"),
+    [sort, setSort] = useState<ReviewSort>("newest"),
+    [page, setPage] = useState(1),
+    [search, setSearch] = useState(""),
+    [applied, setApplied] = useState(""),
     [anchor, setAnchor] = useState<HTMLElement | null>(null),
-    [replies, setReplies] = useState<Record<string, Reply>>({}),
     [writing, setWriting] = useState<string | null>(null),
-    [now] = useState(() => Date.now());
-  const needs = reviews.filter((r) => !replies[r.id]),
-    positive = reviews.filter((r) => r.rating >= 4),
-    negative = reviews.filter((r) => r.rating <= 2),
-    shown = (
-      filter === "needs" ? needs : filter === "positive" ? positive : filter === "negative" ? negative : reviews
-    )
-      .slice()
-      .sort(sorters[sort]);
-  const total = summary?.total ?? 0;
+    [problem, setProblem] = useState(""),
+    [now] = useState(() => Date.now()),
+    { data, isFetching, error } = useGetReviewsQuery(
+      { page, sort, search: applied, replyStatus: filter === "ALL" ? undefined : filter },
+      { skip: DEMO_MODE },
+    ),
+    { data: summary } = useGetRatingSummaryQuery(undefined, { skip: DEMO_MODE }),
+    [postReply, { isLoading: posting }] = useReplyToReviewMutation(),
+    [resubmit, { isLoading: resubmitting }] = useResubmitReviewReplyMutation(),
+    reviews = data?.rows ?? [],
+    total = summary?.total ?? 0,
+    replies = summary?.replies;
+  const choose = (next: Filter) => {
+    setFilter(next);
+    setPage(1);
+  };
+  async function send(r: ReviewRow, text: string) {
+    setProblem("");
+    try {
+      await (r.reply ? resubmit({ id: r.id, text }) : postReply({ id: r.id, text })).unwrap();
+      setWriting(null);
+    } catch (e) {
+      setProblem(errorMessage(e));
+    }
+  }
   return (
     <>
       <PaneHeading title="Ratings & reviews" subtitle="What passengers say about your food. Reply to show you care." />
       <Box sx={{ p: 3, display: "grid", gap: 2.5 }}>
         {error && <ToastAlert severity="error">{errorMessage(error)}</ToastAlert>}
+        {problem && <ToastAlert severity="error">{problem}</ToastAlert>}
         <Box
           sx={{
             display: "grid",
@@ -225,8 +254,7 @@ export function ReviewsPane() {
             </Typography>
             <Stars value={summary?.average ?? 0} size={18} />
             <Typography sx={{ mt: 0.5, fontSize: 11, color: tokens.color.textMuted }}>
-              {total.toLocaleString("en-IN")} {total === 1 ? "rating" : "ratings"} ·{" "}
-              {reviews.length.toLocaleString("en-IN")} {reviews.length === 1 ? "review" : "reviews"}
+              {total.toLocaleString("en-IN")} {total === 1 ? "review" : "reviews"}
             </Typography>
           </Box>
           <Box sx={{ display: "grid", gap: 0.75 }}>
@@ -250,10 +278,37 @@ export function ReviewsPane() {
           </Box>
         </Box>
         <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
-          <Chip on={filter === "all"} onClick={() => setFilter("all")}>{`All ${reviews.length}`}</Chip>
-          <Chip on={filter === "needs"} onClick={() => setFilter("needs")}>{`Needs reply ${needs.length}`}</Chip>
-          <Chip on={filter === "positive"} onClick={() => setFilter("positive")}>{`Positive ${positive.length}`}</Chip>
-          <Chip on={filter === "negative"} onClick={() => setFilter("negative")}>{`Negative ${negative.length}`}</Chip>
+          <Chip on={filter === "ALL"} onClick={() => choose("ALL")}>{`All ${total}`}</Chip>
+          <Chip on={filter === "NOT_REPLIED"} onClick={() => choose("NOT_REPLIED")}>{`Needs reply ${replies?.notReplied ?? 0}`}</Chip>
+          <Chip on={filter === "PENDING_APPROVAL"} onClick={() => choose("PENDING_APPROVAL")}>{`Awaiting approval ${replies?.pending ?? 0}`}</Chip>
+          <Chip on={filter === "APPROVED"} onClick={() => choose("APPROVED")}>{`Approved ${replies?.approved ?? 0}`}</Chip>
+          <Chip on={filter === "REJECTED"} onClick={() => choose("REJECTED")}>{`Not approved ${replies?.rejected ?? 0}`}</Chip>
+        </Box>
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+          <Box
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setApplied(search);
+              setPage(1);
+            }}
+            sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 1.25, height: 32, borderRadius: "8px", border: `1px solid ${tokens.color.borderInput}` }}
+          >
+            <SearchRounded sx={{ fontSize: 17, color: tokens.color.textMuted }} />
+            <InputBase
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                if (!e.target.value) {
+                  setApplied("");
+                  setPage(1);
+                }
+              }}
+              placeholder="Review text or order number"
+              inputProps={{ "aria-label": "Search reviews" }}
+              sx={{ fontSize: 12, width: 200 }}
+            />
+          </Box>
           <ButtonBase
             onClick={(e) => setAnchor(e.currentTarget)}
             aria-haspopup="menu"
@@ -278,6 +333,7 @@ export function ReviewsPane() {
                 selected={s.id === sort}
                 onClick={() => {
                   setSort(s.id);
+                  setPage(1);
                   setAnchor(null);
                 }}
                 sx={{ fontSize: 13 }}
@@ -288,33 +344,22 @@ export function ReviewsPane() {
           </Menu>
         </Box>
         <Box>
-          {shown.length === 0 ? (
+          {reviews.length === 0 ? (
             <Typography sx={{ py: 4, textAlign: "center", fontSize: 14, color: tokens.color.textMuted }}>
-              {isLoading ? "Loading reviews…" : "No reviews here yet."}
+              {isFetching ? "Loading reviews…" : "No reviews here yet."}
             </Typography>
           ) : (
-            shown.map((r) => {
-              const reply = replies[r.id],
-                a = tone(r.name);
+            reviews.map((r) => {
+              const reply = r.reply,
+                a = tone(r.name),
+                tag = reply ? REPLY_TAG[reply.status] : undefined;
               return (
                 <Box key={r.id} sx={{ py: 2.5, borderTop: `1px solid ${tokens.color.borderSubtle}` }}>
                   <Box sx={{ display: "flex", gap: 1.5 }}>
                     <Box
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        flexShrink: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        borderRadius: "50%",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: a.fg,
-                        bgcolor: a.bg,
-                        ...(r.photo && { backgroundImage: `url(${r.photo})`, backgroundSize: "cover" }),
-                      }}
+                      sx={{ width: 36, height: 36, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: "50%", fontSize: 12, fontWeight: 700, color: a.fg, bgcolor: a.bg }}
                     >
-                      {!r.photo && initials(r.name)}
+                      {initials(r.name)}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -326,65 +371,46 @@ export function ReviewsPane() {
                       </Box>
                       <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>Order {r.orderId}</Typography>
                       {r.comment && <Typography sx={{ mt: 1, fontSize: 13 }}>{r.comment}</Typography>}
-                      {r.items.length > 0 && (
-                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-                          {r.items.map((item) => (
-                            <Box
-                              key={item.name}
-                              component="span"
-                              sx={{ px: 1, fontSize: 11, lineHeight: "22px", borderRadius: "6px", bgcolor: tokens.color.muted }}
-                            >
-                              {item.name}
-                            </Box>
-                          ))}
-                        </Box>
-                      )}
                       {writing === r.id ? (
                         <ReplyBox
                           name={r.name}
                           initial={reply?.text ?? ""}
+                          busy={posting || resubmitting}
                           onCancel={() => setWriting(null)}
-                          onPost={(text) => {
-                            setReplies((old) => ({ ...old, [r.id]: { text, at: Date.now() } }));
-                            setWriting(null);
-                          }}
+                          onPost={(text) => void send(r, text)}
                         />
-                      ) : reply ? (
+                      ) : reply && tag ? (
                         <Box
-                          sx={{
-                            mt: 1.5,
-                            p: 1.5,
-                            borderRadius: "8px",
-                            borderLeft: `3px solid ${tokens.color.primary}`,
-                            bgcolor: tokens.color.page,
-                          }}
+                          sx={{ mt: 1.5, p: 1.5, borderRadius: "8px", borderLeft: `3px solid ${tokens.color.primary}`, bgcolor: tokens.color.page }}
                         >
-                          <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, gap: 1 }}>
                             <span>
-                              <b>Your reply</b>{" "}
-                              <Box component="span" sx={{ color: tokens.color.textMuted }}>
-                                · {when(new Date(reply.at).toISOString(), now).toLowerCase()}
+                              <b>Your reply</b>
+                              <Box
+                                component="span"
+                                sx={{ ml: 1, px: 0.75, fontSize: 10, lineHeight: "18px", fontWeight: 700, borderRadius: "6px", color: tag.fg, bgcolor: tag.bg }}
+                              >
+                                {tag.label}
                               </Box>
                             </span>
-                            <ButtonBase onClick={() => setWriting(r.id)} sx={{ fontSize: 11, fontWeight: 600, color: tokens.color.primary }}>
-                              Edit
-                            </ButtonBase>
+                            {reply.canEdit && (
+                              <ButtonBase onClick={() => setWriting(r.id)} sx={{ fontSize: 11, fontWeight: 600, color: tokens.color.primary }}>
+                                Edit and resend
+                              </ButtonBase>
+                            )}
                           </Box>
                           <Typography sx={{ mt: 0.5, fontSize: 13 }}>{reply.text}</Typography>
+                          {reply.status === "REJECTED" && reply.rejectionReason && (
+                            <Typography sx={{ mt: 0.75, fontSize: 12, color: tokens.color.error }}>
+                              Reason: {reply.rejectionReason}
+                            </Typography>
+                          )}
                         </Box>
                       ) : (
                         <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1.5 }}>
                           <ButtonBase
                             onClick={() => setWriting(r.id)}
-                            sx={{
-                              gap: 0.75,
-                              height: 36,
-                              px: 1.75,
-                              fontSize: 13,
-                              fontWeight: 600,
-                              borderRadius: "8px",
-                              border: `1px solid ${tokens.color.borderInput}`,
-                            }}
+                            sx={{ gap: 0.75, height: 36, px: 1.75, fontSize: 13, fontWeight: 600, borderRadius: "8px", border: `1px solid ${tokens.color.borderInput}` }}
                           >
                             <ReplyRounded sx={{ fontSize: 16 }} /> Reply
                           </ButtonBase>
@@ -403,6 +429,7 @@ export function ReviewsPane() {
             })
           )}
         </Box>
+        {data && data.pages > 1 && <Pager page={data.page} pages={data.pages} onPage={setPage} />}
       </Box>
     </>
   );

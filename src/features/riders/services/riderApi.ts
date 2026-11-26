@@ -41,17 +41,60 @@ export const riderApi = baseApi.injectEndpoints({
       }),
       providesTags: ["Riders"],
     }),
-    /** POST /restaurant/riders (multipart): the picture is optional. */
+    /** POST /restaurant/riders (multipart): only the name and phone are required; the rest is optional. */
     addRider: build.mutation<void, RiderForm>({
-      query: ({ name, phone, photo }) => {
+      query: (form) => {
         const data = new FormData();
-        data.append("rider_name", name);
-        data.append("phone_number", phone);
-        if (photo) data.append("rider_profile_img", photo);
+        const put = (key: string, value?: string | File) => {
+          if (value instanceof File) data.append(key, value);
+          else if (value?.trim()) data.append(key, value.trim());
+        };
+        put("rider_name", form.name);
+        put("phone_number", form.phone);
+        put("email", form.email);
+        put("date_of_birth", form.dob);
+        put("gender", form.gender);
+        put("vehicle_type", form.vehicleType);
+        put("vehicle_number", form.vehicleNumber);
+        put("aadhaar_number", form.aadhaarNumber);
+        put("pan_number", form.panNumber);
+        put("license_number", form.licenseNumber);
+        put("Bike_RC_number", form.rcNumber);
+        put("rider_profile_img", form.photo);
+        put("aadhaar_img", form.aadhaarFile);
+        put("pan_img", form.panFile);
+        put("license_img", form.licenseFile);
+        put("bike_rc_img", form.rcFile);
         return { url: endpoint(API_PATHS.riders), method: "post", data };
       },
       invalidatesTags: ["Riders"],
     }),
+    /**
+     * PATCH /restaurant/riders/{rider_id}. NOT in the API docs yet (they list
+     * only GET and POST on /restaurant/riders): written to the usual REST shape
+     * so it works the day the backend adds it; until then the server's error shows.
+     */
+    updateRider: build.mutation<void, { id: string; name: string; phone: string }>({
+      query: ({ id, name, phone }) => ({
+        url: `${endpoint(API_PATHS.riders)}/${encodeURIComponent(id)}`,
+        method: "patch",
+        data: { rider_name: name, phone_number: phone },
+      }),
+      invalidatesTags: ["Riders"],
+    }),
+    /** DELETE /restaurant/riders/{rider_id}. Not in the API docs yet, see updateRider. */
+    removeRider: build.mutation<void, string>({
+      query: (id) => ({
+        url: `${endpoint(API_PATHS.riders)}/${encodeURIComponent(id)}`,
+        method: "delete",
+      }),
+      invalidatesTags: ["Riders"],
+    }),
   }),
 });
-export const { useGetRidersQuery, useAddRiderMutation } = riderApi;
+export const {
+  useGetRidersQuery,
+  useAddRiderMutation,
+  useUpdateRiderMutation,
+  useRemoveRiderMutation,
+} = riderApi;
