@@ -1,24 +1,38 @@
-export interface ReviewItem {
-  name: string;
-  quantity: number;
+/** Where a restaurant's reply to a review stands: replies go through admin approval. */
+export type ReplyStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+
+export interface ReviewReply {
+  id: string;
+  text: string;
+  status: ReplyStatus;
+  /** 1 for the first reply, one more for each resubmission. */
+  attempt: number;
+  /** Why the admin rejected it, so it can be rewritten. */
+  rejectionReason?: string;
+  /** Only a rejected reply can be edited and sent again. */
+  canEdit: boolean;
+  submittedAt?: string;
 }
 
 export interface ReviewRow {
-  /** One order can be reviewed once, so the order number identifies a review. */
+  /** The server's review UUID; replies are posted to it. */
   id: string;
   name: string;
-  /** Signed picture URL; the avatar shows the first letter when there is none. */
-  photo?: string;
+  /** "ORD-R7K2-583921". */
   orderId: string;
-  /** Every item in the order. */
-  items: ReviewItem[];
   rating: number;
-  /** Shown as written, e.g. "12 Apr 2024, 2:15 PM". */
-  date: string;
-  /** Used to sort by latest. */
-  at: string;
   comment: string;
+  /** ISO time the review was written. */
+  at: string;
+  reply?: ReviewReply;
 }
 
-export const itemLabel = ({ name, quantity }: ReviewItem) =>
-  quantity > 1 ? `${quantity} × ${name}` : name;
+export interface ReviewPage {
+  rows: ReviewRow[];
+  page: number;
+  pages: number;
+  total: number;
+}
+
+export type ReplyFilter = "NOT_REPLIED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+export type ReviewSort = "newest" | "oldest" | "highest_rating" | "lowest_rating";

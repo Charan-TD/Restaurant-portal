@@ -7,9 +7,9 @@ import {
   type OrderStatus,
 } from "../models/order";
 // The server's statuses: PLACED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED,
-// CANCELLED and FAILED. Orders are assigned to the restaurant automatically:
+// CANCELLED, FAILED and UNDELIVERED. Orders are assigned to the restaurant automatically:
 // fetching the orders list moves every PLACED order to PREPARING, so a PLACED
-// one is shown as preparing too. FAILED is an order that was not delivered.
+// one is shown as preparing too. UNDELIVERED is an order the restaurant marked not delivered, with a reason.
 const fromServer: Record<string, OrderStatus> = {
   PLACED: "Preparing",
   PREPARING: "Preparing",
@@ -18,6 +18,7 @@ const fromServer: Record<string, OrderStatus> = {
   DELIVERED: "Delivered",
   CANCELLED: "Rejected",
   FAILED: "NotDelivered",
+  UNDELIVERED: "NotDelivered",
 };
 const toServer: Record<OrderStatus, string> = {
   New: "PLACED",
@@ -25,7 +26,7 @@ const toServer: Record<OrderStatus, string> = {
   Ready: "READY",
   HandedOver: "OUT_FOR_DELIVERY",
   Delivered: "DELIVERED",
-  NotDelivered: "FAILED",
+  NotDelivered: "UNDELIVERED",
   Rejected: "CANCELLED",
 };
 type Row = Record<string, unknown>;
@@ -94,6 +95,9 @@ function toOrder(row: Row): Order {
   return {
     // The restaurant API identifies orders by order_number (e.g. ORD-ABCD-123456).
     id: first(row.order_number, row.id) ?? "",
+    canMarkUndelivered:
+      typeof row.can_mark_undelivered === "boolean" ? row.can_mark_undelivered : undefined,
+    undeliveredReason: first(row.undelivered_reason),
     items,
     food: items.map(lineLabel).join(", ") || "Order",
     pnr: first(row.pnr, row.pnr_number, row.pnr_no),
@@ -263,8 +267,7 @@ export const orderApi = baseApi.injectEndpoints({
     /**
      * PATCH /orders/{orderNumber}/status. Moving PREPARING → READY
      * requires assign_rider: the rider's public code (e.g. RID-A7K9M2) from
-     * GET /restaurant/riders. The endpoint rejects any other field (400), so
-     * nothing else is sent: a not-delivered reason has no field to go in.
+     * GET /restaurant/riders. The endpoint rejects any other field (400).
      */
     updateOrder: build.mutation<
       void,
@@ -272,16 +275,46 @@ export const orderApi = baseApi.injectEndpoints({
         id: string;
         state: OrderStatus;
         riderId?: string;
+        /**
+         * Why the order was not delivered; required for NotDelivered, which
+         * goes to PATCH /orders/{orderNumber}/undelivered.
+         */
+        reason?: string;
+        /**
+         * TEMPORARY: a TrainDhaba-rider restaurant's delivery is confirmed
+         * through the fake rider callback until the rider app exists.
+         */
+        viaRiderCallback?: boolean;
       }
     >({
-      query: ({ id, state, riderId }) => ({
-        url: updatePath(id),
-        method: "patch",
-        data: {
-          status: toServer[state],
-          ...(riderId && { assign_rider: riderId }),
-        },
-      }),
+      query: ({ id, state, riderId, reason, viaRiderCallback }) => {
+        if (state === "NotDelivered") {
+          return {
+            url: endpoint(API_PATHS.undeliveredOrder).replace(
+              "{id}",
+              encodeURIComponent(id),
+            ),
+            method: "patch",
+            data: { undelivered_reason: reason?.trim() ?? "" },
+          };
+        }
+        return viaRiderCallback
+          ? {
+              url: endpoint(API_PATHS.fakeRiderDelivered).replace(
+                "{id}",
+                encodeURIComponent(id),
+              ),
+              method: "post",
+            }
+          : {
+              url: updatePath(id),
+              method: "patch",
+              data: {
+                status: toServer[state],
+                ...(riderId && { assign_rider: riderId }),
+              },
+            };
+      },
       invalidatesTags: ["Orders"],
     }),
   }),

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ import {
   useCreateMenuItemMutation,
   useGetMenuItemQuery,
   useLazyListMenuCategoriesQuery,
+  useListMenuItemsQuery,
   useListCategoryNamesQuery,
   useListQtyTypesQuery,
   useCreateQtyTypeMutation,
@@ -25,6 +26,7 @@ import {
   useListAddOnsQuery,
   type RestaurantAddOn,
 } from "../services/addOnApi";
+import { addOnSets, quantitySets } from "../models/menuSets";
 import { useToast } from "@/core/providers/ToastProvider";
 import { menuErrorMessage } from "./menuErrors";
 const NO_NAMES: string[] = [];
@@ -43,6 +45,8 @@ export function useMenuItemFormViewModel(id?: string) {
     [fetchCategories] = useLazyListMenuCategoriesQuery(),
     [addCategories] = useAddMenuCategoriesMutation(),
     // "Sold as" names come from the server; typing a new one saves it with the item.
+    // The other dishes, for "Copy from other items"; the form works without them.
+    otherItems = useListMenuItemsQuery().data,
     qtyQuery = useListQtyTypesQuery(),
     [createQtyType] = useCreateQtyTypeMutation(),
     [createAddOnRequest] = useCreateAddOnMutation(),
@@ -56,6 +60,8 @@ export function useMenuItemFormViewModel(id?: string) {
     categories = namesQuery.data?.categories ?? NO_NAMES,
     subsByCategory = namesQuery.data?.subsByCategory ?? NO_SUBS,
     addOns = addOnsQuery.data ?? NO_ADDONS;
+  const quantityChoices = useMemo(() => quantitySets(otherItems ?? [], id), [otherItems, id]),
+    addOnChoices = useMemo(() => addOnSets(otherItems ?? [], id), [otherItems, id]);
   const form = useForm<MenuItemForm>({
     resolver: zodResolver(menuItemFormSchema),
     defaultValues: emptyMenuItemForm(),
@@ -165,6 +171,8 @@ export function useMenuItemFormViewModel(id?: string) {
     categories,
     subsByCategory,
     addOns,
+    quantityChoices,
+    addOnChoices,
     qtyOptions,
     addQtyType,
     createAddOn: createNewAddOn,

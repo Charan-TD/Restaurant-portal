@@ -55,6 +55,8 @@ export interface MenuItem {
   qtyType: string;
   /** The restaurant's own in / out of stock switch. */
   available: boolean;
+  /** Pinned: shown at the top of the menu for passengers (the API's is_starred). */
+  starred: boolean;
   /** false when TrainDhaba has switched the item off. */
   adminAvailable: boolean | null;
   adminInactiveReason: string;
@@ -360,6 +362,7 @@ export function fromMenuItemRow(row: Row): MenuItem {
     qtyType: text(row.qty_type),
     lowStockThreshold: number(row.low_stock_threshold),
     available: row.owner_is_available !== false,
+    starred: row.is_starred === true,
     adminAvailable:
       typeof row.admin_is_available === "boolean"
         ? row.admin_is_available

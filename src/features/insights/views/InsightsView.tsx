@@ -1,39 +1,49 @@
 "use client";
 import { useState } from "react";
+import { DEMO_MODE } from "@/core/constants/config";
+import { usePortal } from "@/core/providers/PortalProvider";
 import { ScreenSurface } from "@/shared/components/layout/ScreenSurface";
 import { CountTabs } from "@/shared/components/navigation/CountTabs";
-import { useRidersOwner } from "@/features/riders/viewmodels/useRidersOwner";
+import {
+  INSIGHTS_PERIODS,
+  PERIOD_LABEL,
+  type InsightsPeriod,
+} from "../models/insights";
+import { useGetInsightsMetricsQuery } from "../services/insightsApi";
+import { Notice, errorText } from "../components/SettlementParts";
 import { OwnRidersInsights } from "./OwnRidersInsights";
 import { TrainDhabaRidersInsights } from "./TrainDhabaRidersInsights";
 
-type InsightsRange = "today" | "7" | "30";
-const RANGE_TABS: { id: InsightsRange; label: string }[] = [
-  { id: "today", label: "Today" },
-  { id: "7", label: "Last 7 days" },
-  { id: "30", label: "Last 30 days" },
-];
-const PERIOD: Record<InsightsRange, string> = {
-  today: "Today",
-  "7": "Last 7 days",
-  "30": "Last 30 days",
-};
+const RANGE_TABS = INSIGHTS_PERIODS.map((id) => ({ id, label: PERIOD_LABEL[id] }));
+const REFRESH_MS = 60_000;
 
 /**
- * Insights differ by who delivers: a restaurant with its own riders sees its
- * COD and prepaid sales and earnings; one on TrainDhaba's riders sees an
- * item-wise settlement with undelivered orders. Both screens show sample data
- * until the settlement API exists (see models/settlement.ts).
+ * Insights differ by who delivers the order, because the rider is its last
+ * point of contact. A restaurant with its own riders sees COD and prepaid
+ * sales and its earnings; one on TrainDhaba's riders sees an item-wise
+ * settlement with undelivered orders. The server decides which from the
+ * restaurant's record, so the metrics answer picks the screen.
  */
 export function InsightsView() {
-  const [range, setRange] = useState<InsightsRange>("7"),
-    { trainDhabaRiders } = useRidersOwner();
+  const [period, setPeriod] = useState<InsightsPeriod>("7d"),
+    { authenticated } = usePortal(),
+    { data, error, isLoading } = useGetInsightsMetricsQuery(period, {
+      skip: DEMO_MODE || !authenticated,
+      pollingInterval: REFRESH_MS,
+    });
   return (
     <ScreenSurface>
-      <CountTabs label="Insights period" value={range} onChange={setRange} tabs={RANGE_TABS} />
-      {trainDhabaRiders ? (
-        <TrainDhabaRidersInsights period={PERIOD[range]} />
+      <CountTabs label="Insights period" value={period} onChange={setPeriod} tabs={RANGE_TABS} />
+      {DEMO_MODE ? (
+        <Notice>Insights are not available in demo mode.</Notice>
+      ) : isLoading ? (
+        <Notice>Loading Insights…</Notice>
+      ) : !data ? (
+        <Notice error>{errorText(error)}</Notice>
+      ) : data.model === "own" ? (
+        <OwnRidersInsights period={period} metrics={data} />
       ) : (
-        <OwnRidersInsights period={PERIOD[range]} />
+        <TrainDhabaRidersInsights period={period} metrics={data} />
       )}
     </ScreenSurface>
   );

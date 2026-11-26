@@ -21,14 +21,36 @@ import {
   useSelectRecommendedCategoryMutation,
   useSearchMenuItemsQuery,
   useSetMenuItemAvailableMutation,
+  useSetMenuItemStarredMutation,
 } from "../services/menuItemApi";
+import { claimsOf, getAccessToken } from "@/core/api/session";
+import { orderPinned, pinChanges } from "../models/menuPins";
 import { useToast } from "@/core/providers/ToastProvider";
 import { DEMO_MODE } from "@/core/constants/config";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { loadSwitchedOff, rememberActive } from "../services/categoryStatus";
 import { menuErrorMessage } from "./menuErrors";
 export type FoodFilter = MenuFoodType | "All";
-export type MenuTab = "items" | "categories" | "addons";
+export type MenuTab = "items" | "categories" | "addons" | "pinned";
+/** The pinned order is the restaurant's own; the API only knows which dishes are pinned. */
+const orderKey = () => {
+  const token = getAccessToken(),
+    id = token ? claimsOf(token)?.restaurant_id : undefined;
+  return `td.pinOrder.${typeof id === "string" ? id : "anon"}`;
+};
+const readOrder = (): string[] => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(orderKey()) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const writeOrder = (ids: string[]) => {
+  try {
+    localStorage.setItem(orderKey(), JSON.stringify(ids));
+  } catch {}
+};
 const NO_ITEMS: MenuItem[] = [];
 const NO_ADDONS: RestaurantAddOn[] = [];
 const NO_CATEGORIES = { categories: [], subCategories: [] };
@@ -49,6 +71,7 @@ export function useMenuItemsViewModel() {
     [selectRecommended, { isLoading: addingRecommended }] =
       useSelectRecommendedCategoryMutation(),
     [setStock] = useSetMenuItemAvailableMutation(),
+    [setStar] = useSetMenuItemStarredMutation(),
     [deleteItem, { isLoading: deleting }] = useDeleteMenuItemMutation();
   const items = itemsQuery.data ?? NO_ITEMS,
     addOns = addOnsQuery.data ?? NO_ADDONS,
@@ -167,6 +190,46 @@ export function useMenuItemsViewModel() {
       setSaving((ids) => ids.filter((id) => id !== item.id));
     }
   };
+  // Pinned dishes, in the order the restaurant dragged them to.
+  const [pinOrder, setPinOrder] = useState<string[]>([]);
+  useEffect(() => {
+    queueMicrotask(() => setPinOrder(readOrder()));
+  }, []);
+  const pinned = useMemo(() => orderPinned(items, pinOrder), [items, pinOrder]);
+  const keepOrder = (ids: string[]) => {
+    setPinOrder(ids);
+    writeOrder(ids);
+  };
+  const reorderPinned = (ids: string[]) => keepOrder(ids);
+  /** Pins the chosen dishes and unpins the rest. Resolves true when saved. */
+  const savePins = async (chosen: string[]): Promise<boolean> => {
+    setActionError("");
+    const next = chosen,
+      { pin, unpin } = pinChanges(
+        pinned.map((i) => i.id),
+        next,
+      );
+    try {
+      await Promise.all(unpin.map((id) => setStar({ id, starred: false }).unwrap()));
+      await Promise.all(pin.map((id) => setStar({ id, starred: true }).unwrap()));
+      keepOrder(next);
+      toast.success("Pinned items saved.");
+      return true;
+    } catch (e) {
+      setActionError(menuErrorMessage(e));
+      return false;
+    }
+  };
+  const unpin = async (item: MenuItem) => {
+    setActionError("");
+    try {
+      await setStar({ id: item.id, starred: false }).unwrap();
+      keepOrder(pinOrder.filter((id) => id !== item.id));
+      toast.success(`${item.name} is no longer pinned.`);
+    } catch (e) {
+      setActionError(menuErrorMessage(e));
+    }
+  };
   const viewCategory = (name: string) => {
     setCategoryFilter(name);
     setTab("items");
@@ -258,6 +321,10 @@ export function useMenuItemsViewModel() {
     saveAddOn,
     removeAddOn,
     savingAddOn,
+    pinned,
+    reorderPinned,
+    savePins,
+    unpin,
     availableCount: items.filter((i) => i.available).length,
     isSaving: (id: string) => saving.includes(id),
     setAvailable,

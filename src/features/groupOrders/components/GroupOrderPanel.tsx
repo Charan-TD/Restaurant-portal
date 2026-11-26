@@ -96,9 +96,16 @@ export function GroupOrderPanel({
   const next =
     o.status === "PREPARING"
       ? { to: "READY", label: `Food ready${left !== undefined ? ` (${countdown(left)})` : ""}` }
-      : o.status === "READY" && own
-        ? { to: "OUT_FOR_DELIVERY", label: `Handed over${rider ? ` to ${rider.name.split(/\s+/)[0]}` : ""}` }
-        : o.status === "OUT_FOR_DELIVERY" && own
+      : // TEMPORARY for TrainDhaba riders: no rider app yet, so the owner
+        // records the handover and the delivery.
+        o.status === "READY"
+        ? {
+            to: "OUT_FOR_DELIVERY",
+            label: own
+              ? `Handed over${rider ? ` to ${rider.name.split(/\s+/)[0]}` : ""}`
+              : "Handed to TrainDhaba rider",
+          }
+        : o.status === "OUT_FOR_DELIVERY"
           ? { to: "DELIVERED", label: "Mark delivered" }
           : undefined;
   const needsRider = own && !rider && (o.status === "PREPARING" || o.status === "READY");

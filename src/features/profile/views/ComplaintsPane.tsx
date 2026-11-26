@@ -1,29 +1,40 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Box, ButtonBase, InputBase, Typography } from "@mui/material";
 import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
 import ChevronRightRounded from "@mui/icons-material/ChevronRightRounded";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
-import PhotoCameraOutlined from "@mui/icons-material/PhotoCameraOutlined";
-import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
-import UploadOutlined from "@mui/icons-material/UploadOutlined";
+import SearchRounded from "@mui/icons-material/SearchRounded";
+import { DEMO_MODE } from "@/core/constants/config";
+import { ToastAlert } from "@/core/providers/ToastProvider";
 import { tokens } from "@/core/theme/tokens";
-import { formatRupees } from "@/shared/utils/format";
+import { errorMessage } from "@/shared/utils/errors";
+import { statusLabel, type Complaint, type ComplaintStatus } from "../models/complaints";
 import {
-  complaintsSample,
-  statusLabel,
-  type Complaint,
-  type ComplaintStatus,
-} from "../models/complaints";
+  useGetComplaintCountsQuery,
+  useGetComplaintQuery,
+  useGetComplaintsQuery,
+  useReplyToComplaintMutation,
+} from "../services/complaintApi";
 import { PaneHeading } from "./PaneHeading";
 
-type Filter = ComplaintStatus | "all";
-const MAX_PHOTOS = 3;
+type Filter = ComplaintStatus | "ALL";
+const MAX_REPLY = 5000;
 const TAGS: Record<ComplaintStatus, { fg: string; bg: string }> = {
-  needs: { fg: "#8a5a00", bg: "#fff4d6" },
-  review: { fg: tokens.color.info, bg: tokens.color.infoBg },
-  resolved: { fg: tokens.color.success, bg: tokens.color.successBg },
+  PENDING: { fg: "#8a5a00", bg: "#fff4d6" },
+  REPLIED: { fg: tokens.color.info, bg: tokens.color.infoBg },
+  RESOLVED: { fg: tokens.color.success, bg: tokens.color.successBg },
 };
+
+const when = (iso: string) =>
+  Number.isNaN(Date.parse(iso))
+    ? ""
+    : new Date(iso).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+      });
 
 function Tag({ status }: { status: ComplaintStatus }) {
   return (
@@ -46,7 +57,7 @@ function Tag({ status }: { status: ComplaintStatus }) {
   );
 }
 
-function Chip({ label, count, on, onClick }: { label: string; count: number; on: boolean; onClick: () => void }) {
+function Chip({ label, count, on, onClick }: { label: string; count?: number; on: boolean; onClick: () => void }) {
   return (
     <ButtonBase
       onClick={onClick}
@@ -64,18 +75,18 @@ function Chip({ label, count, on, onClick }: { label: string; count: number; on:
       }}
     >
       {label}
-      <Box component="span" sx={{ color: on ? tokens.color.primary : tokens.color.textMuted }}>
-        {count}
-      </Box>
+      {count !== undefined && (
+        <Box component="span" sx={{ color: on ? tokens.color.primary : tokens.color.textMuted }}>
+          {count}
+        </Box>
+      )}
     </ButtonBase>
   );
 }
 
-const meta = (c: Complaint) => `Order #${c.order} · ${c.passenger} · ${c.train} · ${c.seat} · ${c.raised}`;
-
 /** One line of the list. */
 function Row({ c, onOpen }: { c: Complaint; onOpen: () => void }) {
-  const needs = c.status === "needs";
+  const needs = c.status === "PENDING";
   return (
     <Box
       role="button"
@@ -99,37 +110,21 @@ function Row({ c, onOpen }: { c: Complaint; onOpen: () => void }) {
     >
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{c.title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{c.category}</Typography>
           <Tag status={c.status} />
-          <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>#{c.id}</Typography>
+          <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>{c.number}</Typography>
         </Box>
-        <Typography sx={{ mt: 0.5, fontSize: 12, color: tokens.color.textMuted }}>{meta(c)}</Typography>
-        <Typography sx={{ mt: 0.5, fontSize: 13 }}>“{c.message}”</Typography>
-        {needs && c.respondBy ? (
-          <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 0.5, fontSize: 11, fontWeight: 600, color: "#8a5a00" }}>
-            <ScheduleOutlined sx={{ fontSize: 13 }} /> Respond by {c.respondBy}
-          </Box>
-        ) : (
-          c.outcome && (
-            <Typography
-              sx={{
-                mt: 0.5,
-                fontSize: 11,
-                fontWeight: 600,
-                color: c.status === "review" ? tokens.color.info : c.outcome.good ? tokens.color.success : tokens.color.error,
-              }}
-            >
-              {c.outcome.text}
-            </Typography>
-          )
-        )}
+        <Typography sx={{ mt: 0.5, fontSize: 12, color: tokens.color.textMuted }}>
+          Order {c.order} · {c.customer} · {when(c.createdAt)}
+        </Typography>
+        {c.description && <Typography sx={{ mt: 0.5, fontSize: 13 }}>“{c.description}”</Typography>}
       </Box>
       {needs ? (
         <ButtonBase
           component="span"
           sx={{ height: 40, px: 2.5, fontSize: 14, fontWeight: 700, borderRadius: "10px", color: "#fff", bgcolor: tokens.color.primary }}
         >
-          Respond
+          Reply
         </ButtonBase>
       ) : (
         <ChevronRightRounded sx={{ color: tokens.color.textSubtle }} />
@@ -138,191 +133,117 @@ function Row({ c, onOpen }: { c: Complaint; onOpen: () => void }) {
   );
 }
 
-function Fact({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Box sx={{ minWidth: 0 }}>
-      <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.4px", color: tokens.color.textMuted }}>
-        {label}
-      </Typography>
-      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{value}</Typography>
-      {sub && <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>{sub}</Typography>}
-    </Box>
-  );
-}
-
-/** One complaint in full, with the response form while it still needs one. */
-function Detail({
-  c,
-  onBack,
-  onSend,
-  onAccept,
-}: {
-  c: Complaint;
-  onBack: () => void;
-  onSend: (text: string) => void;
-  onAccept: () => void;
-}) {
-  const [text, setText] = useState(c.response ?? ""),
-    [photos, setPhotos] = useState<File[]>([]),
-    pick = useRef<HTMLInputElement>(null),
-    needs = c.status === "needs";
+/** One complaint with its conversation, and the reply form until it is resolved. */
+function Detail({ id, onBack }: { id: string; onBack: () => void }) {
+  const { data: c, isLoading, error } = useGetComplaintQuery(id),
+    [reply, { isLoading: sending }] = useReplyToComplaintMutation(),
+    [text, setText] = useState(""),
+    [problem, setProblem] = useState("");
+  async function send() {
+    setProblem("");
+    try {
+      await reply({ id, message: text.trim() }).unwrap();
+      setText("");
+    } catch (e) {
+      setProblem(errorMessage(e));
+    }
+  }
   return (
     <>
       <Box sx={{ px: 3, pt: 2.5, pb: 2, borderBottom: `1px solid ${tokens.color.borderSubtle}` }}>
         <ButtonBase onClick={onBack} sx={{ gap: 0.5, fontSize: 12, fontWeight: 600, color: tokens.color.primary }}>
           <ArrowBackRounded sx={{ fontSize: 14 }} /> All complaints
         </ButtonBase>
-        <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }}>
-            {c.title}
-          </Typography>
-          <Tag status={c.status} />
-        </Box>
-        <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
-          Complaint #{c.id} · raised {c.raised.replace(/^Today/, "today").replace(/^Yesterday/, "yesterday")}
-        </Typography>
-      </Box>
-      <Box sx={{ p: 3, display: "grid", gap: 2.5 }}>
-        <Box
-          sx={{
-            display: "grid",
-            gap: 2,
-            p: 2,
-            borderRadius: "12px",
-            border: `1px solid ${tokens.color.border}`,
-            gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" },
-          }}
-        >
-          <Fact label="ORDER" value={`#${c.order}`} sub={`${formatRupees(c.orderAmount)} · ${c.payment}`} />
-          <Fact label="PASSENGER" value={c.passenger} sub={`${c.train} · ${c.seat}`} />
-          <Fact label="RIDER" value={c.rider} sub={c.pickedUp} />
-          <Fact label="HANDED OVER" value={c.handedOver} sub={c.handedOverNote} />
-        </Box>
-        <Box sx={{ p: 2, borderRadius: "12px", bgcolor: tokens.color.page }}>
-          <Typography sx={{ fontSize: 12 }}>
-            <b>Passenger says</b>{" "}
-            <Box component="span" sx={{ color: tokens.color.textMuted }}>
-              · {c.raised}
-            </Box>
-          </Typography>
-          <Typography sx={{ mt: 1.5, fontSize: 14 }}>{c.message}</Typography>
-          <Box
-            aria-label="Photo from the passenger"
-            sx={{ mt: 1.5, width: 74, height: 74, borderRadius: "10px", background: "linear-gradient(135deg, #e8d3b8, #c9a479)" }}
-          />
-          <Typography sx={{ mt: 1.5, fontSize: 12, color: tokens.color.textMuted }}>
-            Asked for:{" "}
-            <b style={{ color: tokens.color.text }}>
-              {c.asked.label} {formatRupees(c.asked.amount)}
-            </b>
-          </Typography>
-        </Box>
-        {needs ? (
+        {c && (
           <>
-            <Box>
-              <Typography sx={{ fontSize: 15, fontWeight: 700 }}>Your response</Typography>
-              <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
-                Only TrainDhaba support sees this. Respond by {c.respondBy}.
+            <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }}>
+                {c.category}
               </Typography>
-              <InputBase
-                multiline
-                minRows={4}
-                fullWidth
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Tell us your side: what happened and when."
-                inputProps={{ "aria-label": "Your response" }}
-                sx={{ mt: 1.5, p: 1.5, fontSize: 14, borderRadius: "10px", border: `1px solid ${tokens.color.borderInput}` }}
-              />
+              <Tag status={c.status} />
             </Box>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                p: 1.5,
-                borderRadius: "10px",
-                border: `1px dashed ${tokens.color.borderInput}`,
-                bgcolor: tokens.color.page,
-              }}
-            >
-              <UploadOutlined sx={{ color: tokens.color.primary }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <ButtonBase
-                  disabled={photos.length >= MAX_PHOTOS}
-                  onClick={() => pick.current?.click()}
-                  sx={{ fontSize: 13, color: tokens.color.text }}
-                >
-                  <b style={{ color: tokens.color.primary }}>Add photos</b>&nbsp;of packing or handover
-                </ButtonBase>
-                <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>
-                  {photos.length
-                    ? photos.map((p) => p.name).join(", ")
-                    : `Optional · JPG or PNG · up to ${MAX_PHOTOS} photos`}
-                </Typography>
-              </Box>
-              {photos.length > 0 && (
-                <ButtonBase onClick={() => setPhotos([])} sx={{ fontSize: 12, fontWeight: 600, color: tokens.color.primary }}>
-                  <PhotoCameraOutlined sx={{ fontSize: 14, mr: 0.5 }} /> Clear
-                </ButtonBase>
-              )}
-              <input
-                ref={pick}
-                type="file"
-                hidden
-                multiple
-                accept="image/jpeg,image/png"
-                onChange={(e) => {
-                  const chosen = [...(e.target.files ?? [])].filter((f) => /^image\/(jpeg|png)$/.test(f.type));
-                  setPhotos((old) => [...old, ...chosen].slice(0, MAX_PHOTOS));
-                  e.target.value = "";
-                }}
-              />
-            </Box>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1.4fr" }, gap: 1.5 }}>
-              <ButtonBase
-                onClick={onAccept}
-                sx={{ height: 48, fontSize: 14, fontWeight: 700, borderRadius: "10px", border: `1px solid ${tokens.color.borderInput}` }}
-              >
-                Accept refund
-              </ButtonBase>
-              <ButtonBase
-                disabled={!text.trim()}
-                onClick={() => onSend(text.trim())}
-                sx={{
-                  height: 48,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  borderRadius: "10px",
-                  color: "#fff",
-                  bgcolor: tokens.color.primary,
-                  "&.Mui-disabled": { opacity: 0.5, color: "#fff" },
-                }}
-              >
-                Send response
-              </ButtonBase>
-            </Box>
+            <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+              {c.number} · Order {c.order} · {c.customer} · raised {when(c.createdAt)}
+              {c.resolvedAt ? ` · resolved ${when(c.resolvedAt)}` : ""}
+            </Typography>
           </>
-        ) : (
-          <Box>
-            {c.response && (
-              <Box sx={{ mb: 1.5 }}>
-                <Typography sx={{ fontSize: 15, fontWeight: 700 }}>Your response</Typography>
-                <Typography sx={{ mt: 0.5, fontSize: 14 }}>{c.response}</Typography>
+        )}
+      </Box>
+      <Box sx={{ p: 3, display: "grid", gap: 2 }}>
+        {error && <ToastAlert severity="error">{errorMessage(error)}</ToastAlert>}
+        {isLoading && <Typography sx={{ fontSize: 14, color: tokens.color.textMuted }}>Loading…</Typography>}
+        {c && (
+          <>
+            <Box sx={{ p: 2, borderRadius: "12px", bgcolor: tokens.color.page }}>
+              <Typography sx={{ fontSize: 12 }}>
+                <b>{c.customer} says</b>
+              </Typography>
+              <Typography sx={{ mt: 1, fontSize: 14 }}>{c.description || "No details given."}</Typography>
+            </Box>
+            {c.messages.map((m) => {
+              const mine = m.from === "RESTAURANT";
+              return (
+                <Box
+                  key={m.id}
+                  sx={{
+                    p: 1.5,
+                    maxWidth: "85%",
+                    justifySelf: mine ? "end" : "start",
+                    borderRadius: "12px",
+                    bgcolor: mine ? tokens.color.primarySubtle : tokens.color.page,
+                    border: `1px solid ${mine ? tokens.color.primarySubtleBorder : tokens.color.border}`,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>
+                    <b>{mine ? "You" : c.customer}</b> · {when(m.at)}
+                  </Typography>
+                  <Typography sx={{ mt: 0.5, fontSize: 14, whiteSpace: "pre-wrap" }}>{m.text}</Typography>
+                </Box>
+              );
+            })}
+            {c.status === "RESOLVED" ? (
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.color.success }}>
+                This complaint is resolved. It can no longer be replied to.
+              </Typography>
+            ) : (
+              <Box>
+                <Typography sx={{ fontSize: 15, fontWeight: 700 }}>Your reply</Typography>
+                <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+                  The passenger sees this. Tell them your side: what happened and what you will do.
+                </Typography>
+                <InputBase
+                  multiline
+                  minRows={4}
+                  fullWidth
+                  value={text}
+                  onChange={(e) => setText(e.target.value.slice(0, MAX_REPLY))}
+                  placeholder="Write your reply"
+                  inputProps={{ "aria-label": "Your reply" }}
+                  sx={{ mt: 1.5, p: 1.5, fontSize: 14, borderRadius: "10px", border: `1px solid ${tokens.color.borderInput}` }}
+                />
+                {problem && (
+                  <Typography sx={{ mt: 1, fontSize: 12, color: tokens.color.error }}>{problem}</Typography>
+                )}
+                <ButtonBase
+                  disabled={!text.trim() || sending}
+                  onClick={() => void send()}
+                  sx={{
+                    mt: 1.5,
+                    width: "100%",
+                    height: 48,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    borderRadius: "10px",
+                    color: "#fff",
+                    bgcolor: tokens.color.primary,
+                    "&.Mui-disabled": { opacity: 0.5, color: "#fff" },
+                  }}
+                >
+                  {sending ? "Sending…" : "Send reply"}
+                </ButtonBase>
               </Box>
             )}
-            {c.outcome && (
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: c.status === "review" ? tokens.color.info : c.outcome.good ? tokens.color.success : tokens.color.error,
-                }}
-              >
-                {c.outcome.text}
-              </Typography>
-            )}
-          </Box>
+          </>
         )}
       </Box>
     </>
@@ -330,52 +251,34 @@ function Detail({
 }
 
 /**
- * Complaints raised by passengers: the list with its filters, and one complaint
- * in full. DESIGN ONLY: the backend has no complaints API yet, so the list is
- * sample data (models/complaints.ts) and Send response / Accept refund only
- * change it here, until the page is refreshed. Photos are chosen but not sent.
+ * Complaints raised by passengers, from GET /restaurant/complaints: status
+ * filter and search on the server, ten per page, and a conversation where the
+ * restaurant can reply until the complaint is resolved.
  */
 export function ComplaintsPane() {
-  const [items, setItems] = useState<Complaint[]>(complaintsSample),
-    [filter, setFilter] = useState<Filter>("needs"),
+  const [filter, setFilter] = useState<Filter>("PENDING"),
+    [search, setSearch] = useState(""),
+    [applied, setApplied] = useState(""),
+    [page, setPage] = useState(1),
     [openId, setOpenId] = useState<string | null>(null),
-    count = (status: ComplaintStatus) => items.filter((c) => c.status === status).length,
-    shown = filter === "all" ? items : items.filter((c) => c.status === filter),
-    open = items.find((c) => c.id === openId);
-  const update = (id: string, patch: Partial<Complaint>) =>
-    setItems((old) => old.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-  if (open)
-    return (
-      <Detail
-        key={open.id}
-        c={open}
-        onBack={() => setOpenId(null)}
-        onSend={(text) => {
-          update(open.id, {
-            status: "review",
-            response: text,
-            outcome: { text: "You responded · TrainDhaba support is checking", good: true },
-          });
-          setOpenId(null);
-          setFilter("review");
-        }}
-        onAccept={() => {
-          update(open.id, {
-            status: "resolved",
-            outcome: {
-              text: `${formatRupees(open.asked.amount)} refunded to passenger · taken from your next payout`,
-              good: false,
-            },
-          });
-          setOpenId(null);
-          setFilter("resolved");
-        }}
-      />
-    );
+    query = {
+      page,
+      search: applied,
+      status: filter === "ALL" ? undefined : filter,
+    },
+    { data, isFetching, error } = useGetComplaintsQuery(query, { skip: DEMO_MODE }),
+    { data: counts } = useGetComplaintCountsQuery(applied, { skip: DEMO_MODE });
+  const choose = (next: Filter) => {
+    setFilter(next);
+    setPage(1);
+  };
+  if (openId) return <Detail key={openId} id={openId} onBack={() => setOpenId(null)} />;
   return (
     <>
-      <PaneHeading title="Complaints" subtitle="Raised by passengers and handled by TrainDhaba support with you." />
+      <PaneHeading title="Complaints" subtitle="Raised by passengers about their orders. Reply to sort it out." />
       <Box sx={{ p: 3, display: "grid", gap: 2 }}>
+        {DEMO_MODE && <ToastAlert severity="info">Complaints are not available in demo mode.</ToastAlert>}
+        {error && <ToastAlert severity="error">{errorMessage(error)}</ToastAlert>}
         <Box
           sx={{
             display: "flex",
@@ -389,31 +292,78 @@ export function ComplaintsPane() {
           }}
         >
           <InfoOutlined sx={{ fontSize: 17 }} />
-          <Typography sx={{ fontSize: 13 }}>
-            Reply within 3 hours with your side. If no response, TrainDhaba decides on the complaint and any refund is
-            taken from your payout.
-          </Typography>
+          <Typography sx={{ fontSize: 13 }}>Reply with your side. Once a complaint is resolved it is closed.</Typography>
         </Box>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Chip label="Needs response" count={count("needs")} on={filter === "needs"} onClick={() => setFilter("needs")} />
-          <Chip label="In review" count={count("review")} on={filter === "review"} onClick={() => setFilter("review")} />
-          <Chip label="Resolved" count={count("resolved")} on={filter === "resolved"} onClick={() => setFilter("resolved")} />
-          <Chip label="All" count={items.length} on={filter === "all"} onClick={() => setFilter("all")} />
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+          <Chip label="Needs reply" count={counts?.pending} on={filter === "PENDING"} onClick={() => choose("PENDING")} />
+          <Chip label="Replied" count={counts?.replied} on={filter === "REPLIED"} onClick={() => choose("REPLIED")} />
+          <Chip label="Resolved" count={counts?.resolved} on={filter === "RESOLVED"} onClick={() => choose("RESOLVED")} />
+          <Chip label="All" count={counts?.total} on={filter === "ALL"} onClick={() => choose("ALL")} />
+          <Box
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setApplied(search);
+              setPage(1);
+            }}
+            sx={{
+              ml: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              px: 1.25,
+              height: 34,
+              borderRadius: "17px",
+              border: `1px solid ${tokens.color.borderInput}`,
+            }}
+          >
+            <SearchRounded sx={{ fontSize: 17, color: tokens.color.textMuted }} />
+            <InputBase
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                if (!e.target.value) {
+                  setApplied("");
+                  setPage(1);
+                }
+              }}
+              placeholder="Complaint or order number"
+              inputProps={{ "aria-label": "Search complaints" }}
+              sx={{ fontSize: 13, width: 190 }}
+            />
+          </Box>
         </Box>
         <Box>
-          {shown.length === 0 ? (
+          {!data || data.rows.length === 0 ? (
             <Typography sx={{ py: 4, textAlign: "center", fontSize: 14, color: tokens.color.textMuted }}>
-              No complaints here.
+              {isFetching ? "Loading complaints…" : "No complaints here."}
             </Typography>
           ) : (
-            shown.map((c) => <Row key={c.id} c={c} onOpen={() => setOpenId(c.id)} />)
+            data.rows.map((c) => <Row key={c.id} c={c} onOpen={() => setOpenId(c.id)} />)
           )}
         </Box>
+        {data && data.pages > 1 && (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+            <ButtonBase
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              sx={{ px: 1.5, height: 34, fontSize: 13, fontWeight: 600, "&.Mui-disabled": { opacity: 0.4 } }}
+            >
+              Previous
+            </ButtonBase>
+            <Typography sx={{ fontSize: 12, color: tokens.color.textMuted }}>
+              Page {data.page} of {data.pages}
+            </Typography>
+            <ButtonBase
+              disabled={page >= data.pages}
+              onClick={() => setPage((p) => p + 1)}
+              sx={{ px: 1.5, height: 34, fontSize: 13, fontWeight: 600, "&.Mui-disabled": { opacity: 0.4 } }}
+            >
+              Next
+            </ButtonBase>
+          </Box>
+        )}
       </Box>
     </>
   );
 }
-
-/** Open complaints (waiting on you or on support), for the profile menu's hint. */
-export const openComplaints = (items: Complaint[] = complaintsSample) =>
-  items.filter((c) => c.status !== "resolved").length;

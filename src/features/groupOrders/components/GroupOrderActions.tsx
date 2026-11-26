@@ -46,11 +46,17 @@ export function nextStep(order: GroupOrder, now: number, own: boolean) {
             needsRider: !rider,
             hint: rider ? `${rider.name} is picking it up` : "Choose the rider who picks it up",
           }
-        : { hint: rider ? `${rider.name} (TrainDhaba) is picking it up` : "A TrainDhaba rider will pick it up" };
+        : // TEMPORARY: no rider app yet, so the owner records the handover.
+          {
+            label: "Handed to TrainDhaba rider",
+            to: "OUT_FOR_DELIVERY",
+            hint: rider ? `${rider.name} (TrainDhaba) is picking it up` : "A TrainDhaba rider will pick it up",
+          };
     case "OUT_FOR_DELIVERY":
       return own
         ? { label: "Mark delivered", to: "DELIVERED", hint: rider ? `With ${rider.name}` : "With the rider" }
-        : { hint: "With the TrainDhaba rider" };
+        : // TEMPORARY: until riders confirm deliveries, the owner does.
+          { label: "Mark delivered", to: "DELIVERED", hint: "With the TrainDhaba rider" };
     case "DELIVERED":
       return { hint: "Delivered to the passengers" };
     case "REJECTED":

@@ -40,7 +40,8 @@ function save(owner: RidersOwner) {
 /**
  * Who delivers this restaurant's orders, chosen at registration. Restaurants
  * on TrainDhaba's riders have no riders of their own: the server refuses
- * their riders list, rider assignment and DELIVERED.
+ * their riders list and rider assignment. Until the rider app exists the
+ * owner confirms their deliveries through a temporary callback API.
  */
 export function useRidersOwner() {
   // Asked only once signed in: asked earlier (the shell mounts before login

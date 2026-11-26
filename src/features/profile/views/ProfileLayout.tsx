@@ -23,7 +23,8 @@ import { useChangeRequests } from "../viewmodels/useChangeRequests";
 import { BankPane } from "./BankPane";
 import { DocumentsPane, WARN_DAYS, daysLeft } from "./DocumentsPane";
 import { HoursPane } from "./HoursPane";
-import { ComplaintsPane, openComplaints } from "./ComplaintsPane";
+import { useGetComplaintCountsQuery } from "../services/complaintApi";
+import { ComplaintsPane } from "./ComplaintsPane";
 import { LocationPane } from "./LocationPane";
 import { ReviewsPane } from "./ReviewsPane";
 import { SettingsPane } from "./SettingsPane";
@@ -126,6 +127,7 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
     [section, setSection] = useState<SectionId>("details"),
     changes = useChangeRequests(),
     { data: ratings } = useGetRatingSummaryQuery(undefined, { skip: DEMO_MODE }),
+    { data: complaintCounts } = useGetComplaintCountsQuery(undefined, { skip: DEMO_MODE }),
     // Fields whose change is waiting for an admin; the outcome comes as a notification.
     pending = new Set(
       changes.requests
@@ -283,7 +285,7 @@ export function ProfileLayout({ vm }: { vm: ProfileViewModel }) {
           <NavRow
             icon={<FlagOutlined />}
             title="Complaints"
-            hint={`${openComplaints()} open · handled by TrainDhaba`}
+            hint={`${complaintCounts?.pending ?? 0} need your reply`}
             selected={section === "complaints"}
             onClick={pick("complaints")}
           />

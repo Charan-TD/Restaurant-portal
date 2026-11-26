@@ -50,6 +50,8 @@ import {
   ADDON_IMAGE_TYPES,
   type RestaurantAddOn,
 } from "../services/addOnApi";
+import { CopyRail, SetCard } from "../components/CopyRail";
+import { quantitySummary, type AddOnSet, type QuantitySet } from "../models/menuSets";
 import { useMenuItemFormViewModel } from "../viewmodels/useMenuItemFormViewModel";
 type NumberName =
   "price" | "discountedPrice" | "taxRate" | "preparationMinutes";
@@ -325,6 +327,8 @@ function DraftAddOn({
           disabled={busy}
           options={options}
           getOptionLabel={(o) => (typeof o === "string" ? o : o.name)}
+          // Saved add-ons can share a name; the id is what tells them apart.
+          getOptionKey={(o) => (typeof o === "string" ? o : o.id)}
           inputValue={name}
           onInputChange={(_, next, reason) => {
             if (reason !== "reset") {
@@ -415,25 +419,54 @@ function DraftAddOn({
 function AddOnsField({
   control,
   addOns,
+  choices,
   onCreate,
 }: {
   control: Control<MenuItemForm>;
   addOns: RestaurantAddOn[];
+  /** Add-on sets other dishes already use, offered to copy. */
+  choices: AddOnSet[];
   onCreate: CreateAddOn;
 }) {
   const [drafts, setDrafts] = useState<number[]>([]),
-    [counter, setCounter] = useState(0);
+    [counter, setCounter] = useState(0),
+    [editing, setEditing] = useState(false);
   return (
     <Controller
       control={control}
       name="addOnIds"
       render={({ field }) => {
         const ticked = field.value
-          .map((id) => addOns.find((a) => a.id === id))
-          .filter((a): a is RestaurantAddOn => !!a);
+            .map((id) => addOns.find((a) => a.id === id))
+            .filter((a): a is RestaurantAddOn => !!a),
+          showEditor = editing || drafts.length > 0,
+          has = (set: AddOnSet) => set.ids.every((id) => field.value.includes(id)),
+          names = (set: AddOnSet) =>
+            set.ids
+              .map((id) => addOns.find((a) => a.id === id))
+              .filter((a): a is RestaurantAddOn => !!a)
+              .map((a) => `${a.name} +${formatRupees(a.price)}`)
+              .join(", ");
         return (
           <div>
-            <FieldLabel text="Add-ons" />
+            <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 1 }}>
+              <FieldLabel text="Add-ons" />
+              <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>
+                Customer can pick any
+              </Typography>
+            </Box>
+            {!showEditor && ticked.length > 0 && (
+              <SetCard
+                title="Add-ons"
+                summary={ticked.map((a) => `${a.name} +${formatRupees(a.price)}`).join(", ")}
+                actions={[
+                  { label: "Edit", onClick: () => setEditing(true) },
+                  { label: "Remove all", onClick: () => field.onChange([]) },
+                ]}
+              />
+            )}
+            {showEditor && (
+            <>
             <Typography
               sx={{ mt: -0.5, mb: 1.25, fontSize: 12, color: tokens.color.textMuted }}
             >
@@ -485,6 +518,45 @@ function AddOnsField({
             >
               Add add-on
             </Button>
+            {!drafts.length && (
+              <Button size="small" onClick={() => setEditing(false)} sx={linkButtonSx}>
+                Done
+              </Button>
+            )}
+            </>
+            )}
+            <CopyRail
+              label="Copy from other items"
+              cards={choices
+                .filter((set) => names(set))
+                .map((set) => ({
+                  key: set.key,
+                  title: "Add-ons",
+                  summary: names(set),
+                  usedIn: set.usedIn,
+                  checked: has(set),
+                  onToggle: () =>
+                    field.onChange(
+                      has(set)
+                        ? field.value.filter((id) => !set.ids.includes(id))
+                        : [...new Set([...field.value, ...set.ids])],
+                    ),
+                }))}
+            />
+            {!showEditor && (
+              <Button
+                size="small"
+                startIcon={<AddOutlined />}
+                onClick={() => {
+                  setEditing(true);
+                  setDrafts((d) => [...d, counter]);
+                  setCounter((n) => n + 1);
+                }}
+                sx={linkButtonSx}
+              >
+                Create your own add-on
+              </Button>
+            )}
           </div>
         );
       }}
@@ -499,13 +571,17 @@ function AddOnsField({
 function QuantitiesField({
   control,
   options,
+  choices,
   onCreateType,
 }: {
   control: Control<MenuItemForm>;
   options: string[];
+  /** Quantity sets other dishes already use, offered to copy. */
+  choices: QuantitySet[];
   /** Saves a new quantity type to the restaurant's list; resolves to an error message or "". */
   onCreateType: (name: string) => Promise<string>;
 }) {
+  const [editing, setEditing] = useState(false);
   return (
     <Controller
       control={control}
@@ -517,14 +593,30 @@ function QuantitiesField({
             | undefined,
           update = (i: number, change: Partial<QuantityRow>) =>
             field.onChange(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
+        const named = rows.filter((r) => r.name.trim()),
+          showEditor = editing || !!fieldState.error,
+          same = (set: QuantitySet) =>
+            rows.length === set.rows.length &&
+            set.rows.every((r, i) => rows[i].name === r.name && rows[i].price === r.price);
         return (
           <div>
-            <FieldLabel text="Quantities" />
-            <Typography
-              sx={{ mt: -0.5, mb: 1.25, fontSize: 12, color: tokens.color.textMuted }}
-            >
-              Add sizes if the dish comes in more than one portion
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 1 }}>
+              <FieldLabel text="Quantity" />
+              <Typography sx={{ fontSize: 11, color: tokens.color.textMuted }}>
+                Customer picks one
+              </Typography>
+            </Box>
+            {!showEditor && named.length > 0 && (
+              <SetCard
+                title="Quantity"
+                summary={quantitySummary(named, formatRupees)}
+                actions={[
+                  { label: "Edit", onClick: () => setEditing(true) },
+                  { label: "Remove all", onClick: () => field.onChange([]) },
+                ]}
+              />
+            )}
+            {showEditor && (
             <Box sx={{ display: "grid", gap: 1.25 }}>
               {rows.map((row, i) => {
                 const nameError = errors?.[i]?.name?.message,
@@ -607,6 +699,35 @@ function QuantitiesField({
                 );
               })}
             </Box>
+            )}
+            <CopyRail
+              label="Copy from other items"
+              cards={choices.map((set) => ({
+                key: set.key,
+                title: "Quantity",
+                summary: quantitySummary(set.rows, formatRupees),
+                usedIn: set.usedIn,
+                checked: same(set),
+                onToggle: () => {
+                  field.onChange(same(set) ? [] : set.rows.map((r) => ({ ...r })));
+                  setEditing(false);
+                },
+              }))}
+            />
+            {!showEditor && (
+              <Button
+                size="small"
+                startIcon={<AddOutlined />}
+                onClick={() => {
+                  setEditing(true);
+                  if (!rows.length) field.onChange([{ name: "", price: null }]);
+                }}
+                sx={linkButtonSx}
+              >
+                Create your own quantity
+              </Button>
+            )}
+            {showEditor && (
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <Button
                 size="small"
@@ -629,7 +750,13 @@ function QuantitiesField({
                   );
                 }}
               />
+              {!fieldState.error && (
+                <Button size="small" onClick={() => setEditing(false)} sx={linkButtonSx}>
+                  Done
+                </Button>
+              )}
             </Box>
+            )}
           </div>
         );
       }}
@@ -1432,15 +1559,17 @@ export function MenuItemFormView({
               >
                 How the dish is sold, and extras passengers can add
               </Typography>
-              <Box sx={{ display: "grid", gap: 2.5 }}>
+              <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: "minmax(0, 1fr)" }}>
                 <QuantitiesField
                   control={control}
                   options={vm.qtyOptions.length ? vm.qtyOptions : [...qtyTypes]}
+                  choices={vm.quantityChoices}
                   onCreateType={vm.addQtyType}
                 />
                 <AddOnsField
                   control={control}
                   addOns={vm.addOns}
+                  choices={vm.addOnChoices}
                   onCreate={vm.createAddOn}
                 />
               </Box>

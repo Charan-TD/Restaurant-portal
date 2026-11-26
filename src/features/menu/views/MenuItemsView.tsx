@@ -21,6 +21,8 @@ import CheckBox from "@mui/icons-material/CheckBox";
 import RestaurantMenuOutlined from "@mui/icons-material/RestaurantMenuOutlined";
 import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
+import ExpandLessRounded from "@mui/icons-material/ExpandLessRounded";
+import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
 import { cardSx, tokens, tokenScopeSx } from "@/core/theme/tokens";
 import { CommonButton } from "@/shared/components/actions/CommonButton";
 import { CommonTextField } from "@/shared/components/form/CommonTextField";
@@ -33,6 +35,8 @@ import { AddOnsPanel } from "../components/AddOnsPanel";
 import { MenuImportDialog } from "../components/MenuImportDialog";
 import { RecommendedMenu } from "../components/RecommendedMenu";
 import { CategoryRail } from "../components/CategoryRail";
+import { AddPinnedDialog } from "../components/AddPinnedDialog";
+import { PinnedPanel } from "../components/PinnedPanel";
 import { useMenuItemsViewModel } from "../viewmodels/useMenuItemsViewModel";
 import { MenuItemFormView } from "./MenuItemFormView";
 
@@ -69,12 +73,13 @@ export function MenuItemsView({
     [subPicked, setSubPicked] = useState<string | null>(null),
     [outOnly, setOutOnly] = useState(false),
     [editing, setEditing] = useState(false),
-    [importing, setImporting] = useState(false),
+    [importAnchor, setImportAnchor] = useState<HTMLElement | null>(null),
+    [pinning, setPinning] = useState(false),
     total = vm.items.length,
     outCount = total - vm.availableCount,
     // The first category is open until another is chosen.
     selected =
-      vm.tab === "addons"
+      vm.tab === "addons" || vm.tab === "pinned"
         ? null
         : vm.categories.find((c) => c.name === picked)?.name ??
           vm.categories[0]?.name ??
@@ -145,6 +150,9 @@ export function MenuItemsView({
           addOnsCount={vm.addOns.length}
           addOnsActive={vm.tab === "addons"}
           onOpenAddOns={() => vm.setTab("addons")}
+          pinnedCount={vm.pinned.length}
+          pinnedActive={vm.tab === "pinned"}
+          onOpenPinned={() => vm.setTab("pinned")}
         />
         <Box sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
           {vm.tab === "addons" ? (
@@ -160,7 +168,7 @@ export function MenuItemsView({
               <Box
                 sx={{
                   display: "flex",
-                  flexWrap: "wrap",
+                  flexWrap: { xs: "wrap", xl: "nowrap" },
                   alignItems: "center",
                   gap: 1.5,
                   mb: 2.5,
@@ -172,7 +180,7 @@ export function MenuItemsView({
                   onChange={(e) => vm.setSearch(e.target.value)}
                   inputPrefix={<SearchOutlined fontSize="small" />}
                   slotProps={{ htmlInput: { "aria-label": "Search items" } }}
-                  sx={{ width: 300, "& .MuiOutlinedInput-root": { minHeight: 44 } }}
+                  sx={{ flex: "1 1 200px", maxWidth: 300, minWidth: 160, "& .MuiOutlinedInput-root": { minHeight: 44 } }}
                 />
                 <ButtonBase
                   role="checkbox"
@@ -213,24 +221,39 @@ export function MenuItemsView({
                   busy={vm.addingRecommended}
                   onAdd={vm.addRecommended}
                 />
-                <Box sx={{ flex: 1 }} />
-                <CommonButton
-                  variant="outlined"
-                  startIcon={<UploadFileOutlined />}
-                  onClick={() => setImporting(true)}
-                >
-                  Import Excel
-                </CommonButton>
-                <CommonButton
-                  variant="contained"
-                  startIcon={<AddOutlined />}
-                  href="/menu/add"
-                  LinkComponent={NextLink}
-                >
-                  Add new item
-                </CommonButton>
+                <Box sx={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 1.5, ml: "auto" }}>
+                  <CommonButton
+                    variant="outlined"
+                    startIcon={<UploadFileOutlined />}
+                    endIcon={importAnchor ? <ExpandLessRounded /> : <ExpandMoreRounded />}
+                    aria-haspopup="dialog"
+                    aria-expanded={!!importAnchor}
+                    onClick={(e) => setImportAnchor(e.currentTarget)}
+                    sx={{ minHeight: 44, whiteSpace: "nowrap" }}
+                  >
+                    Bulk upload
+                  </CommonButton>
+                  <CommonButton
+                    variant="contained"
+                    startIcon={<AddOutlined />}
+                    href="/menu/add"
+                    LinkComponent={NextLink}
+                    sx={{ minHeight: 44, whiteSpace: "nowrap" }}
+                  >
+                    Add new item
+                  </CommonButton>
+                </Box>
               </Box>
-              {vm.loading ? (
+              {vm.tab === "pinned" ? (
+                <PinnedPanel
+                  pinned={vm.pinned}
+                  isSaving={vm.isSaving}
+                  onAvailable={(item, available) => void vm.setAvailable(item, available)}
+                  onRemove={(item) => void vm.unpin(item)}
+                  onReorder={vm.reorderPinned}
+                  onAdd={() => setPinning(true)}
+                />
+              ) : vm.loading ? (
                 <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
                   <CircularProgress aria-label="Loading menu items" />
                 </Box>
@@ -347,7 +370,14 @@ export function MenuItemsView({
           )}
         </Box>
       </Box>
-      <MenuImportDialog open={importing} onClose={() => setImporting(false)} />
+      <MenuImportDialog anchorEl={importAnchor} onClose={() => setImportAnchor(null)} />
+      <AddPinnedDialog
+        open={pinning}
+        items={vm.items}
+        pinnedIds={vm.pinned.map((i) => i.id)}
+        onClose={() => setPinning(false)}
+        onSave={vm.savePins}
+      />
       {editing && category && (
         <EditCategoryDrawer
           key={category.name}

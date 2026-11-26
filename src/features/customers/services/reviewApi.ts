@@ -1,99 +1,140 @@
-import { baseApi, flow, type Send } from "@/core/api/baseApi";
+import { baseApi } from "@/core/api/baseApi";
 import { API_PATHS, endpoint } from "@/core/constants/config";
-import type { ReviewRow } from "../models/review";
+import type {
+  ReplyFilter,
+  ReplyStatus,
+  ReviewPage,
+  ReviewReply,
+  ReviewRow,
+  ReviewSort,
+} from "../models/review";
+
 export interface RatingSummary {
   total: number;
   /** Null when nobody has rated yet. */
   average: number | null;
   /** How many ratings each star (1 to 5) has. */
   counts: Record<1 | 2 | 3 | 4 | 5, number>;
+  /** How many reviews are at each stage of replying. */
+  replies: { notReplied: number; pending: number; approved: number; rejected: number };
 }
+
 type Row = Record<string, unknown>;
 const asRow = (value: unknown): Row =>
   value && typeof value === "object" ? (value as Row) : {};
 const text = (value: unknown) =>
-  typeof value === "string" && value.trim()
-    ? value.trim()
-    : typeof value === "number"
-      ? String(value)
-      : undefined;
-const list = (value: unknown) => (Array.isArray(value) ? value : []);
-/** A safety stop on how many pages are fetched. */
-const MAX_PAGES = 50;
-/** The most reviews the server returns per page. */
-const LIMIT = 100;
-const formatDate = (iso: string | undefined) =>
-  iso && !Number.isNaN(Date.parse(iso))
-    ? new Date(iso).toLocaleString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "";
-function toReview(raw: unknown, i: number): ReviewRow {
+  typeof value === "string" && value.trim() ? value.trim() : undefined;
+const num = (value: unknown) => Number(value) || 0;
+
+function toReply(raw: unknown): ReviewReply | undefined {
   const row = asRow(raw),
-    orderId = text(row.order_id) ?? "",
-    at = text(row.reviewed_at) ?? "";
+    status = text(row.status) as ReplyStatus | undefined;
+  if (!status) return undefined;
   return {
-    id: orderId || `review-${i}`,
-    name: text(row.customer_name) ?? "Customer",
-    photo: text(row.customer_profile_img),
-    orderId,
-    items: list(row.menu_items).flatMap((line) => {
-      const item = asRow(line),
-        name = text(item.item_name);
-      return name ? [{ name, quantity: Number(item.quantity) || 1 }] : [];
-    }),
-    rating: Number(row.ord_rating) || 0,
-    date: formatDate(at),
-    at,
-    comment: text(row.comment) ?? "",
+    id: text(row.id) ?? "",
+    text: text(row.reply_text) ?? "",
+    status,
+    attempt: num(row.attempt_number) || 1,
+    rejectionReason: text(row.rejection_reason),
+    canEdit: typeof row.can_edit === "boolean" ? row.can_edit : status === "REJECTED",
+    submittedAt: text(row.submitted_at),
   };
 }
-/** Reads every page of reviews, as the server pages it. */
-async function fetchAllPages(send: Send, url: string): Promise<unknown[]> {
-  const rows: unknown[] = [];
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const body = asRow(
-      asRow(await send({ url, params: { page, limit: LIMIT } })).data,
-    );
-    rows.push(...list(body.reviews));
-    if (page >= (Number(asRow(body.pagination).totalPages) || 1)) break;
-  }
-  return rows;
+
+export function toReview(raw: unknown): ReviewRow {
+  const row = asRow(raw);
+  return {
+    id: text(row.id) ?? "",
+    name: text(row.customer_name) ?? "Customer",
+    orderId: text(row.order_number) ?? "",
+    rating: num(row.rating),
+    comment: text(row.review) ?? "",
+    at: text(row.created_at) ?? "",
+    reply: toReply(row.reply),
+  };
 }
+
+export interface ReviewQuery {
+  page: number;
+  rating?: number;
+  replyStatus?: ReplyFilter;
+  sort?: ReviewSort;
+  search?: string;
+}
+
+const base = () => endpoint(API_PATHS.reviews);
+
 export const reviewApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    /** GET /restaurant/reviews: every page, so the totals cover all of them. */
-    getReviews: build.query<ReviewRow[], void>({
-      queryFn: flow<void, ReviewRow[]>(async (_, send) =>
-        (await fetchAllPages(send, endpoint(API_PATHS.reviews))).map(toReview),
-      ),
+    /** GET /restaurant/reviews: ten per page; every filter is applied before paging. */
+    getReviews: build.query<ReviewPage, ReviewQuery>({
+      query: ({ page, rating, replyStatus, sort, search }) => ({
+        url: base(),
+        params: {
+          page,
+          ...(rating && { rating }),
+          ...(replyStatus && { reply_status: replyStatus }),
+          ...(sort && { sort }),
+          ...(search?.trim() && { search: search.trim() }),
+        },
+      }),
+      transformResponse: (data: unknown): ReviewPage => {
+        const root = asRow(data),
+          pagination = asRow(root.pagination);
+        return {
+          rows: Array.isArray(root.data) ? root.data.map(toReview) : [],
+          page: num(pagination.page) || 1,
+          pages: Math.max(1, num(pagination.total_pages)),
+          total: num(pagination.total_records),
+        };
+      },
       providesTags: ["Reviews"],
     }),
-    /** GET /restaurant/reviews/rating-summary: how many 1 to 5 star ratings there are. */
+    /** GET /restaurant/reviews/metrics: average, how the stars spread, and where replies stand. */
     getRatingSummary: build.query<RatingSummary, void>({
-      queryFn: flow<void, RatingSummary>(async (_, send) => {
-        const data = asRow(
-            asRow(await send({ url: endpoint(API_PATHS.ratingSummary) })).data,
-          ),
-          counts = asRow(data.rating_counts),
-          total = Number(data.total_ratings) || 0,
-          stars = [1, 2, 3, 4, 5].reduce(
-            (sum, star) => sum + star * (Number(counts[star]) || 0),
-            0,
-          );
-        const count = (star: number) => Number(counts[star]) || 0;
+      query: () => ({ url: endpoint(API_PATHS.ratingSummary) }),
+      transformResponse: (data: unknown): RatingSummary => {
+        const d = asRow(asRow(data).data),
+          spread = asRow(d.rating_distribution),
+          total = num(d.total_reviews),
+          count = (star: number) => num(spread[star]);
         return {
           total,
-          average: total ? stars / total : null,
+          average: total ? num(d.average_rating) : null,
           counts: { 1: count(1), 2: count(2), 3: count(3), 4: count(4), 5: count(5) },
+          replies: {
+            notReplied: num(d.not_replied),
+            pending: num(d.pending_replies),
+            approved: num(d.approved_replies),
+            rejected: num(d.rejected_replies),
+          },
         };
-      }),
+      },
       providesTags: ["Reviews"],
+    }),
+    /** POST /restaurant/reviews/{id}/reply: the first reply; it waits for admin approval. */
+    replyToReview: build.mutation<void, { id: string; text: string }>({
+      query: ({ id, text }) => ({
+        url: `${base()}/${encodeURIComponent(id)}/reply`,
+        method: "post",
+        data: { reply_text: text },
+      }),
+      invalidatesTags: ["Reviews"],
+    }),
+    /** PATCH /restaurant/reviews/{id}/reply: a rejected reply, reworded; the text must differ. */
+    resubmitReviewReply: build.mutation<void, { id: string; text: string }>({
+      query: ({ id, text }) => ({
+        url: `${base()}/${encodeURIComponent(id)}/reply`,
+        method: "patch",
+        data: { reply_text: text },
+      }),
+      invalidatesTags: ["Reviews"],
     }),
   }),
 });
-export const { useGetReviewsQuery, useGetRatingSummaryQuery } = reviewApi;
+export const {
+  useGetReviewsQuery,
+  useGetRatingSummaryQuery,
+  useReplyToReviewMutation,
+  useResubmitReviewReplyMutation,
+} = reviewApi;

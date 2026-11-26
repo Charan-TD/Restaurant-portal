@@ -10,7 +10,7 @@ import type { MenuItem } from "../models/menuItem";
 import { MenuItemThumb } from "./MenuItemThumb";
 import { MenuItemStatus } from "./MenuItemStatus";
 
-function PriceValue({ item }: { item: MenuItem }) {
+export function PriceValue({ item }: { item: MenuItem }) {
   // A dish with quantity options shows the range of their prices.
   if (item.quantities.length > 0) {
     const prices = item.quantities.map((q) => q.price),
